@@ -4,25 +4,36 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EduSpace - 课程交流平台</title>
-  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Material Icons (Rounded) -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <!-- Material Web Components (MD3) -->
+  <link href="https://unpkg.com/@material/web@2.3.0/dist/md.theme.css" rel="stylesheet">
+  <script type="module" src="https://unpkg.com/@material/web@2.3.0/button/filled-button.js?module"></script>
+  <script type="module" src="https://unpkg.com/@material/web@2.3.0/button/outlined-button.js?module"></script>
+  <script type="module" src="https://unpkg.com/@material/web@2.3.0/icon/icon.js?module"></script>
+  <!-- Motion (Framer Motion family, vanilla JS) -->
+  <script src="https://unpkg.com/motion@11.18.2/dist/motion.js"></script>
+  <!-- Marked (markdown rendering) -->
   <script src="https://unpkg.com/marked/marked.min.js"></script>
+
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
   <aside class="sidebar">
     <div class="brand">
-      <i data-lucide="layout-dashboard"></i>
+      <span class="mi">dashboard</span>
       <span>EduSpace</span>
     </div>
 
     <nav class="nav-menu">
       <a class="nav-item active" data-page="courses">
-        <i data-lucide="book-open"></i>
+        <span class="mi">menu_book</span>
         <span>课程列表</span>
       </a>
       <a class="nav-item" data-page="profile">
-        <i data-lucide="user"></i>
+        <span class="mi">person</span>
         <span>个人空间</span>
       </a>
     </nav>
