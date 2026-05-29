@@ -70,6 +70,24 @@ function animOut(el, opts = {}) {
   );
 }
 
+// Markdown renderer (handles different marked versions)
+function renderMarkdown(text) {
+  try {
+    // marked v4+: marked.parse()
+    if (typeof marked === 'object' && typeof marked.parse === 'function') {
+      return marked.parse(text);
+    }
+    // marked v0.x-3.x: marked()
+    if (typeof marked === 'function') {
+      return marked(text);
+    }
+  } catch (e) {
+    console.warn('Markdown parse error, showing raw text:', e);
+  }
+  // Fallback: show raw text with basic formatting
+  return '<p>' + text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+}
+
 // Material ripple effect
 function spawnRipple(e) {
   const btn = e.currentTarget;
@@ -239,7 +257,7 @@ function closeModal() {
 async function openImportModal() {
   const bodyHtml = `
     <div class="import-section">
-      <h3 class="import-section-title">显示</h3>
+      <h3 class="import-section-title">帮助</h3>
       <div class="import-notes markdown-body" id="import-notes">
         <p class="text-secondary">加载中...</p>
       </div>
@@ -261,12 +279,14 @@ async function openImportModal() {
     const data = await apiGet('/api/schedule/notes');
     const el = document.getElementById('import-notes');
     if (data.content && data.content.trim()) {
-      el.innerHTML = marked.parse(data.content);
+      el.innerHTML = renderMarkdown(data.content);
     } else {
       el.innerHTML = '<p class="text-secondary">暂无说明。</p>';
     }
-  } catch {
-    document.getElementById('import-notes').innerHTML = '<p class="text-secondary">加载说明失败。</p>';
+  } catch (err) {
+    console.error('加载说明失败:', err);
+    const el = document.getElementById('import-notes');
+    if (el) el.innerHTML = '<p class="text-secondary">加载说明失败。</p>';
   }
 }
 
