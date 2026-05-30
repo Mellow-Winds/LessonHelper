@@ -103,6 +103,37 @@ async function start() {
     FOREIGN KEY (author_id) REFERENCES users(id)
   )`);
 
+  // --- Migration: add new columns (safe if already exist) ---
+  const migrateTable = (table, col, type) => {
+    const info = db.all(`PRAGMA table_info(${table})`);
+    if (!info.some(c => c.name === col)) {
+      db.run(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+      console.log(`  ✓ 迁移: ${table}.${col} (${type})`);
+    }
+  };
+
+  migrateTable('users', 'password_hash', "TEXT DEFAULT ''");
+  migrateTable('users', 'nickname', "TEXT DEFAULT ''");
+  migrateTable('users', 'major', "TEXT DEFAULT ''");
+  migrateTable('users', 'grade', "TEXT DEFAULT ''");
+  migrateTable('users', 'email', "TEXT DEFAULT ''");
+  migrateTable('users', 'email_verified', "INTEGER DEFAULT 0");
+  migrateTable('users', 'verification_code', "TEXT DEFAULT ''");
+  migrateTable('users', 'verification_code_expires', "TEXT DEFAULT ''");
+  migrateTable('courses', 'semester', "TEXT DEFAULT ''");
+  migrateTable('courses', 'teacher', "TEXT DEFAULT ''");
+
+  // New table: user_courses (many-to-many enrollment)
+  db.run(`CREATE TABLE IF NOT EXISTS user_courses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    course_id INTEGER NOT NULL,
+    enrolled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    UNIQUE(user_id, course_id)
+  )`);
+
   db.save();
 
   // --- Middleware ---
@@ -113,10 +144,12 @@ async function start() {
   const coursesRouter = require('./routes/courses')(db);
   const userRouter = require('./routes/user')(db);
   const scheduleRouter = require('./routes/schedule')();
+  const authRouter = require('./routes/auth')(db);
 
   app.use('/api/courses', coursesRouter);
   app.use('/api/user', userRouter);
   app.use('/api/schedule', scheduleRouter);
+  app.use('/api/auth', authRouter);
 
   // --- SPA Fallback ---
   app.get('*', (req, res) => {
@@ -128,7 +161,7 @@ async function start() {
   process.on('SIGTERM', () => { db.save(); process.exit(); });
 
   app.listen(PORT, () => {
-    console.log(`EduSpace server running at http://localhost:${PORT}`);
+    console.log(`课搭子 server running at http://localhost:${PORT}`);
   });
 }
 
