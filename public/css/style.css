@@ -145,10 +145,17 @@ select::-ms-expand {
   line-height: 1;
   letter-spacing: normal;
   text-transform: none;
-  display: inline-block;
+  display: inline-flex;
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  font-feature-settings: 'liga';
+  vertical-align: -0.125em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -232,16 +239,18 @@ select::-ms-expand {
 }
 
 .nav-item .mi {
+  --mi-y: 1.5px;
   font-size: 22px;
+  transform: translateY(var(--mi-y));
   transition: transform var(--dur-normal) var(--ease-spring);
 }
 
 .nav-item:hover .mi {
-  transform: scale(1.1);
+  transform: translateY(var(--mi-y)) scale(1.1);
 }
 
 .nav-item.active .mi {
-  transform: scale(1.05);
+  transform: translateY(var(--mi-y)) scale(1.05);
 }
 
 /* ---- Content: Page Title ---- */
@@ -331,7 +340,9 @@ select::-ms-expand {
 }
 
 .btn .mi {
+  --mi-y: 1px;
   font-size: 18px;
+  transform: translateY(var(--mi-y));
 }
 
 .btn-primary {
@@ -435,6 +446,8 @@ select::-ms-expand {
   opacity: 0 !important;
   visibility: hidden !important;
   display: inline-block;
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 /* Floating label — always transparent */
@@ -478,7 +491,8 @@ select::-ms-expand {
 .md-input-group .md-input:focus ~ .md-label,
 .md-input-group .md-input:not(:placeholder-shown) ~ .md-label {
   top: 0;
-  transform: translateY(-50%) scale(0.85);
+  transform: translateY(-50%);
+  font-size: 0.75rem;
   color: var(--md-primary);
 }
 
