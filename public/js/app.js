@@ -4,6 +4,77 @@
  */
 
 /* =============================================
+   i18n Language Foundation (executes before any DOM)
+   ============================================= */
+
+window.i18nDict = {
+  zh: {
+    app_name: '课搭子',
+    courses: '课程列表',
+    profile: '个人中心',
+    import_schedule: '导入课程表',
+    select_existing: '选择已有课程',
+    search: '搜索',
+    login: '登录',
+    register: '注册',
+    email: '邮箱',
+    password: '密码',
+    password_min: '密码（至少6位）',
+    nickname: '昵称',
+    major: '专业',
+    grade: '年级',
+    verify_code: '验证码',
+    course_id: '课程号',
+    course_name: '课程名称',
+    teacher: '教师',
+    all_time: '全部时间',
+    all_semester: '全部学期',
+    title: '标题',
+    content: '内容',
+    save: '保存',
+    publish: '发布',
+    logout: '退出登录',
+    edit_profile: '编辑资料',
+  },
+  en: {
+    app_name: 'EduSpace',
+    courses: 'Courses',
+    profile: 'Profile',
+    import_schedule: 'Import Schedule',
+    select_existing: 'Select Course',
+    search: 'Search',
+    login: 'Login',
+    register: 'Register',
+    email: 'Email',
+    password: 'Password',
+    password_min: 'Password (min 6)',
+    nickname: 'Nickname',
+    major: 'Major',
+    grade: 'Grade',
+    verify_code: 'Verification Code',
+    course_id: 'Course ID',
+    course_name: 'Course Name',
+    teacher: 'Teacher',
+    all_time: 'All Time',
+    all_semester: 'All Semesters',
+    title: 'Title',
+    content: 'Content',
+    save: 'Save',
+    publish: 'Publish',
+    logout: 'Logout',
+    edit_profile: 'Edit Profile',
+  },
+};
+
+// Lock language synchronously before any rendering
+window.currentLang = localStorage.getItem('lang') || 'zh';
+
+// Global translation function with key fallback
+window.t = function(key) {
+  return (window.i18nDict[window.currentLang] && window.i18nDict[window.currentLang][key]) || key;
+};
+
+/* =============================================
    Animation Engine
    ============================================= */
 
@@ -54,19 +125,129 @@ function animOut(el, opts = {}) {
 }
 
 function renderMarkdown(text) {
-  if (typeof marked === 'object' && typeof marked.parse === 'function') {
-    return marked.parse(text);
+  if (typeof markdownit === 'function') {
+    return markdownit().render(text);
   }
-  if (typeof marked === 'function') {
-    return marked(text);
-  }
-  console.warn('marked.js not loaded, using fallback renderer');
+  console.warn('markdown-it not loaded, using fallback renderer');
   return '<p>' + text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
 }
 
+/* =============================================
+   MD3 Component Factories
+   ============================================= */
+
+/**
+ * createMdInput — MD3 outlined input with <fieldset> native notch
+ * @param {{ id?: string, label: string, placeholder?: string, type?: string, value?: string, required?: boolean, attrs?: string }} config
+ * @returns {string} HTML string
+ */
+function createMdInput(config) {
+  const { id = '', label, placeholder = ' ', type = 'text', value = '', required = false, attrs = '' } = config;
+  const idAttr = id ? `id="${id}"` : '';
+  const reqAttr = required ? 'required' : '';
+  const valAttr = value ? `value="${escHtml(value)}"` : '';
+  return `
+    <div class="md-input-group">
+      <input class="md-input" ${idAttr} type="${type}" placeholder="${placeholder}" ${reqAttr} ${valAttr} ${attrs}>
+      <label class="md-label">${escHtml(label)}</label>
+      <fieldset class="md-border" aria-hidden="true"><legend><span>${escHtml(label)}</span></legend></fieldset>
+    </div>
+  `;
+}
+
+/**
+ * createMdTextarea — MD3 outlined textarea with <fieldset> native notch
+ * @param {{ id?: string, label: string, rows?: number, required?: boolean, attrs?: string }} config
+ * @returns {string} HTML string
+ */
+function createMdTextarea(config) {
+  const { id = '', label, rows = 5, required = false, attrs = '' } = config;
+  const idAttr = id ? `id="${id}"` : '';
+  const reqAttr = required ? 'required' : '';
+  return `
+    <div class="md-input-group">
+      <textarea class="md-input" ${idAttr} placeholder=" " rows="${rows}" ${reqAttr} style="resize:vertical" ${attrs}></textarea>
+      <label class="md-label">${escHtml(label)}</label>
+      <fieldset class="md-border" aria-hidden="true"><legend><span>${escHtml(label)}</span></legend></fieldset>
+    </div>
+  `;
+}
+
+/**
+ * createMdSelect — Custom div+ul select (no native <select>)
+ * @param {{ id?: string, label?: string, options: {text: string, value: string}[], selected?: string }} config
+ * @returns {string} HTML string
+ */
+function createMdSelect(config) {
+  const { id = '', label = '', options, selected = '' } = config;
+  const containerId = id ? `${id}-container` : 'md-select-' + Math.random().toString(36).slice(2, 8);
+  const hiddenId = id;
+  const valueId = id ? `${id}-value` : '';
+
+  const selectedOpt = options.find(o => o.value === selected) || options[0];
+  const triggerLabel = label ? label : selectedOpt.text;
+
+  const listItems = options.map(o =>
+    `<li class="md-select-option${o.value === selected ? ' selected' : ''}" data-value="${escHtml(o.value)}">${escHtml(o.text)}</li>`
+  ).join('');
+
+  return `
+    <div class="md-select-container" id="${containerId}">
+      <div class="md-select-trigger">
+        <span class="md-select-value" id="${valueId}">${escHtml(triggerLabel)}</span>
+        <span class="md-select-arrow mi">arrow_drop_down</span>
+      </div>
+      <ul class="md-select-menu">${listItems}</ul>
+      <input type="hidden" id="${hiddenId}" value="${escHtml(selected)}">
+    </div>
+  `;
+}
+
+/* ---- Global Event Delegation (select only — inputs handled by CSS) ---- */
+
+// Custom select: toggle menu, pick option, close on outside click
+document.addEventListener('click', (e) => {
+  const trigger = e.target.closest('.md-select-trigger');
+  if (trigger) {
+    const container = trigger.closest('.md-select-container');
+    if (container) {
+      document.querySelectorAll('.md-select-container.open').forEach(c => {
+        if (c !== container) c.classList.remove('open');
+      });
+      container.classList.toggle('open');
+      e.stopPropagation();
+    }
+    return;
+  }
+
+  const option = e.target.closest('.md-select-option');
+  if (option) {
+    const container = option.closest('.md-select-container');
+    if (container) {
+      const value = option.getAttribute('data-value');
+      const text = option.textContent;
+      const hidden = container.querySelector('input[type="hidden"]');
+      const valueEl = container.querySelector('.md-select-value');
+      if (hidden) hidden.value = value;
+      if (valueEl) valueEl.textContent = text;
+      container.querySelectorAll('.md-select-option').forEach(li => {
+        li.classList.toggle('selected', li === option);
+      });
+      container.classList.remove('open');
+      container.dispatchEvent(new CustomEvent('md-select-change', { detail: { value, text } }));
+      e.stopPropagation();
+    }
+    return;
+  }
+
+  if (!e.target.closest('.md-select-container')) {
+    document.querySelectorAll('.md-select-container.open').forEach(c => c.classList.remove('open'));
+  }
+});
+
 function spawnRipple(e) {
-  const btn = e.currentTarget;
-  const rect = btn.getBoundingClientRect();
+  const el = e.currentTarget;
+  const rect = el.getBoundingClientRect();
   const size = Math.max(rect.width, rect.height) * 2.5;
   const ripple = document.createElement('span');
   ripple.className = 'ripple';
@@ -75,13 +256,13 @@ function spawnRipple(e) {
     left: (e.clientX - rect.left - size / 2) + 'px',
     top: (e.clientY - rect.top - size / 2) + 'px',
   });
-  btn.appendChild(ripple);
+  el.appendChild(ripple);
   ripple.animate(
     [
-      { transform: 'scale(0)', opacity: 0.35 },
+      { transform: 'scale(0)', opacity: 0.2 },
       { transform: 'scale(1)', opacity: 0 },
     ],
-    { duration: 550, easing: Ease.standard }
+    { duration: 500, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
   ).onfinish = () => ripple.remove();
 }
 
@@ -215,6 +396,15 @@ async function apiPostFile(url, file) {
   return res.json();
 }
 
+async function apiDelete(url) {
+  const token = getToken();
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(url, { method: 'DELETE', headers });
+  if (res.status === 401) { clearToken(); window._currentUser = null; }
+  return res.json();
+}
+
 /* =============================================
    Modal System
    ============================================= */
@@ -312,48 +502,55 @@ function renderAuth(container) {
 
 function renderLoginForm() {
   return `
-    <form id="login-form" onsubmit="handleLogin(event)" style="display:flex;flex-direction:column;gap:16px">
-      <div class="form-field">
-        <label class="form-label">邮箱</label>
-        <input class="input" type="email" name="email" placeholder="请输入邮箱" required autocomplete="email">
+    <form id="login-form" onsubmit="handleLogin(event)" style="display:flex;flex-direction:column;gap:20px">
+      <div class="md-input-group">
+        <input class="md-input" type="email" name="email" placeholder=" " required autocomplete="email">
+        <label class="md-label">${window.t('email')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('email')}</span></legend></fieldset>
       </div>
-      <div class="form-field">
-        <label class="form-label">密码</label>
-        <input class="input" type="password" name="password" placeholder="请输入密码" required autocomplete="current-password">
+      <div class="md-input-group">
+        <input class="md-input" type="password" name="password" placeholder=" " required autocomplete="current-password">
+        <label class="md-label">${window.t('password')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('password')}</span></legend></fieldset>
       </div>
       <div class="form-error" id="login-error" style="display:none"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">登录</button>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">${window.t('login')}</button>
     </form>
   `;
 }
 
 function renderRegisterForm() {
   return `
-    <form id="register-form" onsubmit="handleRegister(event)" style="display:flex;flex-direction:column;gap:14px">
-      <div class="form-field">
-        <label class="form-label">邮箱</label>
-        <input class="input" type="email" name="email" placeholder="请输入邮箱" required autocomplete="email">
+    <form id="register-form" onsubmit="handleRegister(event)" style="display:flex;flex-direction:column;gap:16px">
+      <div class="md-input-group">
+        <input class="md-input" type="email" name="email" placeholder=" " required autocomplete="email">
+        <label class="md-label">${window.t('email')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('email')}</span></legend></fieldset>
       </div>
-      <div class="form-field">
-        <label class="form-label">密码</label>
-        <input class="input" type="password" name="password" placeholder="至少6位密码" required minlength="6" autocomplete="new-password">
+      <div class="md-input-group">
+        <input class="md-input" type="password" name="password" placeholder=" " required minlength="6" autocomplete="new-password">
+        <label class="md-label">${window.t('password_min')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('password_min')}</span></legend></fieldset>
       </div>
-      <div class="form-field">
-        <label class="form-label">昵称</label>
-        <input class="input" type="text" name="nickname" placeholder="你的昵称" required>
+      <div class="md-input-group">
+        <input class="md-input" type="text" name="nickname" placeholder=" " required>
+        <label class="md-label">${window.t('nickname')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('nickname')}</span></legend></fieldset>
       </div>
       <div style="display:flex;gap:12px">
-        <div class="form-field" style="flex:1">
-          <label class="form-label">专业</label>
-          <input class="input" type="text" name="major" placeholder="如：计算机科学">
+        <div class="md-input-group" style="flex:1">
+          <input class="md-input" type="text" name="major" placeholder=" ">
+          <label class="md-label">${window.t('major')}</label>
+          <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('major')}</span></legend></fieldset>
         </div>
-        <div class="form-field" style="flex:1">
-          <label class="form-label">年级</label>
-          <input class="input" type="text" name="grade" placeholder="如：2024级">
+        <div class="md-input-group" style="flex:1">
+          <input class="md-input" type="text" name="grade" placeholder=" ">
+          <label class="md-label">${window.t('grade')}</label>
+          <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('grade')}</span></legend></fieldset>
         </div>
       </div>
       <div class="form-error" id="register-error" style="display:none"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">注册</button>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">${window.t('register')}</button>
     </form>
   `;
 }
@@ -368,10 +565,11 @@ function renderVerifyForm() {
       ${debugCode ? `<div style="background:var(--md-primary-container);color:var(--md-on-primary-container);text-align:center;padding:12px;border-radius:12px;margin-bottom:16px;font-weight:600">
         🔑 开发模式 — 验证码：<span style="font-size:24px;letter-spacing:6px">${debugCode}</span>
       </div>` : ''}
-      <form id="verify-form" onsubmit="handleVerify(event)" style="display:flex;flex-direction:column;gap:16px">
-        <div class="form-field">
-          <label class="form-label">验证码</label>
-          <input class="input" type="text" name="code" placeholder="请输入6位验证码" required maxlength="6" style="text-align:center;font-size:24px;letter-spacing:8px" autocomplete="one-time-code">
+      <form id="verify-form" onsubmit="handleVerify(event)" style="display:flex;flex-direction:column;gap:20px">
+        <div class="md-input-group">
+          <input class="md-input" type="text" name="code" placeholder=" " required maxlength="6" style="text-align:center;font-size:24px;letter-spacing:8px" autocomplete="one-time-code">
+          <label class="md-label" style="text-align:center;left:50%;transform:translate(-50%,-50%)">${window.t('verify_code')}</label>
+          <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('verify_code')}</span></legend></fieldset>
         </div>
         <div class="form-error" id="verify-error" style="display:none"></div>
         <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">验证邮箱</button>
@@ -570,18 +768,21 @@ registerPage('profile', async (container) => {
 async function openEditProfileModal() {
   const user = window._currentUser;
   const html = `
-    <form id="edit-profile-form" onsubmit="handleEditProfile(event)" style="display:flex;flex-direction:column;gap:14px">
-      <div class="form-field">
-        <label class="form-label">昵称</label>
-        <input class="input" type="text" name="nickname" value="${user.nickname || ''}" required>
+    <form id="edit-profile-form" onsubmit="handleEditProfile(event)" style="display:flex;flex-direction:column;gap:16px">
+      <div class="md-input-group">
+        <input class="md-input" type="text" name="nickname" placeholder=" " value="${user.nickname || ''}" required>
+        <label class="md-label">${window.t('nickname')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('nickname')}</span></legend></fieldset>
       </div>
-      <div class="form-field">
-        <label class="form-label">专业</label>
-        <input class="input" type="text" name="major" value="${user.major || ''}">
+      <div class="md-input-group">
+        <input class="md-input" type="text" name="major" placeholder=" " value="${user.major || ''}">
+        <label class="md-label">${window.t('major')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('major')}</span></legend></fieldset>
       </div>
-      <div class="form-field">
-        <label class="form-label">年级</label>
-        <input class="input" type="text" name="grade" value="${user.grade || ''}">
+      <div class="md-input-group">
+        <input class="md-input" type="text" name="grade" placeholder=" " value="${user.grade || ''}">
+        <label class="md-label">${window.t('grade')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('grade')}</span></legend></fieldset>
       </div>
       <div class="form-error" id="edit-profile-error" style="display:none"></div>
       <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">保存</button>
@@ -709,8 +910,34 @@ async function handleScheduleImport(file) {
    Page: Course List
    ============================================= */
 
+// 获取当前学期标识（与后端 getSemesterKey 逻辑一致）
+function getCurrentSemesterKey() {
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const y = now.getFullYear();
+  if ((m === 8 && d >= 15) || m >= 9 || (m === 1 && d === 1)) return `${y}-1`;
+  if ((m === 2 && d >= 15) || (m >= 3 && m <= 5) || (m === 6 && d <= 14)) return `${y}-2`;
+  if ((m === 6 && d >= 15) || m === 7 || (m === 8 && d <= 14)) return `${y}-summer`;
+  return `${y}-closed`;
+}
+
+// 学期标识 → 中文标签
+function semesterLabel(key) {
+  if (!key || key === 'all') return '全部学期';
+  const parts = key.split('-');
+  if (parts.length < 2) return key;
+  const year = parts[0];
+  const tag = parts[1];
+  if (tag === '1') return `${year} 第一学期`;
+  if (tag === '2') return `${year} 第二学期`;
+  if (tag === 'summer') return `${year} 暑期`;
+  return key;
+}
+
+let _currentSemester = getCurrentSemesterKey();
+
 registerPage('courses', async (container) => {
-  // 未登录 → 跳转登录
   if (!isLoggedIn()) {
     showToast('请先登录');
     navigateTo('profile');
@@ -721,10 +948,20 @@ registerPage('courses', async (container) => {
     <div class="page-header">
       <h1 class="page-title" style="margin-bottom:0">课程列表</h1>
       <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="openCourseSearchModal()">
+          <span class="mi">search</span> 选择已有课程
+        </button>
         <button class="btn btn-primary" onclick="openImportModal()">
           <span class="mi">upload_file</span> 导入课程表
         </button>
       </div>
+    </div>
+    <div id="semester-filter-wrap" style="margin-bottom:var(--space-4);width:auto;min-width:180px;display:inline-block">
+      ${createMdSelect({
+        id: 'semester-filter',
+        options: [{ text: semesterLabel(_currentSemester), value: _currentSemester }],
+        selected: _currentSemester,
+      })}
     </div>
     <div id="course-list">
       <div class="card"><p class="text-secondary">加载中...</p></div>
@@ -732,19 +969,67 @@ registerPage('courses', async (container) => {
   `;
 
   bindRipples(container);
-  const header = container.querySelector('.page-header');
-  animIn(header, { y: 16, dur: 380 });
+  animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
+
+  // Listen for semester select changes
+  const semContainer = document.getElementById('semester-filter-container');
+  if (semContainer) {
+    semContainer.addEventListener('md-select-change', (e) => {
+      handleSemesterChange(e.detail.value);
+    });
+  }
+
+  // 加载学期列表并重建下拉框
+  try {
+    const semesters = await apiGet('/api/courses/semesters');
+    if (semesters.length > 0) {
+      const allKeys = new Set([_currentSemester, ...semesters]);
+      const sorted = Array.from(allKeys).sort().reverse();
+      const options = [
+        { text: '全部学期', value: 'all' },
+        ...sorted.map(k => ({ text: semesterLabel(k), value: k }))
+      ];
+      const wrap = document.getElementById('semester-filter-wrap');
+      if (wrap) {
+        wrap.innerHTML = createMdSelect({
+          id: 'semester-filter',
+          options,
+          selected: _currentSemester,
+        });
+        const newSemContainer = document.getElementById('semester-filter-container');
+        if (newSemContainer) {
+          newSemContainer.addEventListener('md-select-change', (e) => {
+            handleSemesterChange(e.detail.value);
+          });
+        }
+      }
+    }
+  } catch {}
+
+  // 加载课程列表
+  await loadCourseList(_currentSemester);
+});
+
+async function handleSemesterChange(semester) {
+  _currentSemester = semester;
+  await loadCourseList(semester);
+}
+
+async function loadCourseList(semester) {
+  const listEl = document.getElementById('course-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
 
   try {
-    const courses = await apiGet('/api/courses');
-    const listEl = document.getElementById('course-list');
+    const url = semester === 'all' ? '/api/courses' : `/api/courses?semester=${encodeURIComponent(semester)}`;
+    const courses = await apiGet(url);
 
     if (courses.length === 0) {
       listEl.innerHTML = `
         <div class="card" style="text-align:center;padding:48px">
           <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">menu_book</span>
-          <p class="text-secondary" style="margin-top:12px">暂无课程</p>
-          <p class="text-secondary">点击"导入课程表"从 xlsx 文件导入</p>
+          <p class="text-secondary" style="margin-top:12px">该学期暂无课程</p>
+          <p class="text-secondary">点击"导入课程表"或"选择已有课程"添加</p>
         </div>
       `;
       animIn(listEl.querySelector('.card'), { y: 20, delay: 80 });
@@ -752,7 +1037,7 @@ registerPage('courses', async (container) => {
     }
 
     listEl.innerHTML = courses.map(c => `
-      <div class="card card-interactive mb-4" onclick="navigateTo('course', ${c.id})">
+      <div class="card mb-4 clickable" onclick="navigateTo('course', ${c.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1;min-width:0">
             <h3 class="card-title">${escHtml(c.title)}</h3>
@@ -763,6 +1048,9 @@ registerPage('courses', async (container) => {
             <span style="font-size:var(--text-sm);color:var(--md-primary);font-weight:600;white-space:nowrap">
               <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> ${c.enrollment_count || 0} 人
             </span>
+            <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();handleLeaveCourse(${c.id})">
+              <span class="mi" style="font-size:14px">logout</span> 退出课程
+            </button>
           </div>
         </div>
       </div>
@@ -771,11 +1059,116 @@ registerPage('courses', async (container) => {
     const cards = listEl.querySelectorAll('.card');
     animStagger(Array.from(cards), { y: 22, dur: 420, gap: 60 });
   } catch {
-    document.getElementById('course-list').innerHTML = `
-      <div class="card"><p class="text-secondary">加载失败，请检查网络连接</p></div>
-    `;
+    listEl.innerHTML = '<div class="card"><p class="text-secondary">加载失败</p></div>';
   }
-});
+}
+
+// ===== 退出课程 =====
+
+async function handleLeaveCourse(courseId) {
+  if (!confirm('确定要退出该课程吗？')) return;
+  const result = await apiDelete(`/api/courses/${courseId}/leave`);
+  if (result.error) {
+    showToast(result.error);
+  } else {
+    showToast('已退出课程');
+    navigateTo('courses');
+  }
+}
+
+// ===== 选择已有课程 =====
+
+async function openCourseSearchModal() {
+  const weekdaySelect = createMdSelect({
+    id: 'search-course-day',
+    options: [
+      { text: '全部时间', value: '' },
+      { text: '周一', value: '周一' },
+      { text: '周二', value: '周二' },
+      { text: '周三', value: '周三' },
+      { text: '周四', value: '周四' },
+      { text: '周五', value: '周五' },
+      { text: '周六', value: '周六' },
+      { text: '周日', value: '周日' },
+    ],
+    selected: '',
+  });
+
+  const bodyHtml = `
+    <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px">
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">${createMdInput({ id: 'search-course-id', label: '课程号' })}</div>
+        <div style="flex:1">${createMdInput({ id: 'search-course-name', label: '课程名称' })}</div>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">${weekdaySelect}</div>
+        <div style="flex:1">${createMdInput({ id: 'search-course-teacher', label: '教师' })}</div>
+      </div>
+      <button class="btn btn-primary" onclick="doCourseSearch()" style="align-self:flex-end">
+        <span class="mi">search</span> 搜索
+      </button>
+    </div>
+    <div id="search-results" style="max-height:320px;overflow-y:auto">
+      <p class="text-secondary" style="text-align:center">输入条件后点击搜索</p>
+    </div>
+  `;
+
+  openModal('选择已有课程', bodyHtml);
+}
+
+async function doCourseSearch() {
+  const courseId = document.getElementById('search-course-id').value.trim();
+  const name = document.getElementById('search-course-name').value.trim();
+  const day = document.getElementById('search-course-day').value;
+  const teacher = document.getElementById('search-course-teacher').value.trim();
+
+  const params = new URLSearchParams();
+  if (courseId) params.set('courseId', courseId);
+  if (name) params.set('name', name);
+  if (day) params.set('day', day);
+  if (teacher) params.set('teacher', teacher);
+
+  const resultsEl = document.getElementById('search-results');
+  resultsEl.innerHTML = '<p class="text-secondary" style="text-align:center">搜索中...</p>';
+
+  try {
+    const courses = await apiGet('/api/schedule/available?' + params.toString());
+    if (courses.length === 0) {
+      resultsEl.innerHTML = '<p class="text-secondary" style="text-align:center">未找到匹配课程</p>';
+      return;
+    }
+
+    resultsEl.innerHTML = courses.map(c => `
+      <div class="card mb-4" style="padding:12px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:var(--text-sm)">${escHtml(c.title)}</div>
+            <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:2px">${escHtml(c.teacher || '')} · ${escHtml(c.description || '')}</div>
+          </div>
+          <div style="flex-shrink:0;margin-left:12px">
+            ${c.is_enrolled
+              ? '<span class="enrolled-badge" style="font-size:12px"><span class="mi" style="font-size:14px">check</span> 已加入</span>'
+              : `<button class="btn btn-primary" style="padding:4px 12px;font-size:12px" onclick="handleEnrollFromSearch(${c.id})">加入</button>`
+            }
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch {
+    resultsEl.innerHTML = '<p class="text-secondary" style="text-align:center">搜索失败</p>';
+  }
+}
+
+async function handleEnrollFromSearch(courseId) {
+  const result = await apiPost(`/api/courses/${courseId}/enroll`, {});
+  if (result.error) {
+    showToast(result.error);
+  } else {
+    showToast('加入成功');
+    closeModal();
+    navigateTo('courses');
+  }
+}
 
 /* =============================================
    Page: Course Space (Forum)
@@ -819,7 +1212,7 @@ registerPage('course', async (container, courseId) => {
               <p class="text-secondary" style="margin-top:12px">暂无帖子，来发第一个吧</p>
             </div>
           ` : posts.map(p => `
-            <div class="card mb-4 post-card">
+            <div class="card mb-4 post-card clickable">
               <h3 class="card-title" style="cursor:pointer" onclick="toggleComments(${p.id})">${escHtml(p.title)}</h3>
               <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
               <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
@@ -873,14 +1266,16 @@ async function openCreatePostModal(courseId) {
     return;
   }
   const html = `
-    <form id="create-post-form" onsubmit="handleCreatePost(event, ${courseId})" style="display:flex;flex-direction:column;gap:14px">
-      <div class="form-field">
-        <label class="form-label">标题 *</label>
-        <input class="input" type="text" name="title" placeholder="帖子标题" required>
+    <form id="create-post-form" onsubmit="handleCreatePost(event, ${courseId})" style="display:flex;flex-direction:column;gap:16px">
+      <div class="md-input-group">
+        <input class="md-input" type="text" name="title" placeholder=" " required>
+        <label class="md-label">${window.t('title')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('title')}</span></legend></fieldset>
       </div>
-      <div class="form-field">
-        <label class="form-label">内容 *</label>
-        <textarea class="input" name="content" placeholder="写点什么..." rows="5" required style="resize:vertical"></textarea>
+      <div class="md-input-group">
+        <textarea class="md-input" name="content" placeholder=" " rows="5" required style="resize:vertical"></textarea>
+        <label class="md-label">${window.t('content')}</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('content')}</span></legend></fieldset>
       </div>
       <div class="form-error" id="create-post-error" style="display:none"></div>
       <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">发布</button>
@@ -1000,8 +1395,9 @@ function escHtml(str) {
 }
 
 function bindRipples(container) {
-  container.querySelectorAll('.btn').forEach(btn => {
-    btn.addEventListener('click', spawnRipple);
+  container.querySelectorAll('.btn, .clickable').forEach(el => {
+    el.removeEventListener('click', spawnRipple);
+    el.addEventListener('click', spawnRipple);
   });
 }
 
@@ -1018,4 +1414,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   navigateTo('courses');
+
+  // Release icon color — signals that fonts + i18n are fully loaded
+  document.body.classList.add('js-ready');
 });

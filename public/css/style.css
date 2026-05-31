@@ -81,6 +81,12 @@
   --dur-xslow:    650ms;
 }
 
+/* ---- FOUE Guard: hide unregistered custom elements ---- */
+:not(:defined) {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
 /* ---- Base & Reset ---- */
 * {
   box-sizing: border-box;
@@ -114,7 +120,23 @@ a {
   text-decoration: none;
 }
 
-/* ---- Material Icon ---- */
+/* ---- Global: Kill native select chrome ---- */
+select,
+select[multiple],
+select[size] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
+  background-repeat: no-repeat;
+}
+
+/* IE/Edge legacy */
+select::-ms-expand {
+  display: none;
+}
+
+/* ---- Material Icon (with ligature flash guard) ---- */
 .mi {
   font-family: 'Material Icons Round';
   font-weight: normal;
@@ -128,6 +150,18 @@ a {
   word-wrap: normal;
   direction: ltr;
   -webkit-font-smoothing: antialiased;
+  /* Flash guard: hide raw ligature text until font loads */
+  font-display: block !important;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  color: transparent;
+  vertical-align: middle;
+}
+
+/* Release icon color once JS is ready */
+.js-ready .mi {
+  color: inherit;
 }
 
 /* ---- Layout: Sidebar ---- */
@@ -332,33 +366,359 @@ a {
   border-color: var(--md-primary);
 }
 
-/* Ripple */
+/* ---- Ripple (MD3 standard easing) ---- */
 .ripple {
   position: absolute;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: currentColor;
+  opacity: 0.15;
   transform: scale(0);
   pointer-events: none;
+  will-change: transform, opacity;
 }
 
-/* ---- Content: Inputs ---- */
+/* Clickable elements container for ripple */
+.clickable {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- MD3 Outlined Text Field — <fieldset> + <legend> Native Notch ---- */
+.md-input-group {
+  position: relative;
+  width: 100%;
+  margin-bottom: 16px;
+  overflow: visible !important;
+}
+
+/* The real input — transparent, on top */
+.md-input-group .md-input {
+  width: 100%;
+  height: 56px;
+  padding: 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 1rem;
+  color: var(--md-on-surface);
+  outline: none;
+  caret-color: var(--md-primary);
+  position: relative;
+  z-index: 1;
+}
+
+/* fieldset — the actual visible border */
+.md-input-group .md-border {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid var(--md-outline);
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 2;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  transition: border-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* legend — invisible text, only used to physically push the border gap open */
+.md-input-group .md-border legend {
+  display: block;
+  width: auto;
+  max-width: 0.01px;
+  padding: 0;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  transition:
+    max-width 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    padding 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* The span inside legend is PURELY structural — never visible */
+.md-input-group .md-border legend span {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  display: inline-block;
+}
+
+/* Floating label — always transparent */
+.md-input-group .md-label {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  transform-origin: left center;
+  font-size: 1rem;
+  color: var(--md-on-surface-variant);
+  pointer-events: none;
+  z-index: 3;
+  background: transparent !important;
+  background-color: transparent !important;
+  padding: 0;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    top 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    font-size 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* === FOCUS or HAS VALUE: notch opens, label floats === */
+.md-input-group .md-input:focus ~ .md-border,
+.md-input-group .md-input:not(:placeholder-shown) ~ .md-border {
+  border-color: var(--md-primary);
+  border-width: 2px;
+}
+
+/* Legend notch opens — browser natively cuts the border gap */
+.md-input-group .md-input:focus ~ .md-border legend,
+.md-input-group .md-input:not(:placeholder-shown) ~ .md-border legend {
+  max-width: 1000px;
+  padding: 0 4px;
+}
+
+/* Label floats up — centered on the border's top edge */
+.md-input-group .md-input:focus ~ .md-label,
+.md-input-group .md-input:not(:placeholder-shown) ~ .md-label {
+  top: 0;
+  transform: translateY(-50%) scale(0.85);
+  transform-origin: top left;
+  color: var(--md-primary);
+}
+
+/* Hover state */
+.md-input-group:hover .md-border {
+  border-color: var(--md-on-surface);
+}
+.md-input-group .md-input:focus ~ .md-border {
+  border-color: var(--md-primary);
+}
+
+/* Error state */
+.md-input-group.error .md-border {
+  border-color: var(--md-error);
+}
+.md-input-group.error .md-label {
+  color: var(--md-error);
+}
+.md-input-group.error .md-input:focus ~ .md-label {
+  color: var(--md-error);
+}
+
+/* Helper text */
+.md-input-group .md-helper {
+  font-size: 11px;
+  color: var(--md-on-surface-variant);
+  padding: 4px 16px 0;
+}
+.md-input-group.error .md-helper {
+  color: var(--md-error);
+}
+
+/* Textarea variant */
+.md-input-group textarea.md-input {
+  height: auto;
+  min-height: 56px;
+  resize: vertical;
+  padding-top: 20px;
+}
+
+/* ---- MD3 Custom Select (div+ul, no native) ---- */
+.md-select-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 16px;
+  overflow: visible !important;
+}
+
+.md-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 56px;
+  padding: 16px;
+  border: 1px solid var(--md-outline);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+  box-sizing: border-box;
+  transition:
+    border-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.md-select-trigger:hover {
+  border-color: var(--md-on-surface);
+}
+
+.md-select-container.open .md-select-trigger {
+  border-color: var(--md-primary);
+  border-width: 2px;
+}
+
+.md-select-value {
+  font-size: var(--text-base);
+  color: var(--md-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.md-select-arrow {
+  flex-shrink: 0;
+  margin-left: 8px;
+  color: var(--md-on-surface-variant);
+  font-size: 24px;
+  line-height: 1;
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+}
+
+.md-select-container.open .md-select-arrow {
+  transform: rotate(180deg);
+}
+
+.md-select-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  z-index: 9999;
+  background: var(--md-surface-container-lowest);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  list-style: none;
+  padding: 4px 0;
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.md-select-container.open .md-select-menu {
+  display: block;
+}
+
+.md-select-option {
+  padding: 12px 16px;
+  font-size: var(--text-sm);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+
+.md-select-option:hover {
+  background-color: var(--md-surface-container-high);
+}
+
+.md-select-option.selected {
+  color: var(--md-primary);
+  font-weight: 600;
+  background-color: var(--md-primary-container);
+}
+
+/* ---- MD3 Outlined Select ---- */
+.md-select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.md-select-wrap .md-select {
+  width: 100%;
+  height: 56px;
+  padding: 20px var(--space-4) 8px 16px;
+  border: 1.5px solid var(--md-outline);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  color: var(--md-on-surface);
+  background-color: var(--md-surface-container-lowest);
+  background-image: none;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition:
+    border-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.md-select-wrap .md-select-icon {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--md-on-surface-variant);
+  pointer-events: none;
+  font-size: 20px;
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.md-select-wrap .md-select:focus {
+  border-color: var(--md-primary);
+  border-width: 2px;
+}
+
+.md-select-wrap .md-select:hover:not(:focus) {
+  border-color: var(--md-on-surface);
+}
+
+.md-select-wrap .md-select:focus + .md-select-icon {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.md-select-wrap .md-select option {
+  padding: 8px;
+  background: var(--md-surface-container-lowest);
+  color: var(--md-on-surface);
+}
+
+/* Backward compatibility: plain .input class */
 .input {
   width: 100%;
   padding: var(--space-3) var(--space-4);
-  border: 1.5px solid var(--md-outline-variant);
-  border-radius: var(--radius-md);
+  border: 1.5px solid var(--md-outline);
+  border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   color: var(--md-on-surface);
   background-color: var(--md-surface-container-lowest);
   outline: none;
+  caret-color: var(--md-primary);
   transition:
-    border-color var(--dur-normal) var(--ease-standard),
-    box-shadow var(--dur-normal) var(--ease-standard);
+    border-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .input:focus {
   border-color: var(--md-primary);
-  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.12);
+  border-width: 2px;
+}
+
+.input:hover:not(:focus) {
+  border-color: var(--md-on-surface);
+}
+
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
+  cursor: pointer;
+  padding-right: 40px;
 }
 
 /* ---- Utility ---- */
@@ -444,6 +804,7 @@ a {
   opacity: 0;
   transform: scale(0.85) translateY(24px);
   will-change: transform, opacity;
+  overflow: visible !important;
 }
 
 .modal-header {
@@ -489,7 +850,7 @@ a {
 
 .modal-body {
   padding: 0 var(--space-6) var(--space-6);
-  overflow-y: auto;
+  overflow: visible !important;
 }
 
 /* ---- Import Modal Sections ---- */

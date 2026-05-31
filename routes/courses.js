@@ -4,17 +4,37 @@ const { authMiddleware } = require('./middleware/auth');
 module.exports = function (db) {
   const router = express.Router();
 
-  // GET /api/courses — 当前用户的课程列表
+  // GET /api/courses/semesters — 当前用户已选课程涉及的学期列表
+  router.get('/semesters', authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const rows = db.all(
+      'SELECT DISTINCT semester_key FROM user_courses WHERE user_id = ? AND semester_key != "" ORDER BY semester_key DESC',
+      [userId]
+    );
+    res.json(rows.map(r => r.semester_key));
+  });
+
+  // GET /api/courses — 当前用户的课程列表（支持学期筛选）
   router.get('/', authMiddleware, (req, res) => {
     const userId = req.user.userId;
-    const courses = db.all(`
+    const { semester } = req.query;
+
+    let sql = `
       SELECT DISTINCT c.*,
         (SELECT COUNT(*) FROM user_courses uc2 WHERE uc2.course_id = c.id) AS enrollment_count
       FROM courses c
       JOIN user_courses uc ON uc.course_id = c.id
       WHERE uc.user_id = ?
-      ORDER BY c.created_at DESC
-    `, [userId]);
+    `;
+    const params = [userId];
+
+    if (semester && semester !== 'all') {
+      sql += ' AND uc.semester_key = ?';
+      params.push(semester);
+    }
+
+    sql += ' ORDER BY c.created_at DESC';
+    const courses = db.all(sql, params);
     res.json(courses);
   });
 
@@ -32,24 +52,55 @@ module.exports = function (db) {
 
   // POST /api/courses/:id/enroll — 加入课程 [Auth]
   router.post('/:id/enroll', authMiddleware, (req, res) => {
+    const userId = req.user.userId;
     const courseId = Number(req.params.id);
     const course = db.get('SELECT * FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: '课程不存在' });
 
     const enrolled = db.get(
       'SELECT * FROM user_courses WHERE user_id = ? AND course_id = ?',
-      [req.user.userId, courseId]
+      [userId, courseId]
     );
     if (enrolled) {
       return res.status(400).json({ error: '已加入该课程' });
     }
 
+    // 检查课程总数上限
+    const count = db.get(
+      'SELECT COUNT(*) AS cnt FROM user_courses WHERE user_id = ?',
+      [userId]
+    );
+    if (count.cnt >= 50) {
+      return res.status(400).json({ error: '课程总数已达 50 门上限，请先退出部分课程' });
+    }
+
     db.run(
       'INSERT INTO user_courses (user_id, course_id) VALUES (?, ?)',
-      [req.user.userId, courseId]
+      [userId, courseId]
     );
     db.save();
     res.json({ message: '加入成功' });
+  });
+
+  // DELETE /api/courses/:id/leave — 退出课程 [Auth]
+  router.delete('/:id/leave', authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const courseId = Number(req.params.id);
+
+    const enrolled = db.get(
+      'SELECT * FROM user_courses WHERE user_id = ? AND course_id = ?',
+      [userId, courseId]
+    );
+    if (!enrolled) {
+      return res.status(400).json({ error: '未加入该课程' });
+    }
+
+    db.run(
+      'DELETE FROM user_courses WHERE user_id = ? AND course_id = ?',
+      [userId, courseId]
+    );
+    db.save();
+    res.json({ message: '已退出课程' });
   });
 
   // GET /api/courses/:id/members — 课程成员列表
