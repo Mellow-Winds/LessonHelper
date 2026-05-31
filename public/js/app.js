@@ -137,18 +137,18 @@ function renderMarkdown(text) {
    ============================================= */
 
 /**
- * createMdInput — MD3 outlined input with <fieldset> native notch
- * @param {{ id?: string, label: string, placeholder?: string, type?: string, value?: string, required?: boolean, attrs?: string }} config
+ * createMdInput — MD3 outlined input with CSS-driven floating label
+ * @param {{ id?: string, label: string, type?: string, value?: string, required?: boolean, attrs?: string }} config
  * @returns {string} HTML string
  */
 function createMdInput(config) {
-  const { id = '', label, placeholder = ' ', type = 'text', value = '', required = false, attrs = '' } = config;
+  const { id = '', label, type = 'text', value = '', required = false, attrs = '' } = config;
   const idAttr = id ? `id="${id}"` : '';
   const reqAttr = required ? 'required' : '';
   const valAttr = value ? `value="${escHtml(value)}"` : '';
   return `
     <div class="md-input-group">
-      <input class="md-input" ${idAttr} type="${type}" placeholder="${placeholder}" ${reqAttr} ${valAttr} ${attrs}>
+      <input class="md-input" ${idAttr} type="${type}" placeholder=" " ${reqAttr} ${valAttr} ${attrs}>
       <label class="md-label">${escHtml(label)}</label>
       <fieldset class="md-border" aria-hidden="true"><legend><span>${escHtml(label)}</span></legend></fieldset>
     </div>
