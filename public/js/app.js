@@ -1414,7 +1414,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   navigateTo('courses');
-
-  // Release icon color — signals that fonts + i18n are fully loaded
-  document.body.classList.add('js-ready');
 });
