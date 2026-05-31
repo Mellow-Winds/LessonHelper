@@ -7,49 +7,110 @@ const { authMiddleware } = require('./middleware/auth');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Rate limit state
-let lastScheduleImport = null;
-const MAX_COURSES = 50;
-const COOLDOWN_DAYS = 100;
+const MAX_COURSES_PER_IMPORT = 50;
+const MAX_COURSES_PER_USER = 50;
+
+// ===== 学期阶段判断 =====
+// 返回 { period: 'first'|'second'|'summer'|'closed', label: string }
+function getCurrentPeriod() {
+  const now = new Date();
+  const m = now.getMonth() + 1; // 1-12
+  const d = now.getDate();
+
+  // 1.2 - 2.14: 寒假，禁止导入
+  if ((m === 1 && d >= 2) || (m === 2 && d <= 14)) {
+    return { period: 'closed', label: '寒假期间，暂不支持导入课程' };
+  }
+  // 2.15 - 6.14: 第二学期
+  if ((m === 2 && d >= 15) || (m >= 3 && m <= 5) || (m === 6 && d <= 14)) {
+    return { period: 'second', label: '第二学期' };
+  }
+  // 6.15 - 8.14: 暑期
+  if ((m === 6 && d >= 15) || m === 7 || (m === 8 && d <= 14)) {
+    return { period: 'summer', label: '暑期' };
+  }
+  // 8.15 - 12.31: 第一学期
+  if ((m === 8 && d >= 15) || m >= 9) {
+    return { period: 'first', label: '第一学期' };
+  }
+  // 1.1: 第一学期末
+  if (m === 1 && d === 1) {
+    return { period: 'first', label: '第一学期' };
+  }
+  return { period: 'closed', label: '非开放导入时段' };
+}
+
+// 生成当前学期标识（用于数据库记录）
+function getSemesterKey() {
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const y = now.getFullYear();
+
+  if ((m === 8 && d >= 15) || m >= 9 || (m === 1 && d === 1)) {
+    return `${y}-1`; // 第一学期
+  }
+  if ((m === 2 && d >= 15) || (m >= 3 && m <= 5) || (m === 6 && d <= 14)) {
+    return `${y}-2`; // 第二学期
+  }
+  if ((m === 6 && d >= 15) || m === 7 || (m === 8 && d <= 14)) {
+    return `${y}-summer`; // 暑期
+  }
+  return `${y}-closed`;
+}
 
 module.exports = function (db) {
   const router = express.Router();
 
-  // GET /api/schedule/notes - 获取导入说明
+  // GET /api/schedule/notes
   router.get('/notes', (req, res) => {
     const notesPath = path.join(__dirname, '..', 'notes.md');
-    if (!fs.existsSync(notesPath)) {
-      return res.json({ content: '' });
-    }
-    const content = fs.readFileSync(notesPath, 'utf-8');
-    res.json({ content });
+    if (!fs.existsSync(notesPath)) return res.json({ content: '' });
+    res.json({ content: fs.readFileSync(notesPath, 'utf-8') });
   });
 
-  // GET /api/schedule/pre-notes - 获取使用须知
+  // GET /api/schedule/pre-notes
   router.get('/pre-notes', (req, res) => {
     const filePath = path.join(__dirname, '..', 'pre-notes.md');
-    if (!fs.existsSync(filePath)) {
-      return res.json({ content: '' });
-    }
-    const content = fs.readFileSync(filePath, 'utf-8');
-    res.json({ content });
+    if (!fs.existsSync(filePath)) return res.json({ content: '' });
+    res.json({ content: fs.readFileSync(filePath, 'utf-8') });
   });
 
-  // POST /api/schedule/import - 解析xlsx并写入课程表 [Auth]
+  // POST /api/schedule/import [Auth]
   router.post('/import', authMiddleware, upload.single('file'), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: '请上传文件' });
     }
 
-    // --- 限流：100天内最多导入一次 ---
-    if (lastScheduleImport) {
-      const daysSince = (Date.now() - lastScheduleImport) / (1000 * 60 * 60 * 24);
-      if (daysSince < COOLDOWN_DAYS) {
-        const remaining = Math.ceil(COOLDOWN_DAYS - daysSince);
-        return res.status(429).json({
-          error: `导入过于频繁，请 ${remaining} 天后再试（限制：${COOLDOWN_DAYS} 天内最多导入一次）`
-        });
-      }
+    const userId = req.user.userId;
+    const semesterKey = getSemesterKey();
+
+    // --- 学期阶段检查 ---
+    const period = getCurrentPeriod();
+    if (period.period === 'closed') {
+      return res.status(403).json({ error: period.label });
+    }
+
+    // --- 本学期是否已导入 ---
+    const alreadyImported = db.get(
+      'SELECT id FROM user_courses WHERE user_id = ? AND semester_key = ? LIMIT 1',
+      [userId, semesterKey]
+    );
+    if (alreadyImported) {
+      return res.status(429).json({
+        error: `本学期（${period.label}）已经导入过课程，每学期仅允许导入一次`
+      });
+    }
+
+    // --- 当前用户课程总数检查 ---
+    const courseCount = db.get(
+      'SELECT COUNT(*) AS cnt FROM user_courses WHERE user_id = ?',
+      [userId]
+    );
+    if (courseCount.cnt >= MAX_COURSES_PER_USER) {
+      return res.status(400).json({
+        error: `你的课程总数已达 ${MAX_COURSES_PER_USER} 门上限，请先退出部分课程后再导入`
+      });
     }
 
     try {
@@ -59,10 +120,9 @@ module.exports = function (db) {
 
       const parsed = parseSchedule(data);
 
-      // --- 限流：单次最多50门 ---
-      if (parsed.length > MAX_COURSES) {
+      if (parsed.length > MAX_COURSES_PER_IMPORT) {
         return res.status(400).json({
-          error: `单次导入上限 ${MAX_COURSES} 门课程，当前解析到 ${parsed.length} 门`
+          error: `单次导入上限 ${MAX_COURSES_PER_IMPORT} 门，当前解析到 ${parsed.length} 门`
         });
       }
 
@@ -70,42 +130,45 @@ module.exports = function (db) {
         return res.status(400).json({ error: '未解析到任何课程，请检查文件格式' });
       }
 
+      // 检查导入后是否超限
+      const remaining = MAX_COURSES_PER_USER - courseCount.cnt;
+      if (parsed.length > remaining) {
+        return res.status(400).json({
+          error: `你还可以添加 ${remaining} 门课程，本次导入 ${parsed.length} 门，超出上限`
+        });
+      }
+
       // --- 写入数据库 ---
-      const userId = req.user.userId;
       let importedCount = 0;
 
       db.run('BEGIN TRANSACTION');
       try {
         for (const c of parsed) {
-          // 按课程号+教师+时间 去重（同一课程可由不同教师/时间开设）
           const existing = db.get(
             'SELECT id FROM courses WHERE description LIKE ? AND teacher = ?',
             [`%${c.courseId}%`, c.teacher]
           );
 
+          let courseId;
           if (existing) {
-            // 课程已存在 → 确保当前用户已加入
-            const enrolled = db.get(
-              'SELECT id FROM user_courses WHERE user_id = ? AND course_id = ?',
-              [userId, existing.id]
-            );
-            if (!enrolled) {
-              db.run(
-                'INSERT INTO user_courses (user_id, course_id) VALUES (?, ?)',
-                [userId, existing.id]
-              );
-              importedCount++;
-            }
+            courseId = existing.id;
           } else {
-            // 新课程 → 创建并关联当前用户
             const desc = [c.courseId, c.time, c.location].filter(Boolean).join(' · ');
             const result = db.run(
               'INSERT INTO courses (title, description, teacher, owner_id) VALUES (?, ?, ?, ?)',
               [c.className, desc, c.teacher, userId]
             );
+            courseId = result.lastInsertRowid;
+          }
+
+          const enrolled = db.get(
+            'SELECT id FROM user_courses WHERE user_id = ? AND course_id = ?',
+            [userId, courseId]
+          );
+          if (!enrolled) {
             db.run(
-              'INSERT INTO user_courses (user_id, course_id) VALUES (?, ?)',
-              [userId, result.lastInsertRowid]
+              'INSERT INTO user_courses (user_id, course_id, semester_key) VALUES (?, ?, ?)',
+              [userId, courseId, semesterKey]
             );
             importedCount++;
           }
@@ -117,13 +180,9 @@ module.exports = function (db) {
         throw dbErr;
       }
 
-      // 记录导入时间
-      lastScheduleImport = Date.now();
-
-      // 返回当前用户的课程列表
       const courses = db.all(`
         SELECT DISTINCT c.*,
-          (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id) AS enrollment_count
+          (SELECT COUNT(*) FROM user_courses uc2 WHERE uc2.course_id = c.id) AS enrollment_count
         FROM courses c
         JOIN user_courses uc ON uc.course_id = c.id
         WHERE uc.user_id = ?
@@ -134,6 +193,43 @@ module.exports = function (db) {
       console.error('解析课表失败:', err);
       res.status(500).json({ error: '解析课表失败，请检查文件格式' });
     }
+  });
+
+  // GET /api/schedule/available - 搜索可选课程
+  router.get('/available', authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const { courseId, name, day, teacher } = req.query;
+
+    let sql = `
+      SELECT c.*,
+        (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id) AS enrollment_count,
+        (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id AND uc.user_id = ?) AS is_enrolled
+      FROM courses c
+      WHERE 1=1
+    `;
+    const params = [userId];
+
+    if (courseId) {
+      sql += ' AND c.description LIKE ?';
+      params.push(`%${courseId}%`);
+    }
+    if (name) {
+      sql += ' AND c.title LIKE ?';
+      params.push(`%${name}%`);
+    }
+    if (teacher) {
+      sql += ' AND c.teacher LIKE ?';
+      params.push(`%${teacher}%`);
+    }
+    if (day) {
+      sql += ' AND c.description LIKE ?';
+      params.push(`%${day}%`);
+    }
+
+    sql += ' ORDER BY c.created_at DESC LIMIT 100';
+
+    const courses = db.all(sql, params);
+    res.json(courses);
   });
 
   return router;
@@ -151,7 +247,6 @@ function parseSchedule(data) {
 
     for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
       const colStart = 1 + dayIdx * 3;
-
       for (let colOff = 0; colOff < 3; colOff++) {
         const colIdx = colStart + colOff;
         if (colIdx >= row.length) continue;

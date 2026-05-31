@@ -122,6 +122,7 @@ async function start() {
   migrateTable('users', 'verification_code_expires', "TEXT DEFAULT ''");
   migrateTable('courses', 'semester', "TEXT DEFAULT ''");
   migrateTable('courses', 'teacher', "TEXT DEFAULT ''");
+  migrateTable('user_courses', 'semester_key', "TEXT DEFAULT ''");
 
   // New table: user_courses (many-to-many enrollment)
   db.run(`CREATE TABLE IF NOT EXISTS user_courses (
