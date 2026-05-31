@@ -136,7 +136,7 @@ select::-ms-expand {
   display: none;
 }
 
-/* ---- Material Icon (with ligature flash guard) ---- */
+/* ---- Material Icon ---- */
 .mi {
   font-family: 'Material Icons Round';
   font-weight: normal;
@@ -150,18 +150,6 @@ select::-ms-expand {
   word-wrap: normal;
   direction: ltr;
   -webkit-font-smoothing: antialiased;
-  /* Flash guard: hide raw ligature text until font loads */
-  font-display: block !important;
-  width: 24px;
-  height: 24px;
-  overflow: hidden;
-  color: transparent;
-  vertical-align: middle;
-}
-
-/* Release icon color once JS is ready */
-.js-ready .mi {
-  color: inherit;
 }
 
 /* ---- Layout: Sidebar ---- */
@@ -486,12 +474,11 @@ select::-ms-expand {
   padding: 0 4px;
 }
 
-/* Label floats up — centered on the border's top edge */
+/* Label floats up */
 .md-input-group .md-input:focus ~ .md-label,
 .md-input-group .md-input:not(:placeholder-shown) ~ .md-label {
   top: 0;
   transform: translateY(-50%) scale(0.85);
-  transform-origin: top left;
   color: var(--md-primary);
 }
 
