@@ -143,7 +143,7 @@ async function start() {
   // --- API Routes ---
   const coursesRouter = require('./routes/courses')(db);
   const userRouter = require('./routes/user')(db);
-  const scheduleRouter = require('./routes/schedule')();
+  const scheduleRouter = require('./routes/schedule')(db);
   const authRouter = require('./routes/auth')(db);
 
   app.use('/api/courses', coursesRouter);
