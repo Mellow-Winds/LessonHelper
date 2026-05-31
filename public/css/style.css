@@ -100,6 +100,7 @@ html, body {
 }
 
 body {
+  --md-field-bg: var(--md-surface);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   background-color: var(--md-surface);
   color: var(--md-on-surface);
@@ -270,6 +271,7 @@ select::-ms-expand {
 
 /* ---- Content: Cards ---- */
 .card {
+  --md-field-bg: var(--md-surface-container-lowest);
   background-color: var(--md-surface-container-lowest);
   border: 1px solid var(--md-outline-variant);
   border-radius: var(--radius-lg);
@@ -408,6 +410,14 @@ select::-ms-expand {
   z-index: 1;
 }
 
+.md-input-group .md-input:-webkit-autofill,
+.md-input-group .md-input:autofill {
+  box-shadow: 0 0 0 1000px var(--md-field-bg) inset;
+  caret-color: var(--md-primary);
+  transition: background-color 9999s ease-out;
+  -webkit-text-fill-color: var(--md-on-surface);
+}
+
 /* fieldset — the actual visible border */
 .md-input-group .md-border {
   position: absolute;
@@ -450,7 +460,6 @@ select::-ms-expand {
   line-height: 1;
 }
 
-/* Floating label — always transparent */
 .md-input-group .md-label {
   position: absolute;
   left: 12px;
@@ -461,10 +470,9 @@ select::-ms-expand {
   color: var(--md-on-surface-variant);
   pointer-events: none;
   z-index: 3;
-  background: transparent !important;
-  background-color: transparent !important;
-  padding: 0;
-  line-height: 1;
+  background-color: var(--md-field-bg);
+  padding: 0 4px;
+  line-height: 1.2;
   white-space: nowrap;
   transition:
     top 200ms cubic-bezier(0.4, 0, 0.2, 1),
@@ -475,21 +483,27 @@ select::-ms-expand {
 
 /* === FOCUS or HAS VALUE: notch opens, label floats === */
 .md-input-group .md-input:focus ~ .md-border,
-.md-input-group .md-input:not(:placeholder-shown) ~ .md-border {
+.md-input-group .md-input:not(:placeholder-shown) ~ .md-border,
+.md-input-group .md-input:-webkit-autofill ~ .md-border,
+.md-input-group .md-input:autofill ~ .md-border {
   border-color: var(--md-primary);
   border-width: 2px;
 }
 
 /* Legend notch opens — browser natively cuts the border gap */
 .md-input-group .md-input:focus ~ .md-border legend,
-.md-input-group .md-input:not(:placeholder-shown) ~ .md-border legend {
+.md-input-group .md-input:not(:placeholder-shown) ~ .md-border legend,
+.md-input-group .md-input:-webkit-autofill ~ .md-border legend,
+.md-input-group .md-input:autofill ~ .md-border legend {
   max-width: 1000px;
-  padding: 0 4px;
+  padding: 0 8px;
 }
 
 /* Label floats up */
 .md-input-group .md-input:focus ~ .md-label,
-.md-input-group .md-input:not(:placeholder-shown) ~ .md-label {
+.md-input-group .md-input:not(:placeholder-shown) ~ .md-label,
+.md-input-group .md-input:-webkit-autofill ~ .md-label,
+.md-input-group .md-input:autofill ~ .md-label {
   top: 0;
   transform: translateY(-50%);
   font-size: 0.75rem;
@@ -795,6 +809,7 @@ select.input {
 }
 
 .modal {
+  --md-field-bg: var(--md-surface-container-highest);
   background-color: var(--md-surface-container-highest);
   border-radius: var(--radius-2xl);
   width: 560px;

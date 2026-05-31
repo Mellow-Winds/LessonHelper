@@ -111,5 +111,8 @@
 - [x] `legend span` 同步为 `0.75rem`，让可见 Label 与边框断口宽度一致
 - [x] `.mi` 图标盒改为固定 `1em` 的 `inline-flex`
 - [x] 导航项与按钮分别加入 `--mi-y` 基线补偿，并保留 hover/active 缩放动效
+- [x] Label 增加容器同色背景遮罩，避免聚焦描边穿过文字
+- [x] MD 输入框统一强制 `placeholder=" "`，由纯 CSS `:not(:placeholder-shown)` / `:autofill` 接管浮起态
+- [x] 增加 autofill 状态选择器，刷新后浏览器自动填充值也能在首帧顶起 Label
 
 **验证**：本地服务 200；CSS 资源已包含新规则
