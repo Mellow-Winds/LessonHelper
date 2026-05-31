@@ -4,14 +4,17 @@ const { authMiddleware } = require('./middleware/auth');
 module.exports = function (db) {
   const router = express.Router();
 
-  // GET /api/courses — 课程列表（含选课人数）
-  router.get('/', (req, res) => {
+  // GET /api/courses — 当前用户的课程列表
+  router.get('/', authMiddleware, (req, res) => {
+    const userId = req.user.userId;
     const courses = db.all(`
-      SELECT c.*,
-        (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id) AS enrollment_count
+      SELECT DISTINCT c.*,
+        (SELECT COUNT(*) FROM user_courses uc2 WHERE uc2.course_id = c.id) AS enrollment_count
       FROM courses c
+      JOIN user_courses uc ON uc.course_id = c.id
+      WHERE uc.user_id = ?
       ORDER BY c.created_at DESC
-    `);
+    `, [userId]);
     res.json(courses);
   });
 
@@ -25,30 +28,6 @@ module.exports = function (db) {
     `, [Number(req.params.id)]);
     if (!course) return res.status(404).json({ error: '课程不存在' });
     res.json(course);
-  });
-
-  // POST /api/courses — 创建课程 [Auth]
-  router.post('/', authMiddleware, (req, res) => {
-    const { title, description, semester, teacher } = req.body;
-    if (!title) {
-      return res.status(400).json({ error: 'title 为必填项' });
-    }
-
-    const result = db.run(
-      'INSERT INTO courses (title, description, owner_id, semester, teacher) VALUES (?, ?, ?, ?, ?)',
-      [title, description || '', req.user.userId, semester || '', teacher || '']
-    );
-
-    // 创建者自动加入课程
-    db.run(
-      'INSERT OR IGNORE INTO user_courses (user_id, course_id) VALUES (?, ?)',
-      [req.user.userId, result.lastInsertRowid]
-    );
-
-    db.save();
-
-    const course = db.get('SELECT * FROM courses WHERE id = ?', [result.lastInsertRowid]);
-    res.status(201).json(course);
   });
 
   // POST /api/courses/:id/enroll — 加入课程 [Auth]

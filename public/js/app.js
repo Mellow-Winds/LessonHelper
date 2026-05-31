@@ -54,10 +54,13 @@ function animOut(el, opts = {}) {
 }
 
 function renderMarkdown(text) {
-  try {
-    if (typeof marked === 'object' && typeof marked.parse === 'function') return marked.parse(text);
-    if (typeof marked === 'function') return marked(text);
-  } catch (e) { console.warn('Markdown error:', e); }
+  if (typeof marked === 'object' && typeof marked.parse === 'function') {
+    return marked.parse(text);
+  }
+  if (typeof marked === 'function') {
+    return marked(text);
+  }
+  console.warn('marked.js not loaded, using fallback renderer');
   return '<p>' + text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
 }
 
@@ -204,7 +207,11 @@ async function apiPut(url, body) {
 async function apiPostFile(url, file) {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(url, { method: 'POST', body: fd });
+  const token = getToken();
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(url, { method: 'POST', headers, body: fd });
+  if (res.status === 401) { clearToken(); window._currentUser = null; }
   return res.json();
 }
 
@@ -608,19 +615,115 @@ async function handleEditProfile(e) {
 }
 
 /* =============================================
+   Import Schedule
+   ============================================= */
+
+async function openImportModal() {
+  if (!isLoggedIn()) {
+    showToast('请先登录');
+    navigateTo('profile');
+    return;
+  }
+
+  // Step 1: Show pre-import agreement
+  const bodyHtml = `
+    <div class="import-section">
+      <div class="import-notes markdown-body" id="pre-notes-content">
+        <p class="text-secondary">加载中...</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:var(--space-4)">
+      <button class="btn btn-secondary" onclick="closeModal()">不同意</button>
+      <button class="btn btn-primary" onclick="handleAgreeAndImport()">我已同意并知晓</button>
+    </div>
+  `;
+
+  openModal('使用须知', bodyHtml);
+
+  try {
+    const data = await apiGet('/api/schedule/pre-notes');
+    const el = document.getElementById('pre-notes-content');
+    if (data.content && data.content.trim()) {
+      el.innerHTML = renderMarkdown(data.content);
+    } else {
+      el.innerHTML = '<p class="text-secondary">暂无须知内容。</p>';
+    }
+  } catch (err) {
+    console.error('加载须知失败:', err);
+    const el = document.getElementById('pre-notes-content');
+    if (el) el.innerHTML = '<p class="text-secondary">加载失败。</p>';
+  }
+}
+
+function handleAgreeAndImport() {
+  // Step 2: Open actual import interface
+  const bodyHtml = `
+    <div class="import-section">
+      <h3 class="import-section-title">导入说明</h3>
+      <div class="import-notes markdown-body" id="import-notes">
+        <p class="text-secondary">加载中...</p>
+      </div>
+    </div>
+    <div class="import-section">
+      <h3 class="import-section-title">选择文件</h3>
+      <label class="btn btn-primary" style="cursor:pointer">
+        <span class="mi">upload_file</span>
+        <span>选择课程表文件</span>
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleScheduleImport(this.files[0])">
+      </label>
+    </div>
+  `;
+
+  openModal('导入课程表', bodyHtml);
+
+  apiGet('/api/schedule/notes').then(data => {
+    const el = document.getElementById('import-notes');
+    if (data.content && data.content.trim()) {
+      el.innerHTML = renderMarkdown(data.content);
+    } else {
+      el.innerHTML = '<p class="text-secondary">暂无说明。</p>';
+    }
+  }).catch(() => {
+    const el = document.getElementById('import-notes');
+    if (el) el.innerHTML = '<p class="text-secondary">加载说明失败。</p>';
+  });
+}
+
+async function handleScheduleImport(file) {
+  if (!file) return;
+  try {
+    const result = await apiPostFile('/api/schedule/import', file);
+    if (result.error) {
+      showToast('导入失败: ' + result.error);
+      return;
+    }
+    closeModal();
+    showToast(`成功导入 ${result.imported} 门课程`);
+    setTimeout(() => navigateTo('courses'), 280);
+  } catch {
+    showToast('导入失败，请检查网络连接');
+  }
+}
+
+/* =============================================
    Page: Course List
    ============================================= */
 
 registerPage('courses', async (container) => {
+  // 未登录 → 跳转登录
+  if (!isLoggedIn()) {
+    showToast('请先登录');
+    navigateTo('profile');
+    return;
+  }
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title" style="margin-bottom:0">课程列表</h1>
       <div style="display:flex;gap:8px">
-        ${isLoggedIn() ? `
-          <button class="btn btn-primary" onclick="openCreateCourseModal()">
-            <span class="mi">add</span> 创建课程
-          </button>
-        ` : ''}
+        <button class="btn btn-primary" onclick="openImportModal()">
+          <span class="mi">upload_file</span> 导入课程表
+        </button>
       </div>
     </div>
     <div id="course-list">
@@ -629,22 +732,11 @@ registerPage('courses', async (container) => {
   `;
 
   bindRipples(container);
-  // Animate header
   const header = container.querySelector('.page-header');
   animIn(header, { y: 16, dur: 380 });
 
   try {
     const courses = await apiGet('/api/courses');
-
-    // 已登录时获取用户已加入的课程
-    let enrolledIds = new Set();
-    if (isLoggedIn() && window._currentUser) {
-      try {
-        const myCourses = await apiGet(`/api/user/${window._currentUser.id}/courses`);
-        myCourses.forEach(c => enrolledIds.add(c.id));
-      } catch {}
-    }
-
     const listEl = document.getElementById('course-list');
 
     if (courses.length === 0) {
@@ -652,36 +744,29 @@ registerPage('courses', async (container) => {
         <div class="card" style="text-align:center;padding:48px">
           <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">menu_book</span>
           <p class="text-secondary" style="margin-top:12px">暂无课程</p>
-          ${isLoggedIn() ? '<p class="text-secondary">点击右上角"创建课程"添加第一门课</p>' : '<p class="text-secondary">请先登录以创建课程</p>'}
+          <p class="text-secondary">点击"导入课程表"从 xlsx 文件导入</p>
         </div>
       `;
       animIn(listEl.querySelector('.card'), { y: 20, delay: 80 });
       return;
     }
 
-    listEl.innerHTML = courses.map(c => {
-      const enrolled = enrolledIds.has(c.id);
-      return `
+    listEl.innerHTML = courses.map(c => `
       <div class="card card-interactive mb-4" onclick="navigateTo('course', ${c.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1;min-width:0">
             <h3 class="card-title">${escHtml(c.title)}</h3>
-            <p class="text-secondary" style="margin-top:4px">${escHtml(c.teacher || '')} ${c.semester ? '· ' + escHtml(c.semester) : ''}</p>
+            <p class="text-secondary" style="margin-top:4px">${escHtml(c.teacher || '')}</p>
             <p class="text-secondary" style="margin-top:2px;font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.description || '暂无描述')}</p>
           </div>
           <div style="flex-shrink:0;margin-left:16px;display:flex;flex-direction:column;align-items:flex-end;gap:8px">
             <span style="font-size:var(--text-sm);color:var(--md-primary);font-weight:600;white-space:nowrap">
               <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> ${c.enrollment_count || 0} 人
             </span>
-            ${isLoggedIn() ? (
-              enrolled
-                ? '<span class="enrolled-badge"><span class="mi" style="font-size:14px">check</span> 已加入</span>'
-                : `<button class="btn btn-secondary" style="padding:6px 16px;font-size:12px" onclick="event.stopPropagation();handleEnroll(${c.id})">加入课程</button>`
-            ) : ''}
           </div>
         </div>
       </div>
-    `}).join('');
+    `).join('');
 
     const cards = listEl.querySelectorAll('.card');
     animStagger(Array.from(cards), { y: 22, dur: 420, gap: 60 });
@@ -692,75 +777,8 @@ registerPage('courses', async (container) => {
   }
 });
 
-async function handleEnroll(courseId) {
-  if (!isLoggedIn()) {
-    showToast('请先登录');
-    navigateTo('profile');
-    return;
-  }
-  const result = await apiPost(`/api/courses/${courseId}/enroll`, {});
-  if (result.error) {
-    showToast(result.error);
-  } else {
-    showToast('加入成功');
-    navigateTo('courses');
-  }
-}
-
-async function openCreateCourseModal() {
-  const html = `
-    <form id="create-course-form" onsubmit="handleCreateCourse(event)" style="display:flex;flex-direction:column;gap:14px">
-      <div class="form-field">
-        <label class="form-label">课程名称 *</label>
-        <input class="input" type="text" name="title" placeholder="如：高等数学" required>
-      </div>
-      <div class="form-field">
-        <label class="form-label">授课教师</label>
-        <input class="input" type="text" name="teacher" placeholder="如：王老师">
-      </div>
-      <div class="form-field">
-        <label class="form-label">学期</label>
-        <input class="input" type="text" name="semester" placeholder="如：2025-2026-2">
-      </div>
-      <div class="form-field">
-        <label class="form-label">课程描述</label>
-        <textarea class="input" name="description" placeholder="简单介绍这门课..." rows="3" style="resize:vertical"></textarea>
-      </div>
-      <div class="form-error" id="create-course-error" style="display:none"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">创建课程</button>
-    </form>
-  `;
-  openModal('创建课程', html);
-}
-
-async function handleCreateCourse(e) {
-  e.preventDefault();
-  const form = e.target;
-  const title = form.title.value.trim();
-  const teacher = form.teacher.value.trim();
-  const semester = form.semester.value.trim();
-  const description = form.description.value.trim();
-
-  if (!title) return;
-
-  const errEl = document.getElementById('create-course-error');
-  errEl.style.display = 'none';
-
-  const result = await apiPost('/api/courses', { title, teacher, semester, description });
-
-  if (result.error) {
-    errEl.textContent = result.error;
-    errEl.style.display = 'block';
-    return;
-  }
-
-  closeModal();
-  showToast('课程创建成功');
-  navigateTo('courses');
-}
-
 /* =============================================
-   Page: Course Space (Forum) — Placeholder
+   Page: Course Space (Forum)
    ============================================= */
 
 registerPage('course', async (container, courseId) => {
@@ -784,7 +802,6 @@ registerPage('course', async (container, courseId) => {
           <h1 class="page-title" style="margin-bottom:4px">${escHtml(course.title)}</h1>
           <p class="text-secondary">
             ${course.teacher ? escHtml(course.teacher) + ' · ' : ''}
-            ${course.semester ? escHtml(course.semester) + ' · ' : ''}
             ${course.enrollment_count || 0} 人选课
           </p>
         </div>
