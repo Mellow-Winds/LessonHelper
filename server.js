@@ -53,6 +53,7 @@ async function start() {
   const SQL = await initSqlJs();
 
   fs.mkdirSync(path.join(__dirname, 'db'), { recursive: true });
+  fs.mkdirSync(path.join(__dirname, 'uploads', 'materials'), { recursive: true });
 
   let sqlDb;
   if (fs.existsSync(DB_PATH)) {
@@ -120,9 +121,11 @@ async function start() {
   migrateTable('users', 'email_verified', "INTEGER DEFAULT 0");
   migrateTable('users', 'verification_code', "TEXT DEFAULT ''");
   migrateTable('users', 'verification_code_expires', "TEXT DEFAULT ''");
+  migrateTable('users', 'qq', "TEXT DEFAULT ''");
+  migrateTable('users', 'privacy_show_profile', "INTEGER DEFAULT 1");
+  migrateTable('users', 'privacy_allow_match', "INTEGER DEFAULT 1");
   migrateTable('courses', 'semester', "TEXT DEFAULT ''");
   migrateTable('courses', 'teacher', "TEXT DEFAULT ''");
-  migrateTable('user_courses', 'semester_key', "TEXT DEFAULT ''");
 
   // New table: user_courses (many-to-many enrollment)
   db.run(`CREATE TABLE IF NOT EXISTS user_courses (
@@ -133,6 +136,124 @@ async function start() {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
     UNIQUE(user_id, course_id)
+  )`);
+
+  migrateTable('user_courses', 'semester_key', "TEXT DEFAULT ''");
+
+  // New table: materials (学习资料)
+  db.run(`CREATE TABLE IF NOT EXISTS materials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id INTEGER NOT NULL,
+    uploader_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    file_path TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_size INTEGER DEFAULT 0,
+    chapter TEXT DEFAULT '',
+    category TEXT DEFAULT '其他',
+    avg_rating REAL DEFAULT 0,
+    rating_count INTEGER DEFAULT 0,
+    download_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    FOREIGN KEY (uploader_id) REFERENCES users(id)
+  )`);
+
+  // New table: material_ratings (资料评分)
+  db.run(`CREATE TABLE IF NOT EXISTS material_ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    rating INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(material_id, user_id)
+  )`);
+
+  // New table: study_invites (自习邀约)
+  db.run(`CREATE TABLE IF NOT EXISTS study_invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id INTEGER NOT NULL,
+    course_id INTEGER,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    study_date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    location TEXT DEFAULT '',
+    max_participants INTEGER DEFAULT 4,
+    status TEXT DEFAULT 'open',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_id) REFERENCES users(id),
+    FOREIGN KEY (course_id) REFERENCES courses(id)
+  )`);
+
+  // New table: study_invite_responses (邀约响应)
+  db.run(`CREATE TABLE IF NOT EXISTS study_invite_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invite_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'accepted',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invite_id) REFERENCES study_invites(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(invite_id, user_id)
+  )`);
+
+  // New table: notifications (消息提醒)
+  db.run(`CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    related_type TEXT,
+    related_id INTEGER,
+    course_id INTEGER,
+    is_read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+
+  // New table: square_posts (交友广场帖子)
+  db.run(`CREATE TABLE IF NOT EXISTS square_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    max_people INTEGER DEFAULT 1,
+    current_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'open',
+    expires_at TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_id) REFERENCES users(id)
+  )`);
+
+  // New table: square_interests (感兴趣记录)
+  db.run(`CREATE TABLE IF NOT EXISTS square_interests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES square_posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(post_id, user_id)
+  )`);
+
+  // New table: square_comments (广场评论)
+  db.run(`CREATE TABLE IF NOT EXISTS square_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    author_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES square_posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (author_id) REFERENCES users(id)
   )`);
 
   db.save();
@@ -146,8 +267,18 @@ async function start() {
   const userRouter = require('./routes/user')(db);
   const scheduleRouter = require('./routes/schedule')(db);
   const authRouter = require('./routes/auth')(db);
+  const materialsRouter = require('./routes/materials')(db);
+  const invitesRouter = require('./routes/invites')(db);
+  const notificationsRouter = require('./routes/notifications')(db);
+  const searchRouter = require('./routes/search')(db);
+  const squareRouter = require('./routes/square')(db);
 
   app.use('/api/courses', coursesRouter);
+  app.use('/api/materials', materialsRouter);
+  app.use('/api/invites', invitesRouter);
+  app.use('/api/notifications', notificationsRouter);
+  app.use('/api/search', searchRouter);
+  app.use('/api/square', squareRouter);
   app.use('/api/user', userRouter);
   app.use('/api/schedule', scheduleRouter);
   app.use('/api/auth', authRouter);
