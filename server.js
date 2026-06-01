@@ -120,9 +120,11 @@ async function start() {
   migrateTable('users', 'email_verified', "INTEGER DEFAULT 0");
   migrateTable('users', 'verification_code', "TEXT DEFAULT ''");
   migrateTable('users', 'verification_code_expires', "TEXT DEFAULT ''");
+  migrateTable('users', 'qq', "TEXT DEFAULT ''");
+  migrateTable('users', 'privacy_show_profile', "INTEGER DEFAULT 1");
+  migrateTable('users', 'privacy_allow_match', "INTEGER DEFAULT 1");
   migrateTable('courses', 'semester', "TEXT DEFAULT ''");
   migrateTable('courses', 'teacher', "TEXT DEFAULT ''");
-  migrateTable('user_courses', 'semester_key', "TEXT DEFAULT ''");
 
   // New table: user_courses (many-to-many enrollment)
   db.run(`CREATE TABLE IF NOT EXISTS user_courses (
@@ -134,6 +136,8 @@ async function start() {
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
     UNIQUE(user_id, course_id)
   )`);
+
+  migrateTable('user_courses', 'semester_key', "TEXT DEFAULT ''");
 
   db.save();
 
