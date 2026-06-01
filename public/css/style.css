@@ -1063,3 +1063,250 @@ select.input {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--md-outline);
 }
+
+/* ========================================
+   Create Post Page
+   ======================================== */
+
+.create-post-page {
+  max-width: 672px;
+  margin: 0 auto;
+  padding: var(--space-6) 0;
+}
+
+/* Header: back button + breadcrumb */
+.create-post-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.create-post-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  color: var(--md-on-surface);
+}
+
+/* Icon-only back button */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--md-on-surface);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-spring);
+}
+
+.btn-icon:hover {
+  background: var(--md-surface-container-high);
+}
+
+.btn-icon:active {
+  transform: scale(0.92);
+}
+
+/* ---- Rich Text Toolbar ---- */
+
+.rte-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: 2px;
+  background: var(--md-surface-container-low);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border: 1px solid var(--md-outline);
+  border-bottom: none;
+  transition: border-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Pill-shaped toolbar button with capsule hover */
+.rte-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  position: relative;
+  transition:
+    background-color var(--dur-normal) var(--ease-standard),
+    color var(--dur-normal) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-spring);
+}
+
+.rte-btn:hover {
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+.rte-btn:active {
+  transform: scale(0.9);
+}
+
+.rte-btn.active {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  box-shadow: 0 0 0 1px var(--md-primary-container);
+}
+
+/* ---- Rich Text Editor Wrapper (MD3 Outlined state machine) ---- */
+
+.rte-wrapper {
+  position: relative;
+  width: 100%;
+  --md-field-bg: var(--md-surface);
+}
+
+/* The actual editable area — generous breathing padding */
+.rte-editor {
+  width: 100%;
+  min-height: 240px;
+  padding: 20px 20px 24px;
+  border: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: transparent;
+  font-size: var(--text-base);
+  line-height: 1.75;
+  color: var(--md-on-surface);
+  outline: none;
+  caret-color: var(--md-primary);
+  position: relative;
+  z-index: 1;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.rte-editor:empty::before {
+  content: '';
+  display: block;
+}
+
+/* fieldset — visible border, mirrors .md-border */
+.rte-border {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid var(--md-outline);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  pointer-events: none;
+  z-index: 2;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  transition:
+    border-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-width 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* legend — structural notch gap */
+.rte-border legend {
+  display: block;
+  width: auto;
+  max-width: 0.01px;
+  padding: 0;
+  margin-left: 8px;
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  transition:
+    max-width 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    padding 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rte-border legend span {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  display: inline-block;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+/* Floating label */
+.rte-label {
+  position: absolute;
+  left: 16px;
+  top: 20px;
+  font-size: 1rem;
+  color: var(--md-on-surface-variant);
+  pointer-events: none;
+  z-index: 3;
+  background-color: var(--md-field-bg);
+  padding: 0 4px 0 0;
+  line-height: 1.2;
+  white-space: nowrap;
+  transform-origin: left center;
+  transition:
+    top 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    font-size 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* === FOCUS-WITHIN: notch opens, label floats, border highlights + shadow === */
+.rte-wrapper:focus-within .rte-border,
+.rte-wrapper.has-content .rte-border {
+  border-color: var(--md-primary);
+  border-width: 2px;
+}
+
+.rte-wrapper:focus-within .rte-border {
+  box-shadow: 0 2px 8px -2px rgba(74, 144, 217, 0.25);
+}
+
+.rte-wrapper:focus-within .rte-border legend,
+.rte-wrapper.has-content .rte-border legend {
+  max-width: 1000px;
+  padding: 0 4px 0 0;
+}
+
+.rte-wrapper:focus-within .rte-label,
+.rte-wrapper.has-content .rte-label {
+  top: 0;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  color: var(--md-primary);
+}
+
+/* Hover state */
+.rte-wrapper:hover .rte-border {
+  border-color: var(--md-on-surface);
+}
+
+/* ---- Post content rich text rendering ---- */
+
+.post-content b,
+.post-content strong {
+  font-weight: 600;
+}
+
+.post-content i,
+.post-content em {
+  font-style: italic;
+}
+
+.post-content u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
