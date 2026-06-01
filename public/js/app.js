@@ -1214,6 +1214,9 @@ async function handleEnrollFromSearch(courseId) {
    Page: Course Space (Forum)
    ============================================= */
 
+// 全局存储课程空间状态
+window._courseSpace = {};
+
 registerPage('course', async (container, courseId) => {
   container.innerHTML = `
     <div class="card"><p class="text-secondary">加载中...</p></div>
@@ -1226,9 +1229,7 @@ registerPage('course', async (container, courseId) => {
       return;
     }
 
-    const posts = await apiGet(`/api/courses/${courseId}/posts`);
-    const members = await apiGet(`/api/courses/${courseId}/members`);
-    const stats = await apiGet(`/api/courses/${courseId}/members/stats`);
+    window._courseSpace = { courseId, course, activeTab: 'forum' };
 
     container.innerHTML = `
       <div class="page-header">
@@ -1239,68 +1240,441 @@ registerPage('course', async (container, courseId) => {
             ${course.enrollment_count || 0} 人选课
           </p>
         </div>
-        <button class="btn btn-primary" onclick="openCreatePostModal(${courseId})">
-          <span class="mi">edit</span> 发帖
+      </div>
+      <div class="course-tabs" id="course-tabs">
+        <button class="course-tab active" data-tab="forum" onclick="switchCourseTab('forum', ${courseId})">
+          <span class="mi" style="font-size:16px;vertical-align:-3px">forum</span> 论坛
+        </button>
+        <button class="course-tab" data-tab="materials" onclick="switchCourseTab('materials', ${courseId})">
+          <span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料
+        </button>
+        <button class="course-tab" data-tab="members" onclick="switchCourseTab('members', ${courseId})">
+          <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 成员
         </button>
       </div>
-
-      <div style="display:flex;gap:24px">
-        <!-- 帖子列表 -->
-        <div style="flex:1;min-width:0" id="posts-area">
-          ${posts.length === 0 ? `
-            <div class="card" style="text-align:center;padding:48px">
-              <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">forum</span>
-              <p class="text-secondary" style="margin-top:12px">暂无帖子，来发第一个吧</p>
-            </div>
-          ` : posts.map(p => `
-            <div class="card mb-4 post-card clickable">
-              <h3 class="card-title" style="cursor:pointer" onclick="toggleComments(${p.id})">${escHtml(p.title)}</h3>
-              <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
-                <span>${escHtml(p.author_name)} · ${formatTime(p.created_at)}</span>
-                <span style="cursor:pointer;color:var(--md-primary);font-weight:500" onclick="toggleComments(${p.id})">
-                  <span class="mi" style="font-size:16px;vertical-align:-3px">chat_bubble_outline</span> ${p.comment_count || 0} 回复
-                </span>
-              </div>
-              <div class="comments-section" id="comments-${p.id}" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--md-outline-variant)"></div>
-            </div>
-          `).join('')}
-        </div>
-
-        <!-- 成员侧栏 -->
-        <div style="width:220px;flex-shrink:0">
-          <div class="card" id="members-sidebar">
-            <h3 style="font-size:var(--text-sm);font-weight:600;margin-bottom:12px;color:var(--md-on-surface-variant)">
-              <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 课程成员 (<span id="member-count">${members.length}</span>)
-            </h3>
-            <div id="member-filters" style="margin-bottom:12px">
-              <select id="filter-major" class="member-filter-select" onchange="filterMembers(${courseId})">
-                <option value="">全部专业</option>
-                ${(stats?.majors || []).map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('')}
-              </select>
-              <select id="filter-grade" class="member-filter-select" onchange="filterMembers(${courseId})">
-                <option value="">全部年级</option>
-                ${(stats?.grades || []).map(g => `<option value="${escHtml(g)}">${escHtml(g)}</option>`).join('')}
-              </select>
-            </div>
-            <div id="members-list">
-              ${renderMembersList(members)}
-            </div>
-          </div>
-        </div>
-      </div>
+      <div id="course-tab-content"></div>
     `;
 
     bindRipples(container);
     animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
-    const cards = container.querySelectorAll('.post-card');
-    if (cards.length) animStagger(Array.from(cards), { y: 20, dur: 400, gap: 50 });
-    const memberCard = container.querySelector('.card:not(.post-card)');
-    if (memberCard) animIn(memberCard, { y: 16, delay: 150, dur: 400 });
+    animIn(container.querySelector('.course-tabs'), { y: 12, delay: 80, dur: 350 });
+
+    // 默认加载论坛
+    await switchCourseTab('forum', courseId);
   } catch (e) {
     container.innerHTML = `<div class="card"><p class="text-secondary">加载失败: ${e.message}</p></div>`;
   }
 });
+
+async function switchCourseTab(tab, courseId) {
+  window._courseSpace.activeTab = tab;
+
+  // 更新 tab 高亮
+  document.querySelectorAll('.course-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab);
+  });
+
+  const contentEl = document.getElementById('course-tab-content');
+  if (!contentEl) return;
+
+  switch (tab) {
+    case 'forum':
+      await renderForumTab(contentEl, courseId);
+      break;
+    case 'materials':
+      await renderMaterialsTab(contentEl, courseId);
+      break;
+    case 'members':
+      await renderMembersTab(contentEl, courseId);
+      break;
+  }
+}
+
+// ===== 论坛标签页 =====
+async function renderForumTab(contentEl, courseId) {
+  contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
+  const posts = await apiGet(`/api/courses/${courseId}/posts`);
+
+  contentEl.innerHTML = `
+    <div style="display:flex;gap:24px">
+      <div style="flex:1;min-width:0" id="posts-area">
+        <div style="margin-bottom:16px;text-align:right">
+          <button class="btn btn-primary" onclick="openCreatePostModal(${courseId})">
+            <span class="mi">edit</span> 发帖
+          </button>
+        </div>
+        ${posts.length === 0 ? `
+          <div class="card" style="text-align:center;padding:48px">
+            <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">forum</span>
+            <p class="text-secondary" style="margin-top:12px">暂无帖子，来发第一个吧</p>
+          </div>
+        ` : posts.map(p => `
+          <div class="card mb-4 post-card clickable">
+            <h3 class="card-title" style="cursor:pointer" onclick="toggleComments(${p.id})">${escHtml(p.title)}</h3>
+            <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
+              <span>${escHtml(p.author_name)} · ${formatTime(p.created_at)}</span>
+              <span style="cursor:pointer;color:var(--md-primary);font-weight:500" onclick="toggleComments(${p.id})">
+                <span class="mi" style="font-size:16px;vertical-align:-3px">chat_bubble_outline</span> ${p.comment_count || 0} 回复
+              </span>
+            </div>
+            <div class="comments-section" id="comments-${p.id}" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--md-outline-variant)"></div>
+          </div>
+        `).join('')}
+      </div>
+      ${await renderMemberSidebar(courseId)}
+    </div>
+  `;
+
+  const cards = contentEl.querySelectorAll('.post-card');
+  if (cards.length) animStagger(Array.from(cards), { y: 20, dur: 400, gap: 50 });
+}
+
+// ===== 成员侧栏（论坛和资料页共用）=====
+async function renderMemberSidebar(courseId) {
+  const members = await apiGet(`/api/courses/${courseId}/members`);
+  const stats = await apiGet(`/api/courses/${courseId}/members/stats`);
+
+  return `
+    <div style="width:220px;flex-shrink:0">
+      <div class="card" id="members-sidebar">
+        <h3 style="font-size:var(--text-sm);font-weight:600;margin-bottom:12px;color:var(--md-on-surface-variant)">
+          <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 成员 (<span id="member-count">${members.length}</span>)
+        </h3>
+        <div id="member-filters" style="margin-bottom:12px">
+          <select id="filter-major" class="member-filter-select" onchange="filterMembers(${courseId})">
+            <option value="">全部专业</option>
+            ${(stats?.majors || []).map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('')}
+          </select>
+          <select id="filter-grade" class="member-filter-select" onchange="filterMembers(${courseId})">
+            <option value="">全部年级</option>
+            ${(stats?.grades || []).map(g => `<option value="${escHtml(g)}">${escHtml(g)}</option>`).join('')}
+          </select>
+        </div>
+        <div id="members-list">
+          ${renderMembersList(members)}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ===== 资料标签页 =====
+async function renderMaterialsTab(contentEl, courseId) {
+  contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
+  await loadMaterials(contentEl, courseId);
+}
+
+async function loadMaterials(contentEl, courseId, opts = {}) {
+  const params = new URLSearchParams();
+  if (opts.category && opts.category !== 'all') params.set('category', opts.category);
+  if (opts.chapter) params.set('chapter', opts.chapter);
+  if (opts.sort) params.set('sort', opts.sort);
+
+  const data = await apiGet(`/api/materials/courses/${courseId}?${params.toString()}`);
+  const materials = data?.materials || [];
+  const categories = ['全部', '课件', '笔记', '作业', '真题', '其他'];
+
+  contentEl.innerHTML = `
+    <div style="display:flex;gap:24px">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <select id="mat-category" class="member-filter-select" style="width:auto;min-width:100px;margin-bottom:0" onchange="refreshMaterials(${courseId})">
+              ${categories.map(c => `<option value="${c === '全部' ? 'all' : c}">${c}</option>`).join('')}
+            </select>
+            <input id="mat-chapter" class="member-filter-select" style="width:auto;min-width:120px;margin-bottom:0" placeholder="按章节搜索" onchange="refreshMaterials(${courseId})">
+            <select id="mat-sort" class="member-filter-select" style="width:auto;min-width:100px;margin-bottom:0" onchange="refreshMaterials(${courseId})">
+              <option value="newest">最新上传</option>
+              <option value="rating">评分最高</option>
+              <option value="downloads">下载最多</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="openUploadMaterialModal(${courseId})">
+            <span class="mi">upload</span> 上传资料
+          </button>
+        </div>
+        <div id="materials-list">
+          ${renderMaterialsList(materials, courseId)}
+        </div>
+      </div>
+      ${await renderMemberSidebar(courseId)}
+    </div>
+  `;
+}
+
+function renderMaterialsList(materials, courseId) {
+  if (materials.length === 0) {
+    return `
+      <div class="card" style="text-align:center;padding:48px">
+        <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">folder_open</span>
+        <p class="text-secondary" style="margin-top:12px">暂无资料，来上传第一份吧</p>
+      </div>
+    `;
+  }
+
+  const typeIcons = { pdf: 'picture_as_pdf', ppt: 'slideshow', doc: 'description', image: 'image', other: 'insert_drive_file' };
+  const typeColors = { pdf: '#e53935', ppt: '#FB8C00', doc: '#1E88E5', image: '#43A047', other: '#757575' };
+
+  return materials.map(m => `
+    <div class="card material-card">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div class="material-icon" style="color:${typeColors[m.file_type] || typeColors.other}">
+          <span class="mi" style="font-size:28px">${typeIcons[m.file_type] || typeIcons.other}</span>
+          <span style="font-size:10px;text-transform:uppercase">${m.file_type}</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:var(--text-base)">${escHtml(m.title)}</div>
+          ${m.description ? `<div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">${escHtml(m.description)}</div>` : ''}
+          <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;font-size:12px;color:var(--md-on-surface-variant)">
+            ${m.chapter ? `<span><span class="mi" style="font-size:14px;vertical-align:-2px">bookmark</span> ${escHtml(m.chapter)}</span>` : ''}
+            <span><span class="mi" style="font-size:14px;vertical-align:-2px">category</span> ${escHtml(m.category)}</span>
+            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> ${escHtml(m.uploader_name)}</span>
+            <span>${formatFileSize(m.file_size)}</span>
+            <span><span class="mi" style="font-size:14px;vertical-align:-2px">download</span> ${m.download_count}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            ${renderStars(m.avg_rating, m.id)}
+            <span style="font-size:12px;color:var(--md-on-surface-variant)">${m.rating_count > 0 ? m.avg_rating.toFixed(1) + ' 分' : '暂无评分'}</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+          <a href="/api/materials/${m.id}/download" class="btn btn-primary" style="font-size:12px;padding:6px 12px">
+            <span class="mi" style="font-size:16px">download</span> 下载
+          </a>
+          ${m.uploader_id === window._currentUser?.id ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 12px" onclick="deleteMaterial(${m.id}, ${courseId})"><span class="mi" style="font-size:16px">delete</span> 删除</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderStars(avgRating, materialId) {
+  let html = '<div class="stars-row">';
+  for (let i = 1; i <= 5; i++) {
+    const filled = i <= Math.round(avgRating) ? 'star' : 'star_border';
+    html += `<span class="mi star-icon" style="font-size:18px;cursor:pointer;color:${i <= Math.round(avgRating) ? '#FB8C00' : 'var(--md-outline-variant)'}" onclick="rateMaterial(${materialId}, ${i})">${filled}</span>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+async function rateMaterial(materialId, rating) {
+  if (!window._currentUser) {
+    showToast('请先登录');
+    return;
+  }
+  const result = await apiPost(`/api/materials/${materialId}/rate`, { rating });
+  if (result.error) {
+    showToast(result.error);
+    return;
+  }
+  showToast(`评分成功 (${result.avg_rating} 分)`);
+  // 刷新资料列表
+  const courseId = window._courseSpace.courseId;
+  const contentEl = document.getElementById('course-tab-content');
+  if (contentEl && courseId) await loadMaterials(contentEl, courseId);
+}
+
+async function refreshMaterials(courseId) {
+  const category = document.getElementById('mat-category')?.value || 'all';
+  const chapter = document.getElementById('mat-chapter')?.value || '';
+  const sort = document.getElementById('mat-sort')?.value || 'newest';
+  const contentEl = document.getElementById('course-tab-content');
+  if (contentEl) await loadMaterials(contentEl, courseId, { category, chapter, sort });
+}
+
+async function deleteMaterial(materialId, courseId) {
+  if (!confirm('确定删除这份资料？')) return;
+  const result = await apiDelete(`/api/materials/${materialId}`);
+  if (result.error) {
+    showToast(result.error);
+    return;
+  }
+  showToast('删除成功');
+  const contentEl = document.getElementById('course-tab-content');
+  if (contentEl) await loadMaterials(contentEl, courseId);
+}
+
+function openUploadMaterialModal(courseId) {
+  const categories = ['课件', '笔记', '作业', '真题', '其他'];
+  const html = `
+    <form id="upload-material-form" onsubmit="handleUploadMaterial(event, ${courseId})" style="display:flex;flex-direction:column;gap:16px">
+      <div id="upload-drop-zone" class="upload-drop-zone">
+        <span class="mi" style="font-size:36px;color:var(--md-outline-variant)">cloud_upload</span>
+        <p style="margin-top:8px;color:var(--md-on-surface-variant);font-size:14px">点击选择文件或拖拽到此处</p>
+        <p style="font-size:12px;color:var(--md-outline)">支持 PDF、PPT、Word、图片，最大 20MB</p>
+        <input type="file" id="upload-file-input" style="display:none" accept=".pdf,.ppt,.pptx,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp" onchange="onFileSelected(this)">
+        <p id="upload-file-name" style="display:none;font-size:14px;font-weight:500;color:var(--md-primary);margin-top:8px"></p>
+      </div>
+      <div class="md-input-group">
+        <input class="md-input" name="title" placeholder=" " required>
+        <label class="md-label">资料标题</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>资料标题</span></legend></fieldset>
+      </div>
+      <div class="md-input-group">
+        <input class="md-input" name="description" placeholder=" ">
+        <label class="md-label">描述（可选）</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>描述（可选）</span></legend></fieldset>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div class="md-input-group" style="flex:1">
+          <input class="md-input" name="chapter" placeholder=" ">
+          <label class="md-label">章节（如：第3章）</label>
+          <fieldset class="md-border" aria-hidden="true"><legend><span>章节</span></legend></fieldset>
+        </div>
+        <div style="flex:1">
+          ${createMdSelect({
+            id: 'upload-category',
+            label: '分类',
+            options: categories.map(c => ({ text: c, value: c })),
+            selected: '其他'
+          })}
+        </div>
+      </div>
+      <div class="form-error" id="upload-error" style="display:none"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">上传</button>
+    </form>
+  `;
+  openModal('上传资料', html);
+
+  // 点击拖拽区触发文件选择
+  setTimeout(() => {
+    const dropZone = document.getElementById('upload-drop-zone');
+    const fileInput = document.getElementById('upload-file-input');
+    if (dropZone && fileInput) {
+      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+          fileInput.files = e.dataTransfer.files;
+          onFileSelected(fileInput);
+        }
+      });
+    }
+  }, 100);
+}
+
+function onFileSelected(input) {
+  const nameEl = document.getElementById('upload-file-name');
+  if (input.files.length && nameEl) {
+    nameEl.textContent = '📎 ' + input.files[0].name;
+    nameEl.style.display = 'block';
+  }
+}
+
+async function handleUploadMaterial(e, courseId) {
+  e.preventDefault();
+  const form = e.target;
+  const fileInput = document.getElementById('upload-file-input');
+  const errEl = document.getElementById('upload-error');
+
+  if (!fileInput.files.length) {
+    if (errEl) { errEl.textContent = '请选择文件'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  formData.append('title', form.title.value.trim());
+  formData.append('description', form.description.value.trim());
+  formData.append('chapter', form.chapter.value.trim());
+  formData.append('category', document.getElementById('upload-category')?.value || '其他');
+
+  const btn = form.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = '上传中...';
+
+  try {
+    const token = getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`/api/materials/courses/${courseId}`, { method: 'POST', headers, body: formData });
+    const result = await res.json();
+
+    if (result.error) {
+      if (errEl) { errEl.textContent = result.error; errEl.style.display = 'block'; }
+      btn.disabled = false;
+      btn.textContent = '上传';
+      return;
+    }
+
+    closeModal();
+    showToast('上传成功');
+    const contentEl = document.getElementById('course-tab-content');
+    if (contentEl) await loadMaterials(contentEl, courseId);
+  } catch (err) {
+    if (errEl) { errEl.textContent = '上传失败'; errEl.style.display = 'block'; }
+    btn.disabled = false;
+    btn.textContent = '上传';
+  }
+}
+
+// ===== 成员标签页（全宽）=====
+async function renderMembersTab(contentEl, courseId) {
+  contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
+  const members = await apiGet(`/api/courses/${courseId}/members`);
+  const stats = await apiGet(`/api/courses/${courseId}/members/stats`);
+
+  contentEl.innerHTML = `
+    <div class="card">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+        <span style="font-weight:600;color:var(--md-on-surface-variant)"><span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 课程成员 (<span id="member-count">${members.length}</span>)</span>
+        <div style="flex:1"></div>
+        <select id="filter-major" class="member-filter-select" style="width:auto;min-width:120px;margin-bottom:0" onchange="filterMembersTab(${courseId})">
+          <option value="">全部专业</option>
+          ${(stats?.majors || []).map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('')}
+        </select>
+        <select id="filter-grade" class="member-filter-select" style="width:auto;min-width:120px;margin-bottom:0" onchange="filterMembersTab(${courseId})">
+          <option value="">全部年级</option>
+          ${(stats?.grades || []).map(g => `<option value="${escHtml(g)}">${escHtml(g)}</option>`).join('')}
+        </select>
+      </div>
+      <div id="members-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+        ${renderMemberCards(members)}
+      </div>
+    </div>
+  `;
+}
+
+function renderMemberCards(members) {
+  if (members.length === 0) {
+    return '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">暂无匹配成员</p>';
+  }
+  return members.map(m => `
+    <div class="member-card-grid">
+      <div class="avatar-small">${(m.nickname || '?')[0]}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:500">${escHtml(m.nickname)}</div>
+        ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
+        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">tag</span> ${escHtml(m.qq)}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function filterMembersTab(courseId) {
+  const major = document.getElementById('filter-major')?.value || '';
+  const grade = document.getElementById('filter-grade')?.value || '';
+  const params = new URLSearchParams();
+  if (major) params.set('major', major);
+  if (grade) params.set('grade', grade);
+
+  const gridEl = document.getElementById('members-grid');
+  const countEl = document.getElementById('member-count');
+  if (gridEl) gridEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">加载中...</p>';
+
+  try {
+    const members = await apiGet(`/api/courses/${courseId}/members?${params.toString()}`);
+    if (gridEl) gridEl.innerHTML = renderMemberCards(members);
+    if (countEl) countEl.textContent = members.length;
+  } catch {
+    if (gridEl) gridEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">加载失败</p>';
+  }
+}
 
 function renderMembersList(members) {
   if (members.length === 0) {
@@ -1466,6 +1840,13 @@ function formatTime(ts) {
   if (!ts) return '';
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
 }
 
 function escHtml(str) {

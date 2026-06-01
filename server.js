@@ -53,6 +53,7 @@ async function start() {
   const SQL = await initSqlJs();
 
   fs.mkdirSync(path.join(__dirname, 'db'), { recursive: true });
+  fs.mkdirSync(path.join(__dirname, 'uploads', 'materials'), { recursive: true });
 
   let sqlDb;
   if (fs.existsSync(DB_PATH)) {
@@ -139,6 +140,39 @@ async function start() {
 
   migrateTable('user_courses', 'semester_key', "TEXT DEFAULT ''");
 
+  // New table: materials (学习资料)
+  db.run(`CREATE TABLE IF NOT EXISTS materials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id INTEGER NOT NULL,
+    uploader_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    file_path TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_size INTEGER DEFAULT 0,
+    chapter TEXT DEFAULT '',
+    category TEXT DEFAULT '其他',
+    avg_rating REAL DEFAULT 0,
+    rating_count INTEGER DEFAULT 0,
+    download_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    FOREIGN KEY (uploader_id) REFERENCES users(id)
+  )`);
+
+  // New table: material_ratings (资料评分)
+  db.run(`CREATE TABLE IF NOT EXISTS material_ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    rating INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(material_id, user_id)
+  )`);
+
   db.save();
 
   // --- Middleware ---
@@ -150,8 +184,10 @@ async function start() {
   const userRouter = require('./routes/user')(db);
   const scheduleRouter = require('./routes/schedule')(db);
   const authRouter = require('./routes/auth')(db);
+  const materialsRouter = require('./routes/materials')(db);
 
   app.use('/api/courses', coursesRouter);
+  app.use('/api/materials', materialsRouter);
   app.use('/api/user', userRouter);
   app.use('/api/schedule', scheduleRouter);
   app.use('/api/auth', authRouter);
