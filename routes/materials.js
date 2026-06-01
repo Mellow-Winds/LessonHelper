@@ -115,7 +115,11 @@ module.exports = function (db) {
 
     db.run('UPDATE materials SET download_count = download_count + 1 WHERE id = ?', [material.id]);
     db.save();
-    res.download(filePath, material.file_name);
+
+    // 中文文件名需要 RFC 5987 编码
+    const encodedName = encodeURIComponent(material.file_name);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedName}`);
+    res.sendFile(filePath);
   });
 
   // POST /api/materials/:id/rate — 评分 [Auth]
