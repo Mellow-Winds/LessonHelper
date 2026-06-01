@@ -399,8 +399,8 @@ export function switchSearchTab(type) {
 }
 
 function renderSearchResults(data, q) {
-  const { courses = [], materials = [], posts = [] } = data;
-  const total = courses.length + materials.length + posts.length;
+  const { courses = [], materials = [], posts = [], squarePosts = [] } = data;
+  const total = courses.length + materials.length + posts.length + squarePosts.length;
 
   if (total === 0) {
     return `
@@ -453,6 +453,23 @@ function renderSearchResults(data, q) {
     }).join('');
   }
 
+  if (squarePosts.length > 0) {
+    html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">explore</span> 广场帖子 (${squarePosts.length})</h3>`;
+    html += squarePosts.map(p => {
+      const snippet = getSnippet(p.description, q, 80);
+      const remainingDays = Math.max(0, Math.ceil((new Date(p.expires_at) - Date.now()) / (24 * 60 * 60 * 1000)));
+      return `
+        <div class="card search-result-card" onclick="navigateTo('square-post', ${p.id})">
+          <div style="font-weight:600">${highlight(p.title, q)}</div>
+          ${snippet ? `<div style="font-size:13px;color:var(--md-on-surface-variant);margin-top:4px">${highlight(snippet, q)}</div>` : ''}
+          <div style="font-size:12px;color:var(--md-outline);margin-top:4px">
+            ${escHtml(p.category)} · ${escHtml(p.creator_name)} · ${escHtml(p.status)} · 剩余 ${remainingDays} 天
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
   return html;
 }
 
@@ -495,7 +512,7 @@ registerPage('search', async (container, data) => {
         <span class="mi" style="font-size:20px;color:var(--md-on-surface-variant);margin-top:18px">search</span>
         ${createMdInput({
           id: 'search-page-input',
-          label: '搜索课程、资料、帖子...',
+          label: '搜索课程、资料、帖子、广场帖子...',
           value: q,
           style: 'flex:1;margin-bottom:0',
           attrs: `onkeydown="handleSearchPageKey(event)"`
@@ -508,6 +525,7 @@ registerPage('search', async (container, data) => {
       <button class="md-tab-btn ${activeTab === 'courses' ? 'active' : ''}" data-tab="courses">课程</button>
       <button class="md-tab-btn ${activeTab === 'materials' ? 'active' : ''}" data-tab="materials">资料</button>
       <button class="md-tab-btn ${activeTab === 'posts' ? 'active' : ''}" data-tab="posts">帖子</button>
+      <button class="md-tab-btn ${activeTab === 'squarePosts' ? 'active' : ''}" data-tab="squarePosts">广场帖子</button>
     </div>
     <div id="search-results"></div>
   `;
