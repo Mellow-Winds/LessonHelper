@@ -177,3 +177,18 @@
 
 - [x] 下载文件中文名乱码：改用标题+扩展名作为下载文件名（RFC 5987 编码）
 - [x] multer 中文文件名编码：增加 Latin-1 → UTF-8 转换
+
+---
+
+## 第11轮：消息提醒 ✅
+
+**目标**：新帖、评论、邀约回复、新资料实时提醒
+
+- [x] `server.js`：新建 `notifications` 表
+- [x] `routes/notifications.js`（新建）：GET 通知列表、GET 未读数量、PUT 标记已读、PUT 全部已读；导出 `createNotification` 和 `notifyCourseMembers` 辅助函数
+- [x] 通知触发点：发帖→通知课程成员；评论→通知帖子作者；加入邀约→通知创建者；取消邀约→通知参与者；上传资料→通知课程成员
+- [x] `app.js`：铃铛图标+未读角标+通知面板（下拉）+30秒轮询+点击跳转+全部已读
+- [x] `index.html`：侧栏底部增加铃铛入口
+- [x] `style.css`：notification-bell、notif-badge、notification-panel、notif-item、notif-unread 样式
+
+**验证**：用户 A 发帖→用户 B 收到通知→铃铛显示角标→点击展开面板→点击通知跳转→全部已读
