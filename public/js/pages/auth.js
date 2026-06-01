@@ -467,7 +467,7 @@ function renderSearchResults(data, q) {
   }
 
   if (squarePosts.length > 0) {
-    html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">explore</span> 广场帖子 (${squarePosts.length})</h3>`;
+    html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">explore</span> 广场 (${squarePosts.length})</h3>`;
     html += squarePosts.map(p => {
       const snippet = getSnippet(p.description, q, 80);
       const remainingDays = Math.max(0, Math.ceil((new Date(p.expires_at) - Date.now()) / (24 * 60 * 60 * 1000)));
@@ -525,7 +525,7 @@ registerPage('search', async (container, data) => {
         <span class="mi" style="font-size:20px;color:var(--md-on-surface-variant);margin-top:18px">search</span>
         ${createMdInput({
           id: 'search-page-input',
-          label: '搜索课程、资料、帖子、广场帖子...',
+          label: '搜索课程、资料、帖子、广场...',
           value: q,
           style: 'flex:1;margin-bottom:0',
           attrs: `onkeydown="handleSearchPageKey(event)"`
@@ -538,7 +538,7 @@ registerPage('search', async (container, data) => {
       <button class="md-tab-btn ${activeTab === 'courses' ? 'active' : ''}" data-tab="courses">课程</button>
       <button class="md-tab-btn ${activeTab === 'materials' ? 'active' : ''}" data-tab="materials">资料</button>
       <button class="md-tab-btn ${activeTab === 'posts' ? 'active' : ''}" data-tab="posts">帖子</button>
-      <button class="md-tab-btn ${activeTab === 'squarePosts' ? 'active' : ''}" data-tab="squarePosts">广场帖子</button>
+      <button class="md-tab-btn ${activeTab === 'squarePosts' ? 'active' : ''}" data-tab="squarePosts">广场</button>
     </div>
     <div id="search-results"></div>
   `;
