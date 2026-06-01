@@ -192,3 +192,16 @@
 - [x] `style.css`：notification-bell、notif-badge、notification-panel、notif-item、notif-unread 样式
 
 **验证**：用户 A 发帖→用户 B 收到通知→铃铛显示角标→点击展开面板→点击通知跳转→全部已读
+
+---
+
+## 第12轮：全局搜索 ✅
+
+**目标**：搜索课程、资料、帖子
+
+- [x] `routes/search.js`（新建）：GET `/api/search?q=xxx&type=all|courses|materials|posts`，返回分组结果
+- [x] `app.js`：侧栏搜索框（回车触发）、`search` 页面、搜索结果分 Tab（全部/课程/资料/帖子）、关键词高亮、搜索历史（localStorage 最近 5 条）
+- [x] `index.html`：侧栏品牌下方增加搜索框
+- [x] `style.css`：sidebar-search 搜索框、search-result-card 结果卡片、search-highlight 关键词高亮、search-tabs
+
+**验证**：侧栏输入关键词回车→搜索结果页→分 Tab 展示→关键词高亮→点击跳转
