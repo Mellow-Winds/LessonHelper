@@ -114,11 +114,11 @@ async function handleNotifItemClick(notifId, relatedType, relatedId, courseId, i
   }
 
   if (relatedType === 'post' && courseId) {
-    navigateTo('course', courseId);
+    navigateTo('mycourse-detail', courseId);
   } else if (relatedType === 'invite') {
     navigateTo('explore');
   } else if (relatedType === 'material' && courseId) {
-    navigateTo('course', courseId);
+    navigateTo('mycourse-detail', courseId);
   }
 }
 

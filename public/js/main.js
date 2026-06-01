@@ -102,11 +102,20 @@ import './pages/notifications.js';
 import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
   openImportModal, handleAgreeAndImport, handleScheduleImport,
-  switchCourseTab, toggleComments, handleAddComment,
-  refreshMaterials, rateMaterial, deleteMaterial,
+  switchMyCourseTab, toggleComments, handleAddComment,
+  refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
   openUploadMaterialModal, onFileSelected, handleUploadMaterial,
-  filterMembers, filterMembersTab,
-} from './pages/courses.js';
+  filterMyMembers, filterMyMembersTab,
+  handlePortalToPlaza,
+} from './pages/courses/my_courses.js';
+
+import {
+  switchPlazaTab, filterPlazaCourses, handlePlazaPublish,
+} from './pages/courses/plaza.js';
+
+import {
+  onPublishFileSelected,
+} from './pages/courses/publish.js';
 
 import { switchExploreTab } from './pages/explore.js';
 import {
@@ -193,7 +202,7 @@ Object.assign(window, {
   openEditProfileModal,
   handleEditProfile,
   handlePrivacyChange,
-  // courses
+  // my courses
   handleLeaveCourse,
   openCourseSearchModal,
   doCourseSearch,
@@ -201,17 +210,24 @@ Object.assign(window, {
   openImportModal,
   handleAgreeAndImport,
   handleScheduleImport,
-  switchCourseTab,
+  switchMyCourseTab,
   toggleComments,
   handleAddComment,
-  refreshMaterials,
-  rateMaterial,
-  deleteMaterial,
+  refreshMyMaterials,
+  rateMyMaterial,
+  deleteMyMaterial,
   openUploadMaterialModal,
   onFileSelected,
   handleUploadMaterial,
-  filterMembers,
-  filterMembersTab,
+  filterMyMembers,
+  filterMyMembersTab,
+  handlePortalToPlaza,
+  // plaza
+  switchPlazaTab,
+  filterPlazaCourses,
+  handlePlazaPublish,
+  // publish
+  onPublishFileSelected,
   // explore
   switchExploreTab,
   // invites
@@ -244,7 +260,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // 初始化路由系统：解析URL → 导航到对应页面
-  initRouter(() => navigateTo('courses'));
+  initRouter(() => navigateTo('mycourse'));
 
   // 启动通知轮询
   if (window._currentUser) {

@@ -1,11 +1,11 @@
 /**
- * pages/courses.js — 课程列表/详情/论坛/资料/成员 + 课表导入 + 发帖
- * registerPage: courses, course, create-post
+ * pages/courses/my_courses.js — 我的课程（学期班级制）
+ * registerPage: mycourse, mycourse-detail
  */
 
-import { apiGet, apiPost, apiPut, apiDelete, apiPostFile, getToken, isLoggedIn } from '../core/api.js';
-import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../core/router.js';
-import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, formatTime, formatFileSize } from '../components/ui.js';
+import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
+import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../../core/router.js';
+import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, formatTime, formatFileSize } from '../../components/ui.js';
 
 /* =============================================
    学期工具函数
@@ -34,13 +34,25 @@ function semesterLabel(key) {
   return key;
 }
 
-let _currentSemester = getCurrentSemesterKey();
+function semesterFullLabel(key) {
+  if (!key || key === 'all') return '';
+  const parts = key.split('-');
+  if (parts.length < 2) return key;
+  const year = parts[0];
+  const tag = parts[1];
+  if (tag === '1') return `${year}学年 第1学期`;
+  if (tag === '2') return `${year}学年 第2学期`;
+  if (tag === 'summer') return `${year}学年 暑期`;
+  return key;
+}
+
+let _myCurrentSemester = getCurrentSemesterKey();
 
 /* =============================================
-   Page: Course List
+   Page: 我的课程列表
    ============================================= */
 
-registerPage('courses', async (container) => {
+registerPage('mycourse', async (container) => {
   if (!isLoggedIn()) {
     showToast('请先登录');
     navigateTo('profile');
@@ -49,7 +61,10 @@ registerPage('courses', async (container) => {
 
   container.innerHTML = `
     <div class="page-header">
-      <h1 class="page-title" style="margin-bottom:0">课程列表</h1>
+      <div>
+        <h1 class="page-title" style="margin-bottom:0">我的课程</h1>
+        <p class="text-secondary" style="margin-top:4px;font-size:var(--text-sm)">当前学期的班级课程</p>
+      </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-secondary" onclick="openCourseSearchModal()">
           <span class="mi">search</span> 选择已有课程
@@ -59,14 +74,14 @@ registerPage('courses', async (container) => {
         </button>
       </div>
     </div>
-    <div id="semester-filter-wrap" style="margin-bottom:var(--space-4);width:auto;min-width:180px;display:inline-block">
+    <div id="my-semester-filter-wrap" style="margin-bottom:var(--space-4);width:auto;min-width:180px;display:inline-block">
       ${createMdSelect({
-        id: 'semester-filter',
-        options: [{ text: semesterLabel(_currentSemester), value: _currentSemester }],
-        selected: _currentSemester,
+        id: 'my-semester-filter',
+        options: [{ text: semesterLabel(_myCurrentSemester), value: _myCurrentSemester }],
+        selected: _myCurrentSemester,
       })}
     </div>
-    <div id="course-list">
+    <div id="my-course-list">
       <div class="card"><p class="text-secondary">加载中...</p></div>
     </div>
   `;
@@ -74,49 +89,46 @@ registerPage('courses', async (container) => {
   bindRipples(container);
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
-  const semContainer = document.getElementById('semester-filter-container');
+  const semContainer = document.getElementById('my-semester-filter-container');
   if (semContainer) {
     semContainer.addEventListener('md-select-change', (e) => {
-      handleSemesterChange(e.detail.value);
+      _myCurrentSemester = e.detail.value;
+      loadMyCourseList(_myCurrentSemester);
     });
   }
 
   try {
     const semesters = await apiGet('/api/courses/semesters');
     if (semesters.length > 0) {
-      const allKeys = new Set([_currentSemester, ...semesters]);
+      const allKeys = new Set([_myCurrentSemester, ...semesters]);
       const sorted = Array.from(allKeys).sort().reverse();
       const options = [
         { text: '全部学期', value: 'all' },
         ...sorted.map(k => ({ text: semesterLabel(k), value: k }))
       ];
-      const wrap = document.getElementById('semester-filter-wrap');
+      const wrap = document.getElementById('my-semester-filter-wrap');
       if (wrap) {
         wrap.innerHTML = createMdSelect({
-          id: 'semester-filter',
+          id: 'my-semester-filter',
           options,
-          selected: _currentSemester,
+          selected: _myCurrentSemester,
         });
-        const newSemContainer = document.getElementById('semester-filter-container');
+        const newSemContainer = document.getElementById('my-semester-filter-container');
         if (newSemContainer) {
           newSemContainer.addEventListener('md-select-change', (e) => {
-            handleSemesterChange(e.detail.value);
+            _myCurrentSemester = e.detail.value;
+            loadMyCourseList(_myCurrentSemester);
           });
         }
       }
     }
   } catch {}
 
-  await loadCourseList(_currentSemester);
+  await loadMyCourseList(_myCurrentSemester);
 });
 
-async function handleSemesterChange(semester) {
-  _currentSemester = semester;
-  await loadCourseList(semester);
-}
-
-async function loadCourseList(semester) {
-  const listEl = document.getElementById('course-list');
+async function loadMyCourseList(semester) {
+  const listEl = document.getElementById('my-course-list');
   if (!listEl) return;
   listEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
 
@@ -137,7 +149,7 @@ async function loadCourseList(semester) {
     }
 
     listEl.innerHTML = courses.map(c => `
-      <div class="card mb-4 clickable" onclick="navigateTo('course', ${c.id})">
+      <div class="card mb-4 clickable" onclick="navigateTo('mycourse-detail', ${c.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1;min-width:0">
             <h3 class="card-title">${escHtml(c.title)}</h3>
@@ -163,19 +175,8 @@ async function loadCourseList(semester) {
   }
 }
 
-export async function handleLeaveCourse(courseId) {
-  if (!confirm('确定要退出该课程吗？')) return;
-  const result = await apiDelete(`/api/courses/${courseId}/leave`);
-  if (result.error) {
-    showToast(result.error);
-  } else {
-    showToast('已退出课程');
-    navigateTo('courses');
-  }
-}
-
 /* =============================================
-   选择已有课程
+   选择已有课程（模态框）
    ============================================= */
 
 export async function openCourseSearchModal() {
@@ -266,12 +267,12 @@ export async function handleEnrollFromSearch(courseId) {
   } else {
     showToast('加入成功');
     closeModal();
-    navigateTo('courses');
+    navigateTo('mycourse');
   }
 }
 
 /* =============================================
-   导入课程表
+   导入课程表（模态框）
    ============================================= */
 
 export async function openImportModal() {
@@ -346,6 +347,7 @@ export function handleAgreeAndImport() {
 export async function handleScheduleImport(file) {
   if (!file) return;
   try {
+    const { apiPostFile } = await import('../../core/api.js');
     const result = await apiPostFile('/api/schedule/import', file);
     if (result.error) {
       showToast('导入失败: ' + result.error);
@@ -353,22 +355,35 @@ export async function handleScheduleImport(file) {
     }
     closeModal();
     showToast(`成功导入 ${result.imported} 门课程`);
-    setTimeout(() => navigateTo('courses'), 280);
+    setTimeout(() => navigateTo('mycourse'), 280);
   } catch {
     showToast('导入失败，请检查网络连接');
   }
 }
 
 /* =============================================
-   Page: Course Space (Forum)
+   退出课程
    ============================================= */
 
-window._courseSpace = {};
+export async function handleLeaveCourse(courseId) {
+  if (!confirm('确定要退出该课程吗？')) return;
+  const result = await apiDelete(`/api/courses/${courseId}/leave`);
+  if (result.error) {
+    showToast(result.error);
+  } else {
+    showToast('已退出课程');
+    navigateTo('mycourse');
+  }
+}
 
-registerPage('course', async (container, courseId) => {
-  container.innerHTML = `
-    <div class="card"><p class="text-secondary">加载中...</p></div>
-  `;
+/* =============================================
+   Page: 我的课程详情（小班空间 · 三段式药丸）
+   ============================================= */
+
+window._myCourseSpace = {};
+
+registerPage('mycourse-detail', async (container, courseId) => {
+  container.innerHTML = `<div class="card"><p class="text-secondary">加载中...</p></div>`;
 
   try {
     const course = await apiGet(`/api/courses/${courseId}`);
@@ -377,79 +392,84 @@ registerPage('course', async (container, courseId) => {
       return;
     }
 
-    window._courseSpace = { courseId, course, activeTab: 'forum' };
+    window._myCourseSpace = { courseId, course, activeTab: null };
+    const portalName = cleanPortalName(course.title);
 
     container.innerHTML = `
       <div class="page-header">
-        <div>
+        <div style="flex:1;min-width:0">
           <h1 class="page-title" style="margin-bottom:4px">${escHtml(course.title)}</h1>
           <p class="text-secondary">
             ${course.teacher ? escHtml(course.teacher) + ' · ' : ''}
             ${course.enrollment_count || 0} 人选课
           </p>
         </div>
+        <button class="btn btn-secondary btn-compact" onclick="handlePortalToPlaza('${escHtml(portalName)}')" title="穿梭到课程广场·大课主页">
+          <span class="mi">open_in_new</span> 穿梭到广场
+        </button>
+        <button class="btn btn-primary btn-compact" onclick="navigateTo('publish', ${courseId})">
+          <span class="mi">edit</span> 发布
+        </button>
       </div>
-      <div class="course-tabs" id="course-tabs">
-        <button class="course-tab active" data-tab="forum" onclick="switchCourseTab('forum', ${courseId})">
+      <div class="md-pills" id="my-course-pills">
+        <button class="md-pill-btn active" data-tab="forum" onclick="switchMyCourseTab('forum', ${courseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">forum</span> 论坛
         </button>
-        <button class="course-tab" data-tab="materials" onclick="switchCourseTab('materials', ${courseId})">
+        <button class="md-pill-btn" data-tab="materials" onclick="switchMyCourseTab('materials', ${courseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料
         </button>
-        <button class="course-tab" data-tab="members" onclick="switchCourseTab('members', ${courseId})">
+        <button class="md-pill-btn" data-tab="members" onclick="switchMyCourseTab('members', ${courseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 成员
         </button>
       </div>
-      <div id="course-tab-content"></div>
+      <div id="my-course-tab-content" style="min-height:200px"></div>
     `;
 
     bindRipples(container);
     animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
-    animIn(container.querySelector('.course-tabs'), { y: 12, delay: 80, dur: 350 });
+    animIn(container.querySelector('.md-pills'), { y: 12, delay: 80, dur: 350 });
 
-    await switchCourseTab('forum', courseId);
+    await switchMyCourseTab('forum', courseId);
   } catch (e) {
     container.innerHTML = `<div class="card"><p class="text-secondary">加载失败: ${e.message}</p></div>`;
   }
 });
 
-export async function switchCourseTab(tab, courseId) {
-  window._courseSpace.activeTab = tab;
+/* ---- 药丸Tab切换 ---- */
 
-  document.querySelectorAll('.course-tab').forEach(el => {
+export async function switchMyCourseTab(tab, courseId) {
+  if (tab === window._myCourseSpace.activeTab) return;
+  window._myCourseSpace.activeTab = tab;
+
+  document.querySelectorAll('#my-course-pills .md-pill-btn').forEach(el => {
     el.classList.toggle('active', el.dataset.tab === tab);
   });
 
-  const contentEl = document.getElementById('course-tab-content');
+  const contentEl = document.getElementById('my-course-tab-content');
   if (!contentEl) return;
 
   switch (tab) {
     case 'forum':
-      await renderForumTab(contentEl, courseId);
+      await renderMyForumTab(contentEl, courseId);
       break;
     case 'materials':
-      await renderMaterialsTab(contentEl, courseId);
+      await renderMyMaterialsTab(contentEl, courseId);
       break;
     case 'members':
-      await renderMembersTab(contentEl, courseId);
+      await renderMyMembersTab(contentEl, courseId);
       break;
   }
 }
 
-/* ===== 论坛标签页 ===== */
+/* ---- 论坛标签页 ---- */
 
-async function renderForumTab(contentEl, courseId) {
+async function renderMyForumTab(contentEl, courseId) {
   contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
   const posts = await apiGet(`/api/courses/${courseId}/posts`);
 
   contentEl.innerHTML = `
     <div style="display:flex;gap:24px">
-      <div style="flex:1;min-width:0" id="posts-area">
-        <div style="margin-bottom:16px;text-align:right">
-          <button class="btn btn-primary" onclick="navigateTo('create-post', ${courseId})">
-            <span class="mi">edit</span> 发帖
-          </button>
-        </div>
+      <div style="flex:1;min-width:0" id="my-posts-area">
         ${posts.length === 0 ? `
           <div class="card" style="text-align:center;padding:48px">
             <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">forum</span>
@@ -469,7 +489,7 @@ async function renderForumTab(contentEl, courseId) {
           </div>
         `).join('')}
       </div>
-      ${await renderMemberSidebar(courseId)}
+      ${await renderMyMemberSidebar(courseId)}
     </div>
   `;
 
@@ -477,46 +497,82 @@ async function renderForumTab(contentEl, courseId) {
   if (cards.length) animStagger(Array.from(cards), { y: 20, dur: 400, gap: 50 });
 }
 
-/* ===== 成员侧栏 ===== */
+/* ---- 成员侧栏 ---- */
 
-async function renderMemberSidebar(courseId) {
+async function renderMyMemberSidebar(courseId) {
   const members = await apiGet(`/api/courses/${courseId}/members`);
   const stats = await apiGet(`/api/courses/${courseId}/members/stats`);
 
   return `
     <div style="width:220px;flex-shrink:0">
-      <div class="card" id="members-sidebar">
+      <div class="card" id="my-members-sidebar">
         <h3 style="font-size:var(--text-sm);font-weight:600;margin-bottom:12px;color:var(--md-on-surface-variant)">
-          <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 成员 (<span id="member-count">${members.length}</span>)
+          <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 成员 (<span id="my-member-count">${members.length}</span>)
         </h3>
-        <div id="member-filters" style="margin-bottom:12px">
+        <div id="my-member-filters" style="margin-bottom:12px">
           ${createMdSelect({
-            id: 'filter-major',
+            id: 'my-filter-major',
             options: [{ text: '全部专业', value: '' }, ...(stats?.majors || []).map(m => ({ text: m, value: m }))],
-            onchange: `filterMembers(${courseId})`
+            onchange: `filterMyMembers(${courseId})`
           })}
           ${createMdSelect({
-            id: 'filter-grade',
+            id: 'my-filter-grade',
             options: [{ text: '全部年级', value: '' }, ...(stats?.grades || []).map(g => ({ text: g, value: g }))],
-            onchange: `filterMembers(${courseId})`
+            onchange: `filterMyMembers(${courseId})`
           })}
         </div>
-        <div id="members-list">
-          ${renderMembersList(members)}
+        <div id="my-members-list">
+          ${renderMyMembersList(members)}
         </div>
       </div>
     </div>
   `;
 }
 
-/* ===== 资料标签页 ===== */
-
-async function renderMaterialsTab(contentEl, courseId) {
-  contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
-  await loadMaterials(contentEl, courseId);
+function renderMyMembersList(members) {
+  if (members.length === 0) {
+    return '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">暂无匹配成员</p>';
+  }
+  return members.map(m => `
+    <div class="member-item">
+      <div class="avatar-small">${(m.nickname || '?')[0]}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:var(--text-sm);font-weight:500">${escHtml(m.nickname)}</div>
+        ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
+        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">qq</span> ${escHtml(m.qq)}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
 }
 
-async function loadMaterials(contentEl, courseId, opts = {}) {
+export async function filterMyMembers(courseId) {
+  const major = document.getElementById('my-filter-major')?.value || '';
+  const grade = document.getElementById('my-filter-grade')?.value || '';
+  const params = new URLSearchParams();
+  if (major) params.set('major', major);
+  if (grade) params.set('grade', grade);
+
+  const listEl = document.getElementById('my-members-list');
+  if (listEl) listEl.innerHTML = '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">加载中...</p>';
+
+  try {
+    const members = await apiGet(`/api/courses/${courseId}/members?${params.toString()}`);
+    if (listEl) listEl.innerHTML = renderMyMembersList(members);
+    const countEl = document.getElementById('my-member-count');
+    if (countEl) countEl.textContent = members.length;
+  } catch {
+    if (listEl) listEl.innerHTML = '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">加载失败</p>';
+  }
+}
+
+/* ---- 资料标签页 ---- */
+
+async function renderMyMaterialsTab(contentEl, courseId) {
+  contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
+  await loadMyMaterials(contentEl, courseId);
+}
+
+async function loadMyMaterials(contentEl, courseId, opts = {}) {
   const params = new URLSearchParams();
   if (opts.category && opts.category !== 'all') params.set('category', opts.category);
   if (opts.chapter) params.set('chapter', opts.chapter);
@@ -532,43 +588,46 @@ async function loadMaterials(contentEl, courseId, opts = {}) {
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             ${createMdSelect({
-              id: 'mat-category',
+              id: 'my-mat-category',
               options: categories.map(c => ({ text: c, value: c === '全部' ? 'all' : c })),
               style: 'width:auto;min-width:100px;margin-bottom:0',
-              onchange: `refreshMaterials(${courseId})`
+              onchange: `refreshMyMaterials(${courseId})`
             })}
             ${createMdInput({
-              id: 'mat-chapter',
+              id: 'my-mat-chapter',
               label: '按章节搜索',
               style: 'width:auto;min-width:120px;margin-bottom:0',
-              onchange: `refreshMaterials(${courseId})`,
+              onchange: `refreshMyMaterials(${courseId})`,
               placeholder: ' '
             })}
             ${createMdSelect({
-              id: 'mat-sort',
+              id: 'my-mat-sort',
               options: [
                 { text: '最新上传', value: 'newest' },
                 { text: '评分最高', value: 'rating' },
                 { text: '下载最多', value: 'downloads' }
               ],
               style: 'width:auto;min-width:100px;margin-bottom:0',
-              onchange: `refreshMaterials(${courseId})`
+              onchange: `refreshMyMaterials(${courseId})`
             })}
           </div>
           <button class="btn btn-primary" onclick="openUploadMaterialModal(${courseId})">
             <span class="mi">upload</span> 上传资料
           </button>
         </div>
-        <div id="materials-list">
-          ${renderMaterialsList(materials, courseId)}
+        <div id="my-materials-list">
+          ${renderMyMaterialsList(materials, courseId)}
         </div>
       </div>
-      ${await renderMemberSidebar(courseId)}
+      ${await renderMyMemberSidebar(courseId)}
     </div>
   `;
+
+  const cards = contentEl.querySelectorAll('.material-card');
+  if (cards.length) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });
 }
 
-function renderMaterialsList(materials, courseId) {
+function renderMyMaterialsList(materials, courseId) {
   if (materials.length === 0) {
     return `
       <div class="card" style="text-align:center;padding:48px">
@@ -599,7 +658,7 @@ function renderMaterialsList(materials, courseId) {
             <span><span class="mi" style="font-size:14px;vertical-align:-2px">download</span> ${m.download_count}</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-            ${renderStars(m.avg_rating, m.id)}
+            ${renderMyStars(m.avg_rating, m.id)}
             <span style="font-size:12px;color:var(--md-on-surface-variant)">${m.rating_count > 0 ? m.avg_rating.toFixed(1) + ' 分' : '暂无评分'}</span>
           </div>
         </div>
@@ -607,24 +666,24 @@ function renderMaterialsList(materials, courseId) {
           <a href="/api/materials/${m.id}/download" class="btn btn-primary" style="font-size:12px;padding:6px 12px">
             <span class="mi" style="font-size:16px">download</span> 下载
           </a>
-          ${m.uploader_id === window._currentUser?.id ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 12px" onclick="deleteMaterial(${m.id}, ${courseId})"><span class="mi" style="font-size:16px">delete</span> 删除</button>` : ''}
+          ${m.uploader_id === window._currentUser?.id ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 12px" onclick="deleteMyMaterial(${m.id}, ${courseId})"><span class="mi" style="font-size:16px">delete</span> 删除</button>` : ''}
         </div>
       </div>
     </div>
   `).join('');
 }
 
-function renderStars(avgRating, materialId) {
+function renderMyStars(avgRating, materialId) {
   let html = '<div class="stars-row">';
   for (let i = 1; i <= 5; i++) {
     const filled = i <= Math.round(avgRating) ? 'star' : 'star_border';
-    html += `<span class="mi star-icon" style="font-size:18px;cursor:pointer;color:${i <= Math.round(avgRating) ? '#FB8C00' : 'var(--md-outline-variant)'}" onclick="rateMaterial(${materialId}, ${i})">${filled}</span>`;
+    html += `<span class="mi star-icon" style="font-size:18px;cursor:pointer;color:${i <= Math.round(avgRating) ? '#FB8C00' : 'var(--md-outline-variant)'}" onclick="rateMyMaterial(${materialId}, ${i})">${filled}</span>`;
   }
   html += '</div>';
   return html;
 }
 
-export async function rateMaterial(materialId, rating) {
+export async function rateMyMaterial(materialId, rating) {
   if (!window._currentUser) {
     showToast('请先登录');
     return;
@@ -635,20 +694,20 @@ export async function rateMaterial(materialId, rating) {
     return;
   }
   showToast(`评分成功 (${result.avg_rating} 分)`);
-  const courseId = window._courseSpace.courseId;
-  const contentEl = document.getElementById('course-tab-content');
-  if (contentEl && courseId) await loadMaterials(contentEl, courseId);
+  const courseId = window._myCourseSpace.courseId;
+  const contentEl = document.getElementById('my-course-tab-content');
+  if (contentEl && courseId) await loadMyMaterials(contentEl, courseId);
 }
 
-export async function refreshMaterials(courseId) {
-  const category = document.getElementById('mat-category')?.value || 'all';
-  const chapter = document.getElementById('mat-chapter')?.value || '';
-  const sort = document.getElementById('mat-sort')?.value || 'newest';
-  const contentEl = document.getElementById('course-tab-content');
-  if (contentEl) await loadMaterials(contentEl, courseId, { category, chapter, sort });
+export async function refreshMyMaterials(courseId) {
+  const category = document.getElementById('my-mat-category')?.value || 'all';
+  const chapter = document.getElementById('my-mat-chapter')?.value || '';
+  const sort = document.getElementById('my-mat-sort')?.value || 'newest';
+  const contentEl = document.getElementById('my-course-tab-content');
+  if (contentEl) await loadMyMaterials(contentEl, courseId, { category, chapter, sort });
 }
 
-export async function deleteMaterial(materialId, courseId) {
+export async function deleteMyMaterial(materialId, courseId) {
   if (!confirm('确定删除这份资料？')) return;
   const result = await apiDelete(`/api/materials/${materialId}`);
   if (result.error) {
@@ -656,8 +715,8 @@ export async function deleteMaterial(materialId, courseId) {
     return;
   }
   showToast('删除成功');
-  const contentEl = document.getElementById('course-tab-content');
-  if (contentEl) await loadMaterials(contentEl, courseId);
+  const contentEl = document.getElementById('my-course-tab-content');
+  if (contentEl) await loadMyMaterials(contentEl, courseId);
 }
 
 export function openUploadMaterialModal(courseId) {
@@ -752,6 +811,7 @@ export async function handleUploadMaterial(e, courseId) {
   btn.textContent = '上传中...';
 
   try {
+    const { getToken } = await import('../../core/api.js');
     const token = getToken();
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -767,8 +827,8 @@ export async function handleUploadMaterial(e, courseId) {
 
     closeModal();
     showToast('上传成功');
-    const contentEl = document.getElementById('course-tab-content');
-    if (contentEl) await loadMaterials(contentEl, courseId);
+    const contentEl = document.getElementById('my-course-tab-content');
+    if (contentEl) await loadMyMaterials(contentEl, courseId);
   } catch (err) {
     if (errEl) { errEl.textContent = '上传失败'; errEl.style.display = 'block'; }
     btn.disabled = false;
@@ -776,9 +836,9 @@ export async function handleUploadMaterial(e, courseId) {
   }
 }
 
-/* ===== 成员标签页（全宽）===== */
+/* ---- 成员标签页（全宽）---- */
 
-async function renderMembersTab(contentEl, courseId) {
+async function renderMyMembersTab(contentEl, courseId) {
   contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
   const members = await apiGet(`/api/courses/${courseId}/members`);
   const stats = await apiGet(`/api/courses/${courseId}/members/stats`);
@@ -786,29 +846,32 @@ async function renderMembersTab(contentEl, courseId) {
   contentEl.innerHTML = `
     <div class="card">
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-        <span style="font-weight:600;color:var(--md-on-surface-variant)"><span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 课程成员 (<span id="member-count">${members.length}</span>)</span>
+        <span style="font-weight:600;color:var(--md-on-surface-variant)"><span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 课程成员 (<span id="my-member-count-full">${members.length}</span>)</span>
         <div style="flex:1"></div>
         ${createMdSelect({
-          id: 'filter-major',
+          id: 'my-filter-major-full',
           options: [{ text: '全部专业', value: '' }, ...(stats?.majors || []).map(m => ({ text: m, value: m }))],
           style: 'width:auto;min-width:120px;margin-bottom:0',
-          onchange: `filterMembersTab(${courseId})`
+          onchange: `filterMyMembersTab(${courseId})`
         })}
         ${createMdSelect({
-          id: 'filter-grade',
+          id: 'my-filter-grade-full',
           options: [{ text: '全部年级', value: '' }, ...(stats?.grades || []).map(g => ({ text: g, value: g }))],
           style: 'width:auto;min-width:120px;margin-bottom:0',
-          onchange: `filterMembersTab(${courseId})`
+          onchange: `filterMyMembersTab(${courseId})`
         })}
       </div>
-      <div id="members-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
-        ${renderMemberCards(members)}
+      <div id="my-members-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+        ${renderMyMemberCards(members)}
       </div>
     </div>
   `;
+
+  const cards = contentEl.querySelectorAll('.member-card-grid');
+  if (cards.length) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });
 }
 
-function renderMemberCards(members) {
+function renderMyMemberCards(members) {
   if (members.length === 0) {
     return '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">暂无匹配成员</p>';
   }
@@ -818,200 +881,71 @@ function renderMemberCards(members) {
       <div style="flex:1;min-width:0">
         <div style="font-weight:500">${escHtml(m.nickname)}</div>
         ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
-        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px" data-icon="qq">qq</span> ${escHtml(m.qq)}</div>` : ''}
+        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">qq</span> ${escHtml(m.qq)}</div>` : ''}
       </div>
     </div>
   `).join('');
 }
 
-export async function filterMembersTab(courseId) {
-  const major = document.getElementById('filter-major')?.value || '';
-  const grade = document.getElementById('filter-grade')?.value || '';
+export async function filterMyMembersTab(courseId) {
+  const major = document.getElementById('my-filter-major-full')?.value || '';
+  const grade = document.getElementById('my-filter-grade-full')?.value || '';
   const params = new URLSearchParams();
   if (major) params.set('major', major);
   if (grade) params.set('grade', grade);
 
-  const gridEl = document.getElementById('members-grid');
-  const countEl = document.getElementById('member-count');
+  const gridEl = document.getElementById('my-members-grid');
+  const countEl = document.getElementById('my-member-count-full');
   if (gridEl) gridEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">加载中...</p>';
 
   try {
     const members = await apiGet(`/api/courses/${courseId}/members?${params.toString()}`);
-    if (gridEl) gridEl.innerHTML = renderMemberCards(members);
+    if (gridEl) gridEl.innerHTML = renderMyMemberCards(members);
     if (countEl) countEl.textContent = members.length;
   } catch {
     if (gridEl) gridEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">加载失败</p>';
   }
 }
 
-function renderMembersList(members) {
-  if (members.length === 0) {
-    return '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">暂无匹配成员</p>';
-  }
-  return members.map(m => `
-    <div class="member-item">
-      <div class="avatar-small">${(m.nickname || '?')[0]}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:var(--text-sm);font-weight:500">${escHtml(m.nickname)}</div>
-        ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
-        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px" data-icon="qq">qq</span> ${escHtml(m.qq)}</div>` : ''}
-      </div>
-    </div>
-  `).join('');
+/* =============================================
+   穿梭门：清洗班级名 → 导航到广场
+   ============================================= */
+
+function cleanPortalName(title) {
+  if (!title) return '';
+  const parens = title.match(/[（(].+?[)）]/g) || [];
+  let temp = title;
+  parens.forEach((p, i) => { temp = temp.replace(p, `__PH${i}__`); });
+  // 清除末尾班级号：支持 "07班"、"25班"、孤立数字 "25"、带空格 " 25"
+  temp = temp.replace(/\d{1,3}\s*班\s*$/, '');
+  temp = temp.replace(/[\s ]*\d{1,3}\s*$/, '');
+  temp = temp.replace(/\d{1,3}$/, '');
+  parens.forEach((p, i) => { temp = temp.replace(`__PH${i}__`, p); });
+  return temp.trim();
 }
 
-export async function filterMembers(courseId) {
-  const major = document.getElementById('filter-major')?.value || '';
-  const grade = document.getElementById('filter-grade')?.value || '';
-  const params = new URLSearchParams();
-  if (major) params.set('major', major);
-  if (grade) params.set('grade', grade);
-
-  const listEl = document.getElementById('members-list');
-  if (listEl) listEl.innerHTML = '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">加载中...</p>';
-
+export async function handlePortalToPlaza(cleanName) {
+  // 先搜索课程ID，确保URL正确
   try {
-    const members = await apiGet(`/api/courses/${courseId}/members?${params.toString()}`);
-    if (listEl) listEl.innerHTML = renderMembersList(members);
-    const countEl = document.getElementById('member-count');
-    if (countEl) countEl.textContent = members.length;
+    const allCourses = await apiGet('/api/courses');
+    const q = cleanName.toLowerCase();
+    const found = allCourses.find(c => {
+      const big = cleanPortalName(c.title).toLowerCase();
+      return big.includes(q) || (c.title || '').toLowerCase().includes(q);
+    });
+    if (found) {
+      navigateTo('plaza-course', found.id);
+    } else {
+      showToast('未在课程广场找到对应的课程');
+    }
   } catch {
-    if (listEl) listEl.innerHTML = '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">加载失败</p>';
+    showToast('搜索课程失败');
   }
 }
 
 /* =============================================
-   Page: Create Post
+   Post & Comment Helpers（共用）
    ============================================= */
-
-registerPage('create-post', async (container, courseId) => {
-  if (!isLoggedIn()) {
-    showToast('请先登录');
-    navigateTo('profile');
-    return;
-  }
-
-  const course = await apiGet(`/api/courses/${courseId}`);
-  const courseTitle = course.error ? '课程' : course.title;
-
-  container.innerHTML = `
-    <div class="create-post-page">
-      <div class="create-post-header">
-        <button class="btn btn-icon" onclick="navigateTo('course', ${courseId})" title="返回课程空间">
-          <span class="mi">arrow_back</span>
-        </button>
-        <div class="create-post-breadcrumb">
-          <span class="text-secondary">${escHtml(courseTitle)}</span>
-          <span class="mi" style="font-size:18px;color:var(--md-outline)">chevron_right</span>
-          <span style="font-weight:600">发帖</span>
-        </div>
-      </div>
-
-      <div class="md-input-group" style="--md-field-bg: var(--md-surface)">
-        <input class="md-input" type="text" id="post-title" placeholder=" " required>
-        <label class="md-label">${window.t('title')}</label>
-        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('title')}</span></legend></fieldset>
-      </div>
-
-      <div class="rte-toolbar" role="toolbar" aria-label="文本格式化">
-        <button type="button" class="rte-btn" data-cmd="bold" title="加粗 (Ctrl+B)">
-          <span class="mi">format_bold</span>
-        </button>
-        <button type="button" class="rte-btn" data-cmd="italic" title="斜体 (Ctrl+I)">
-          <span class="mi">format_italic</span>
-        </button>
-        <button type="button" class="rte-btn" data-cmd="underline" title="下划线 (Ctrl+U)">
-          <span class="mi">format_underlined</span>
-        </button>
-      </div>
-
-      <div class="rte-wrapper">
-        <div class="rte-editor" contenteditable="true" id="post-content" role="textbox" aria-multiline="true" aria-label="帖子内容"></div>
-        <label class="rte-label">${window.t('content')}</label>
-        <fieldset class="rte-border" aria-hidden="true"><legend><span>${window.t('content')}</span></legend></fieldset>
-      </div>
-
-      <div class="form-error" id="create-post-error" style="display:none"></div>
-
-      <button class="btn btn-primary" id="submit-post-btn" style="width:100%;justify-content:center">
-        <span class="mi">send</span> 发布
-      </button>
-    </div>
-  `;
-
-  const editor = container.querySelector('#post-content');
-  const toolbar = container.querySelector('.rte-toolbar');
-
-  toolbar.addEventListener('mousedown', (e) => e.preventDefault());
-
-  editor.addEventListener('focus', () => {
-    toolbar.style.borderColor = 'var(--md-primary)';
-    toolbar.style.transition = 'border-color 200ms cubic-bezier(0.4, 0, 0.2, 1)';
-  });
-  editor.addEventListener('blur', () => {
-    toolbar.style.borderColor = '';
-  });
-
-  toolbar.addEventListener('click', (e) => {
-    const btn = e.target.closest('.rte-btn');
-    if (!btn) return;
-    const cmd = btn.dataset.cmd;
-    document.execCommand(cmd, false, null);
-    editor.focus();
-    syncToolbarState();
-  });
-
-  function syncToolbarState() {
-    toolbar.querySelectorAll('.rte-btn').forEach(btn => {
-      const cmd = btn.dataset.cmd;
-      btn.classList.toggle('active', document.queryCommandState(cmd));
-    });
-  }
-
-  editor.addEventListener('keyup', syncToolbarState);
-  editor.addEventListener('mouseup', syncToolbarState);
-
-  const editorWrapper = container.querySelector('.rte-wrapper');
-  function syncEditorContent() {
-    editorWrapper.classList.toggle('has-content', editor.textContent.trim().length > 0);
-  }
-  editor.addEventListener('input', syncEditorContent);
-  editor.addEventListener('blur', syncEditorContent);
-
-  container.querySelector('#submit-post-btn').addEventListener('click', async () => {
-    const title = container.querySelector('#post-title').value.trim();
-    const content = editor.innerHTML.trim();
-    const errEl = container.querySelector('#create-post-error');
-    errEl.style.display = 'none';
-
-    if (!title) {
-      errEl.textContent = '请输入标题';
-      errEl.style.display = 'block';
-      return;
-    }
-    const textContent = editor.textContent.trim();
-    if (!textContent) {
-      errEl.textContent = '请输入内容';
-      errEl.style.display = 'block';
-      return;
-    }
-
-    const result = await apiPost(`/api/courses/${courseId}/posts`, { title, content });
-    if (result.error) {
-      errEl.textContent = result.error;
-      errEl.style.display = 'block';
-      return;
-    }
-
-    showToast('发帖成功');
-    navigateTo('course', courseId);
-  });
-
-  bindRipples(container);
-  animIn(container.querySelector('.create-post-header'), { y: 16, dur: 380 });
-});
-
-/* ===== Post & Comment Helpers ===== */
 
 let loadedComments = {};
 

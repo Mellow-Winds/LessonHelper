@@ -15,6 +15,17 @@ module.exports = function (db) {
     res.json(rows.map(r => r.semester_key));
   });
 
+  // GET /api/courses/all — 全校课程列表（公开，供课程广场使用，不需要登录）
+  router.get('/all', (req, res) => {
+    const courses = db.all(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id) AS enrollment_count
+      FROM courses c
+      ORDER BY c.title ASC
+    `);
+    res.json(courses);
+  });
+
   // GET /api/courses — 当前用户的课程列表（支持学期筛选）
   router.get('/', authMiddleware, (req, res) => {
     const userId = req.user.userId;

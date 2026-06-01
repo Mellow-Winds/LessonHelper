@@ -4,7 +4,7 @@
  */
 
 import { apiPost, apiGet, saveToken, clearToken, isLoggedIn } from '../core/api.js';
-import { registerPage, navigateTo, animIn, animOut, bindRipples } from '../core/router.js';
+import { registerPage, navigateTo, animIn, animOut, animStagger, bindRipples } from '../core/router.js';
 import { showToast, closeModal, createMdInput, escHtml, formatTime } from '../components/ui.js';
 
 /* =============================================
@@ -182,7 +182,7 @@ export async function handleLogin(e) {
   saveToken(result.token);
   window._currentUser = result.user;
   showToast('登录成功');
-  navigateTo('courses');
+  navigateTo('mycourse');
   refreshNotifBadge();
   if (!window._notifInterval) window._notifInterval = setInterval(refreshNotifBadge, 30000);
 }
@@ -251,7 +251,7 @@ export async function handleVerify(e) {
   saveToken(result.token);
   window._currentUser = result.user;
   showToast('注册成功！');
-  navigateTo('courses');
+  navigateTo('mycourse');
   refreshNotifBadge();
   if (!window._notifInterval) window._notifInterval = setInterval(refreshNotifBadge, 30000);
 }
@@ -374,20 +374,24 @@ export async function executeSearch(type) {
     return;
   }
 
-  const activeTab = type || document.querySelector('#search-tabs .course-tab.active')?.dataset?.tab || 'all';
+  const activeTab = type || document.querySelector('#search-tabs .md-tab-btn.active')?.dataset?.tab || 'all';
   const resultsEl = document.getElementById('search-results');
   if (resultsEl) resultsEl.innerHTML = '<div class="card"><p class="text-secondary">搜索中...</p></div>';
 
+  document.querySelectorAll('#search-tabs .md-tab-btn').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === activeTab);
+  });
+
   try {
     const data = await apiGet(`/api/search?q=${encodeURIComponent(q)}&type=${activeTab}`);
-    if (resultsEl) resultsEl.innerHTML = renderSearchResults(data, q);
+    if (resultsEl) {
+      resultsEl.innerHTML = renderSearchResults(data, q);
+      const cards = resultsEl.querySelectorAll('.search-result-card');
+      if (cards.length) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });
+    }
   } catch {
     if (resultsEl) resultsEl.innerHTML = '<div class="card"><p class="text-secondary">搜索失败</p></div>';
   }
-
-  document.querySelectorAll('#search-tabs .course-tab').forEach(el => {
-    el.classList.toggle('active', el.dataset.tab === activeTab);
-  });
 }
 
 export function switchSearchTab(type) {
@@ -412,7 +416,7 @@ function renderSearchResults(data, q) {
   if (courses.length > 0) {
     html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">menu_book</span> 课程 (${courses.length})</h3>`;
     html += courses.map(c => `
-      <div class="card search-result-card" onclick="navigateTo('course', ${c.id})">
+      <div class="card search-result-card" onclick="navigateTo('mycourse-detail', ${c.id})">
         <div style="font-weight:600">${highlight(c.title, q)}</div>
         <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">
           ${c.teacher ? escHtml(c.teacher) + ' · ' : ''}${c.enrollment_count || 0} 人选课
@@ -424,7 +428,7 @@ function renderSearchResults(data, q) {
   if (materials.length > 0) {
     html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料 (${materials.length})</h3>`;
     html += materials.map(m => `
-      <div class="card search-result-card" onclick="navigateTo('course', ${m.course_id})">
+      <div class="card search-result-card" onclick="navigateTo('mycourse-detail', ${m.course_id})">
         <div style="font-weight:600">${highlight(m.title, q)}</div>
         <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">
           ${escHtml(m.course_title)} · ${escHtml(m.category)}${m.chapter ? ' · ' + escHtml(m.chapter) : ''} · ${escHtml(m.uploader_name)}
@@ -438,7 +442,7 @@ function renderSearchResults(data, q) {
     html += posts.map(p => {
       const snippet = getSnippet(p.content, q, 80);
       return `
-        <div class="card search-result-card" onclick="navigateTo('course', ${p.course_id})">
+        <div class="card search-result-card" onclick="navigateTo('mycourse-detail', ${p.course_id})">
           <div style="font-weight:600">${highlight(p.title, q)}</div>
           <div style="font-size:13px;color:var(--md-on-surface-variant);margin-top:4px">${highlight(snippet, q)}</div>
           <div style="font-size:12px;color:var(--md-outline);margin-top:4px">
@@ -499,17 +503,22 @@ registerPage('search', async (container, data) => {
         <button class="btn btn-primary" style="height:56px" onclick="executeSearch()">搜索</button>
       </div>
     </div>
-    <div class="search-tabs" id="search-tabs">
-      <button class="course-tab ${activeTab === 'all' ? 'active' : ''}" data-tab="all" onclick="switchSearchTab('all')">全部</button>
-      <button class="course-tab ${activeTab === 'courses' ? 'active' : ''}" data-tab="courses" onclick="switchSearchTab('courses')">课程</button>
-      <button class="course-tab ${activeTab === 'materials' ? 'active' : ''}" data-tab="materials" onclick="switchSearchTab('materials')">资料</button>
-      <button class="course-tab ${activeTab === 'posts' ? 'active' : ''}" data-tab="posts" onclick="switchSearchTab('posts')">帖子</button>
+    <div class="md-tabs" id="search-tabs">
+      <button class="md-tab-btn ${activeTab === 'all' ? 'active' : ''}" data-tab="all">全部</button>
+      <button class="md-tab-btn ${activeTab === 'courses' ? 'active' : ''}" data-tab="courses">课程</button>
+      <button class="md-tab-btn ${activeTab === 'materials' ? 'active' : ''}" data-tab="materials">资料</button>
+      <button class="md-tab-btn ${activeTab === 'posts' ? 'active' : ''}" data-tab="posts">帖子</button>
     </div>
     <div id="search-results"></div>
   `;
 
   bindRipples(container);
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
+
+  // 绑定 Tab 切换
+  container.querySelectorAll('#search-tabs .md-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchSearchTab(btn.dataset.tab));
+  });
 
   // 自动聚焦搜索输入框
   const searchInput = container.querySelector('#search-page-input');
