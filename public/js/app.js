@@ -749,10 +749,34 @@ registerPage('profile', async (container) => {
         <div style="display:flex;gap:16px;justify-content:center;margin-top:16px;flex-wrap:wrap">
           ${user.major ? `<span class="info-chip"><span class="mi" style="font-size:16px">school</span> ${user.major}</span>` : ''}
           ${user.grade ? `<span class="info-chip"><span class="mi" style="font-size:16px">calendar_month</span> ${user.grade}</span>` : ''}
+          ${user.qq ? `<span class="info-chip"><span class="mi" style="font-size:16px">tag</span> QQ: ${user.qq}</span>` : ''}
         </div>
         <button class="btn btn-secondary" style="margin-top:24px" onclick="openEditProfileModal()">
           <span class="mi">edit</span> 编辑资料
         </button>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3 style="margin-bottom:16px"><span class="mi" style="font-size:20px;vertical-align:middle;margin-right:8px">privacy_tip</span>隐私设置</h3>
+        <div class="privacy-toggle-row">
+          <div>
+            <div style="font-weight:500">公开个人信息</div>
+            <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:2px">关闭后，其他用户无法看到你的专业、年级和QQ</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="privacy-show-profile" ${user.privacy_show_profile !== 0 ? 'checked' : ''} onchange="handlePrivacyChange('privacy_show_profile', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="privacy-toggle-row">
+          <div>
+            <div style="font-weight:500">允许被匹配</div>
+            <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:2px">关闭后，你不会出现在同课程同学匹配结果中</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="privacy-allow-match" ${user.privacy_allow_match !== 0 ? 'checked' : ''} onchange="handlePrivacyChange('privacy_allow_match', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
       </div>
       <button class="btn btn-secondary" style="margin-top:16px;width:100%;justify-content:center" onclick="logout()">
         <span class="mi">logout</span> 退出登录
@@ -784,6 +808,11 @@ async function openEditProfileModal() {
         <label class="md-label">${window.t('grade')}</label>
         <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('grade')}</span></legend></fieldset>
       </div>
+      <div class="md-input-group">
+        <input class="md-input" type="text" name="qq" placeholder=" " value="${user.qq || ''}">
+        <label class="md-label">QQ号</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>QQ号</span></legend></fieldset>
+      </div>
       <div class="form-error" id="edit-profile-error" style="display:none"></div>
       <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">保存</button>
     </form>
@@ -797,11 +826,12 @@ async function handleEditProfile(e) {
   const nickname = form.nickname.value.trim();
   const major = form.major.value.trim();
   const grade = form.grade.value.trim();
+  const qq = form.qq.value.trim();
 
   const errEl = document.getElementById('edit-profile-error');
   errEl.style.display = 'none';
 
-  const result = await apiPut('/api/auth/me', { nickname, major, grade });
+  const result = await apiPut('/api/auth/me', { nickname, major, grade, qq });
 
   if (result.error) {
     errEl.textContent = result.error;
@@ -813,6 +843,16 @@ async function handleEditProfile(e) {
   closeModal();
   showToast('资料已更新');
   navigateTo('profile');
+}
+
+async function handlePrivacyChange(field, value) {
+  const result = await apiPut('/api/auth/me', { [field]: value });
+  if (result.error) {
+    showToast('设置失败：' + result.error);
+    return;
+  }
+  window._currentUser = result;
+  showToast(value ? '已开启' : '已关闭');
 }
 
 /* =============================================
@@ -1235,9 +1275,10 @@ registerPage('course', async (container, courseId) => {
             ${members.map(m => `
               <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--md-outline-variant);border-bottom-color:transparent">
                 <div class="avatar-small">${(m.nickname || '?')[0]}</div>
-                <div>
+                <div style="flex:1;min-width:0">
                   <div style="font-size:var(--text-sm);font-weight:500">${escHtml(m.nickname)}</div>
-                  <div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml(m.major + ' · ' + m.grade)}</div>
+                  ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
+                  ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">tag</span> ${escHtml(m.qq)}</div>` : ''}
                 </div>
               </div>
             `).join('')}

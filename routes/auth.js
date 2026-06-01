@@ -201,7 +201,7 @@ module.exports = function (db) {
   // GET /api/auth/me — 获取当前用户信息
   router.get('/me', authMiddleware, (req, res) => {
     const user = db.get(
-      'SELECT id, username, email, nickname, major, grade, avatar_url, email_verified, created_at FROM users WHERE id = ?',
+      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, privacy_show_profile, privacy_allow_match, email_verified, created_at FROM users WHERE id = ?',
       [req.user.userId]
     );
     if (!user) {
@@ -212,26 +212,29 @@ module.exports = function (db) {
 
   // PUT /api/auth/me — 更新个人信息
   router.put('/me', authMiddleware, (req, res) => {
-    const { nickname, major, grade, avatar_url } = req.body;
+    const { nickname, major, grade, avatar_url, qq, privacy_show_profile, privacy_allow_match } = req.body;
     const user = db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
     if (!user) {
       return res.status(404).json({ error: '用户不存在' });
     }
 
     db.run(
-      'UPDATE users SET nickname = ?, major = ?, grade = ?, avatar_url = ? WHERE id = ?',
+      'UPDATE users SET nickname = ?, major = ?, grade = ?, avatar_url = ?, qq = ?, privacy_show_profile = ?, privacy_allow_match = ? WHERE id = ?',
       [
         nickname !== undefined ? nickname : user.nickname,
         major !== undefined ? major : user.major,
         grade !== undefined ? grade : user.grade,
         avatar_url !== undefined ? avatar_url : user.avatar_url,
+        qq !== undefined ? qq : user.qq,
+        privacy_show_profile !== undefined ? (privacy_show_profile ? 1 : 0) : user.privacy_show_profile,
+        privacy_allow_match !== undefined ? (privacy_allow_match ? 1 : 0) : user.privacy_allow_match,
         req.user.userId
       ]
     );
     db.save();
 
     const updated = db.get(
-      'SELECT id, username, email, nickname, major, grade, avatar_url, email_verified, created_at FROM users WHERE id = ?',
+      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, privacy_show_profile, privacy_allow_match, email_verified, created_at FROM users WHERE id = ?',
       [req.user.userId]
     );
     res.json(updated);
