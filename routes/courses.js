@@ -1,6 +1,60 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const { authMiddleware } = require('./middleware/auth');
 const { createNotification, notifyCourseMembers } = require('./notifications');
+
+const POST_ATTACHMENT_DIR = path.join(__dirname, '..', 'uploads', 'post-attachments');
+const POST_ATTACHMENT_LIMIT = 9;
+const MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024;
+const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+
+const attachmentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(POST_ATTACHMENT_DIR, { recursive: true });
+      cb(null, POST_ATTACHMENT_DIR);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: MAX_ATTACHMENT_SIZE, files: POST_ATTACHMENT_LIMIT },
+});
+
+function parsePostAttachments(req, res, next) {
+  if (!req.is('multipart/form-data')) return next();
+  attachmentUpload.array('files', POST_ATTACHMENT_LIMIT)(req, res, (error) => {
+    if (!error) return next();
+    (req.files || []).forEach(file => {
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+    });
+    const message = error.code === 'LIMIT_FILE_COUNT' || error.code === 'LIMIT_UNEXPECTED_FILE'
+      ? '每个帖子最多上传 9 个附件'
+      : error.code === 'LIMIT_FILE_SIZE'
+        ? '单个附件不能超过 20MB'
+        : '附件上传失败';
+    res.status(400).json({ error: message });
+  });
+}
+
+function cleanupUploadedFiles(files = []) {
+  files.forEach(file => {
+    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+  });
+}
+
+function toAttachmentResponse(attachment) {
+  const base = `/api/courses/posts/attachments/${attachment.id}`;
+  return {
+    ...attachment,
+    view_url: attachment.file_type === 'image' ? `${base}/view` : null,
+    download_url: `${base}/download`,
+  };
+}
 
 module.exports = function (db) {
   const router = express.Router();
@@ -212,24 +266,47 @@ module.exports = function (db) {
       WHERE p.course_id = ?
       ORDER BY p.created_at DESC
     `, [Number(req.params.id)]);
+    for (const post of posts) {
+      post.attachments = db.all(
+        'SELECT id, file_name, file_type, file_size FROM post_attachments WHERE post_id = ? ORDER BY id ASC',
+        [post.id]
+      ).map(toAttachmentResponse);
+    }
     res.json(posts);
   });
 
   // POST /api/courses/:id/posts — 发帖 [Auth]
-  router.post('/:id/posts', authMiddleware, (req, res) => {
+  router.post('/:id/posts', authMiddleware, parsePostAttachments, (req, res) => {
     const { title, content } = req.body;
     if (!title || !content) {
+      cleanupUploadedFiles(req.files);
       return res.status(400).json({ error: 'title 和 content 为必填项' });
     }
 
     const courseId = Number(req.params.id);
     const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
-    if (!course) return res.status(404).json({ error: '课程不存在' });
+    if (!course) {
+      cleanupUploadedFiles(req.files);
+      return res.status(404).json({ error: '课程不存在' });
+    }
 
     const result = db.run(
       'INSERT INTO posts (course_id, author_id, title, content) VALUES (?, ?, ?, ?)',
       [courseId, req.user.userId, title, content]
     );
+    const attachments = (req.files || []).map(file => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const attachment = db.run(
+        'INSERT INTO post_attachments (post_id, file_path, file_name, file_type, file_size) VALUES (?, ?, ?, ?, ?)',
+        [result.lastInsertRowid, file.filename, file.originalname, IMAGE_EXTENSIONS.has(ext) ? 'image' : 'file', file.size]
+      );
+      return toAttachmentResponse({
+        id: attachment.lastInsertRowid,
+        file_name: file.originalname,
+        file_type: IMAGE_EXTENSIONS.has(ext) ? 'image' : 'file',
+        file_size: file.size,
+      });
+    });
     db.save();
 
     // 通知：课程有新帖
@@ -248,8 +325,22 @@ module.exports = function (db) {
       course_id: courseId,
       author_id: req.user.userId,
       title,
-      content
+      content,
+      attachments
     });
+  });
+
+  router.get('/posts/attachments/:attachmentId/view', (req, res) => {
+    const attachment = db.get('SELECT * FROM post_attachments WHERE id = ?', [Number(req.params.attachmentId)]);
+    if (!attachment || attachment.file_type !== 'image') return res.status(404).json({ error: '图片不存在' });
+    res.sendFile(path.join(POST_ATTACHMENT_DIR, attachment.file_path));
+  });
+
+  router.get('/posts/attachments/:attachmentId/download', (req, res) => {
+    const attachment = db.get('SELECT * FROM post_attachments WHERE id = ?', [Number(req.params.attachmentId)]);
+    if (!attachment) return res.status(404).json({ error: '附件不存在' });
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(attachment.file_name)}`);
+    res.sendFile(path.join(POST_ATTACHMENT_DIR, attachment.file_path));
   });
 
   // GET /api/courses/posts/:postId/comments — 评论列表
