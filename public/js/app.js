@@ -639,6 +639,8 @@ async function handleLogin(e) {
   window._currentUser = result.user;
   showToast('登录成功');
   navigateTo('courses');
+  refreshNotifBadge();
+  if (!window._notifInterval) window._notifInterval = setInterval(refreshNotifBadge, 30000);
 }
 
 async function handleRegister(e) {
@@ -706,6 +708,8 @@ async function handleVerify(e) {
   window._currentUser = result.user;
   showToast('注册成功！');
   navigateTo('courses');
+  refreshNotifBadge();
+  if (!window._notifInterval) window._notifInterval = setInterval(refreshNotifBadge, 30000);
 }
 
 async function resendCode(e) {
@@ -2152,4 +2156,129 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   navigateTo('courses');
+
+  // 启动通知轮询
+  if (window._currentUser) {
+    refreshNotifBadge();
+    if (!window._notifInterval) window._notifInterval = setInterval(refreshNotifBadge, 30000);
+  }
+});
+
+/* =============================================
+   Notifications
+   ============================================= */
+
+async function refreshNotifBadge() {
+  if (!window._currentUser) return;
+  try {
+    const data = await apiGet('/api/notifications/unread-count');
+    const badge = document.getElementById('notif-badge');
+    if (badge) {
+      if (data?.count > 0) {
+        badge.textContent = data.count > 99 ? '99+' : data.count;
+        badge.style.display = 'flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+function toggleNotificationPanel() {
+  const existing = document.getElementById('notification-panel');
+  if (existing) {
+    existing.remove();
+    return;
+  }
+  renderNotificationPanel();
+}
+
+async function renderNotificationPanel() {
+  const bell = document.getElementById('notification-bell');
+  if (!bell) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'notification-panel';
+  panel.className = 'notification-panel';
+  panel.innerHTML = '<p style="text-align:center;padding:24px;color:var(--md-on-surface-variant)">加载中...</p>';
+  bell.parentElement.appendChild(panel);
+
+  try {
+    const data = await apiGet('/api/notifications');
+    const notifs = data?.notifications || [];
+
+    if (notifs.length === 0) {
+      panel.innerHTML = '<p style="text-align:center;padding:32px;color:var(--md-on-surface-variant)">暂无通知</p>';
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="notif-header">
+        <span style="font-weight:600">通知</span>
+        ${data.unread > 0 ? `<button class="notif-read-all" onclick="markAllRead()">全部已读</button>` : ''}
+      </div>
+      <div class="notif-list">
+        ${notifs.map(n => `
+          <div class="notif-item ${n.is_read ? '' : 'notif-unread'}" onclick="handleNotifClick(${n.id}, '${n.related_type || ''}', ${n.related_id || 0}, ${n.course_id || 0}, ${n.is_read})">
+            <div class="notif-icon">${getNotifIcon(n.type)}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:${n.is_read ? '400' : '600'}">${escHtml(n.title)}</div>
+              <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:2px">${escHtml(n.message)}</div>
+              <div style="font-size:11px;color:var(--md-outline);margin-top:4px">${formatTime(n.created_at)}</div>
+            </div>
+            ${!n.is_read ? '<div class="notif-dot"></div>' : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch {
+    panel.innerHTML = '<p style="text-align:center;padding:24px;color:var(--md-on-surface-variant)">加载失败</p>';
+  }
+}
+
+function getNotifIcon(type) {
+  const icons = {
+    new_post: 'forum',
+    new_comment: 'chat',
+    new_material: 'folder',
+    invite_join: 'person_add',
+    invite_cancel: 'event_busy',
+  };
+  return `<span class="mi" style="font-size:20px">${icons[type] || 'notifications'}</span>`;
+}
+
+async function handleNotifClick(notifId, relatedType, relatedId, courseId, isRead) {
+  // 标记已读
+  if (!isRead) {
+    await apiPut(`/api/notifications/${notifId}/read`, {});
+    refreshNotifBadge();
+  }
+
+  // 关闭面板
+  document.getElementById('notification-panel')?.remove();
+
+  // 跳转
+  if (relatedType === 'post' && courseId) {
+    navigateTo('course', courseId);
+  } else if (relatedType === 'invite') {
+    navigateTo('invites');
+  } else if (relatedType === 'material' && courseId) {
+    navigateTo('course', courseId);
+  }
+}
+
+async function markAllRead() {
+  await apiPut('/api/notifications/read-all', {});
+  refreshNotifBadge();
+  document.getElementById('notification-panel')?.remove();
+  showToast('全部已读');
+}
+
+// 点击外部关闭通知面板
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('notification-panel');
+  const bell = document.getElementById('notification-bell');
+  if (panel && bell && !panel.contains(e.target) && !bell.contains(e.target)) {
+    panel.remove();
+  }
 });

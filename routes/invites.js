@@ -1,5 +1,6 @@
 const express = require('express');
 const { authMiddleware } = require('./middleware/auth');
+const { createNotification } = require('./notifications');
 
 module.exports = function (db) {
   const router = express.Router();
@@ -209,6 +210,17 @@ module.exports = function (db) {
     }
     db.save();
 
+    // 通知邀约创建者
+    const joiner = db.get('SELECT nickname FROM users WHERE id = ?', [userId]);
+    if (invite.creator_id !== userId) {
+      createNotification(db, {
+        userId: invite.creator_id, type: 'invite_join', title: '有人加入自习',
+        message: `${joiner?.nickname || '匿名'} 加入了你的自习邀约「${invite.title}」`,
+        relatedType: 'invite', relatedId: inviteId
+      });
+      db.save();
+    }
+
     res.json({ message: '加入成功' });
   });
 
@@ -249,6 +261,20 @@ module.exports = function (db) {
     const invite = db.get('SELECT * FROM study_invites WHERE id = ?', [inviteId]);
     if (!invite) return res.status(404).json({ error: '邀约不存在' });
     if (invite.creator_id !== userId) return res.status(403).json({ error: '只能取消自己发布的邀约' });
+
+    // 通知所有参与者
+    const participants = db.all(
+      "SELECT user_id FROM study_invite_responses WHERE invite_id = ? AND user_id != ?",
+      [inviteId, userId]
+    );
+    for (const p of participants) {
+      createNotification(db, {
+        userId: p.user_id, type: 'invite_cancel', title: '自习邀约已取消',
+        message: `「${invite.title}」已被发起人取消`,
+        relatedType: 'invite', relatedId: inviteId
+      });
+    }
+    db.save();
 
     db.run('DELETE FROM study_invites WHERE id = ?', [inviteId]);
     db.save();
