@@ -69,6 +69,10 @@ Lessonhelper/
 ├── public/                # 前端
 │   ├── index.html
 │   ├── css/style.css
-│   └── js/app.js
+│   └── js/                #   ES6 Modules
+│       ├── main.js
+│       ├── core/          #   api.js + router.js
+│       ├── components/    #   ui.js
+│       └── pages/         #   auth / profile / courses / square
 └── uploads/               # 文件存储（预留）
 ```

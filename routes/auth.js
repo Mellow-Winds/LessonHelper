@@ -201,7 +201,7 @@ module.exports = function (db) {
   // GET /api/auth/me — 获取当前用户信息
   router.get('/me', authMiddleware, (req, res) => {
     const user = db.get(
-      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, privacy_show_profile, privacy_allow_match, email_verified, created_at FROM users WHERE id = ?',
+      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, wechat, douyin, avatar_desc, mbti, checkin_streak, last_checkin_date, grace_days, privacy_show_profile, privacy_allow_match, email_verified, created_at FROM users WHERE id = ?',
       [req.user.userId]
     );
     if (!user) {
@@ -212,20 +212,35 @@ module.exports = function (db) {
 
   // PUT /api/auth/me — 更新个人信息
   router.put('/me', authMiddleware, (req, res) => {
-    const { nickname, major, grade, avatar_url, qq, privacy_show_profile, privacy_allow_match } = req.body;
+    const { nickname, major, grade, avatar_url, qq, wechat, douyin, avatar_desc, mbti, privacy_show_profile, privacy_allow_match } = req.body;
     const user = db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
     if (!user) {
       return res.status(404).json({ error: '用户不存在' });
     }
 
+    // 验证 avatar_desc 长度
+    if (avatar_desc !== undefined && avatar_desc.length > 80) {
+      return res.status(400).json({ error: '肖像描述不能超过80字' });
+    }
+
+    // 验证 mbti 选项
+    const validMbti = ['INTJ','INTP','ENTJ','ENTP','INFJ','INFP','ENFJ','ENFP','ISTJ','ISFJ','ESTJ','ESFJ','ISTP','ISFP','ESTP','ESFP'];
+    if (mbti !== undefined && mbti !== '' && !validMbti.includes(mbti)) {
+      return res.status(400).json({ error: '无效的MBTI人格类型' });
+    }
+
     db.run(
-      'UPDATE users SET nickname = ?, major = ?, grade = ?, avatar_url = ?, qq = ?, privacy_show_profile = ?, privacy_allow_match = ? WHERE id = ?',
+      'UPDATE users SET nickname = ?, major = ?, grade = ?, avatar_url = ?, qq = ?, wechat = ?, douyin = ?, avatar_desc = ?, mbti = ?, privacy_show_profile = ?, privacy_allow_match = ? WHERE id = ?',
       [
         nickname !== undefined ? nickname : user.nickname,
         major !== undefined ? major : user.major,
         grade !== undefined ? grade : user.grade,
         avatar_url !== undefined ? avatar_url : user.avatar_url,
         qq !== undefined ? qq : user.qq,
+        wechat !== undefined ? wechat : user.wechat,
+        douyin !== undefined ? douyin : user.douyin,
+        avatar_desc !== undefined ? avatar_desc : user.avatar_desc,
+        mbti !== undefined ? mbti : user.mbti,
         privacy_show_profile !== undefined ? (privacy_show_profile ? 1 : 0) : user.privacy_show_profile,
         privacy_allow_match !== undefined ? (privacy_allow_match ? 1 : 0) : user.privacy_allow_match,
         req.user.userId
@@ -234,10 +249,90 @@ module.exports = function (db) {
     db.save();
 
     const updated = db.get(
-      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, privacy_show_profile, privacy_allow_match, email_verified, created_at FROM users WHERE id = ?',
+      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, wechat, douyin, avatar_desc, mbti, checkin_streak, last_checkin_date, grace_days, privacy_show_profile, privacy_allow_match, email_verified, created_at FROM users WHERE id = ?',
       [req.user.userId]
     );
     res.json(updated);
+  });
+
+  // POST /api/auth/checkin — 每日签到（连续学习天数 + 双重保护机制）
+  router.post('/checkin', authMiddleware, (req, res) => {
+    const user = db.get(
+      'SELECT id, checkin_streak, last_checkin_date, grace_days FROM users WHERE id = ?',
+      [req.user.userId]
+    );
+    if (!user) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+
+    const today = req.body.date || new Date().toISOString().slice(0, 10);
+
+    // 已经今天签到过了
+    if (user.last_checkin_date === today) {
+      return res.json({ streak: user.checkin_streak, alreadyCheckedIn: true });
+    }
+
+    let streak = user.checkin_streak || 0;
+    let graceDays = user.grace_days || 0;
+
+    // 计算上次签到距今天数
+    const lastDate = user.last_checkin_date ? new Date(user.last_checkin_date) : null;
+    const todayDate = new Date(today);
+    const daysDiff = lastDate ? Math.floor((todayDate - lastDate) / (1000 * 60 * 60 * 24)) : 999;
+
+    if (daysDiff === 1) {
+      // 连续签到：累加
+      streak += 1;
+      graceDays = 0;
+    } else if (daysDiff > 1 && streak > 0) {
+      // 漏签：根据连续天数判断保护机制
+      if (streak >= 45) {
+        // 长期保护：7天缓冲
+        if (daysDiff <= 7 + 1) {
+          // 在缓冲期内签到：重燃
+          graceDays = 0;
+          streak += 1;
+        } else {
+          // 缓冲期过：归零 + 老友标记
+          streak = 1;
+          graceDays = 0;
+        }
+      } else if (streak >= 7) {
+        // 短期保护：3天缓冲
+        if (daysDiff <= 3 + 1) {
+          // 在缓冲期内签到：重燃
+          graceDays = 0;
+          streak += 1;
+        } else {
+          // 缓冲期过：归零 + 老友标记
+          streak = 1;
+          graceDays = 0;
+        }
+      } else {
+        // 无保护：直接归零
+        streak = 1;
+        graceDays = 0;
+      }
+    } else if (daysDiff > 1) {
+      // 首次或已归零后重新签到
+      streak = 1;
+      graceDays = 0;
+    }
+
+    // 更新缓冲天数（用于前端显示"X天后归零"）
+    if (streak >= 45 && daysDiff > 1 && daysDiff <= 8) {
+      graceDays = Math.max(0, 7 - (daysDiff - 1));
+    } else if (streak >= 7 && daysDiff > 1 && daysDiff <= 4) {
+      graceDays = Math.max(0, 3 - (daysDiff - 1));
+    }
+
+    db.run(
+      'UPDATE users SET checkin_streak = ?, last_checkin_date = ?, grace_days = ? WHERE id = ?',
+      [streak, today, graceDays, req.user.userId]
+    );
+    db.save();
+
+    res.json({ streak, alreadyCheckedIn: false });
   });
 
   return router;

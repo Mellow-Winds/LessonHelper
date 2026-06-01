@@ -1,0 +1,238 @@
+/**
+ * main.js — 全局唯一入口
+ * 负责：i18n初始化 + 模块导入 + 跨层函数 + 全局函数注册 + DOMContentLoaded
+ */
+
+/* =============================================
+   i18n Language Foundation（必须在任何模块渲染前执行）
+   ============================================= */
+
+window.i18nDict = {
+  zh: {
+    app_name: '课搭子',
+    courses: '课程列表',
+    profile: '个人中心',
+    import_schedule: '导入课程表',
+    select_existing: '选择已有课程',
+    search: '搜索',
+    login: '登录',
+    register: '注册',
+    email: '邮箱',
+    password: '密码',
+    password_min: '密码（至少6位）',
+    nickname: '昵称',
+    major: '专业',
+    grade: '年级',
+    verify_code: '验证码',
+    course_id: '课程号',
+    course_name: '课程名称',
+    teacher: '教师',
+    all_time: '全部时间',
+    all_semester: '全部学期',
+    title: '标题',
+    content: '内容',
+    save: '保存',
+    publish: '发布',
+    logout: '退出登录',
+    edit_profile: '编辑资料',
+  },
+  en: {
+    app_name: 'EduSpace',
+    courses: 'Courses',
+    profile: 'Profile',
+    import_schedule: 'Import Schedule',
+    select_existing: 'Select Course',
+    search: 'Search',
+    login: 'Login',
+    register: 'Register',
+    email: 'Email',
+    password: 'Password',
+    password_min: 'Password (min 6)',
+    nickname: 'Nickname',
+    major: 'Major',
+    grade: 'Grade',
+    verify_code: 'Verification Code',
+    course_id: 'Course ID',
+    course_name: 'Course Name',
+    teacher: 'Teacher',
+    all_time: 'All Time',
+    all_semester: 'All Semesters',
+    title: 'Title',
+    content: 'Content',
+    save: 'Save',
+    publish: 'Publish',
+    logout: 'Logout',
+    edit_profile: 'Edit Profile',
+  },
+};
+
+window.currentLang = localStorage.getItem('lang') || 'zh';
+
+window.t = function(key) {
+  return (window.i18nDict[window.currentLang] && window.i18nDict[window.currentLang][key]) || key;
+};
+
+/* =============================================
+   Import 核心模块
+   ============================================= */
+
+import { apiGet, isLoggedIn, clearToken } from './core/api.js';
+import { navigateTo, initRouter, pages, registerPage } from './core/router.js';
+import { showToast } from './components/ui.js';
+
+/* =============================================
+   Import 页面模块（触发 registerPage + 模块初始化）
+   ============================================= */
+
+import {
+  switchAuthTab, handleLogin, handleRegister, handleVerify, resendCode,
+  refreshNotifBadge, toggleNotificationPanel, handleNotifClick, markAllRead,
+  handleSidebarSearchKey, handleSearchPageKey, executeSearch, switchSearchTab,
+} from './pages/auth.js';
+
+import {
+  registerProfilePages,
+  openEditProfileModal, handleEditProfile, handlePrivacyChange,
+  handleCheckin, handleSaveProfile, handlePrivacyToggle, showFeedbackModal,
+} from './pages/profile.js';
+
+import {
+  handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
+  openImportModal, handleAgreeAndImport, handleScheduleImport,
+  switchCourseTab, toggleComments, handleAddComment,
+  refreshMaterials, rateMaterial, deleteMaterial,
+  openUploadMaterialModal, onFileSelected, handleUploadMaterial,
+  filterMembers, filterMembersTab,
+} from './pages/courses.js';
+
+import {
+  refreshInvites, respondInvite, cancelInvite,
+  openCreateInviteModal, handleCreateInvite, switchMyTab,
+  refreshSquarePosts, openCreateSquarePostModal, handleCreateSquarePost,
+  submitSquareInterest, handleSquareInterest, submitSquareComment,
+  switchSquareMyTab,
+} from './pages/square.js';
+
+/* =============================================
+   注册 Profile 子页面（必须在路由初始化前完成）
+   ============================================= */
+
+registerProfilePages(registerPage);
+
+/* =============================================
+   跨层桥接函数（同时依赖 api + ui + router，无法归属单一模块）
+   ============================================= */
+
+window._currentUser = null;
+
+async function loadCurrentUser() {
+  if (!isLoggedIn()) return null;
+  try {
+    const user = await apiGet('/api/auth/me');
+    if (user && !user.error) {
+      window._currentUser = user;
+      return user;
+    }
+    clearToken();
+    return null;
+  } catch {
+    clearToken();
+    return null;
+  }
+}
+
+function logout() {
+  clearToken();
+  window._currentUser = null;
+  navigateTo('profile');
+  showToast('已退出登录');
+}
+
+// 挂载到 window 供页面模块和 HTML 内联事件使用
+window.loadCurrentUser = loadCurrentUser;
+window.logout = logout;
+window.navigateTo = navigateTo;
+
+/* =============================================
+   全局函数注册（供 HTML 内联 onclick/onsubmit 使用）
+   ============================================= */
+
+Object.assign(window, {
+  // auth
+  switchAuthTab,
+  handleLogin,
+  handleRegister,
+  handleVerify,
+  resendCode,
+  // notifications
+  refreshNotifBadge,
+  toggleNotificationPanel,
+  handleNotifClick,
+  markAllRead,
+  // search
+  handleSidebarSearchKey,
+  handleSearchPageKey,
+  executeSearch,
+  switchSearchTab,
+  // profile
+  openEditProfileModal,
+  handleEditProfile,
+  handlePrivacyChange,
+  // courses
+  handleLeaveCourse,
+  openCourseSearchModal,
+  doCourseSearch,
+  handleEnrollFromSearch,
+  openImportModal,
+  handleAgreeAndImport,
+  handleScheduleImport,
+  switchCourseTab,
+  toggleComments,
+  handleAddComment,
+  refreshMaterials,
+  rateMaterial,
+  deleteMaterial,
+  openUploadMaterialModal,
+  onFileSelected,
+  handleUploadMaterial,
+  filterMembers,
+  filterMembersTab,
+  // invites
+  refreshInvites,
+  respondInvite,
+  cancelInvite,
+  openCreateInviteModal,
+  handleCreateInvite,
+  switchMyTab,
+  // square
+  refreshSquarePosts,
+  openCreateSquarePostModal,
+  handleCreateSquarePost,
+  submitSquareInterest,
+  handleSquareInterest,
+  submitSquareComment,
+  switchSquareMyTab,
+});
+
+/* =============================================
+   DOMContentLoaded — 应用启动
+   ============================================= */
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // 加载当前用户
+  await loadCurrentUser();
+
+  // 绑定侧边栏导航（点击时同步更新URL）
+  document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+    item.addEventListener('click', () => navigateTo(item.dataset.page));
+  });
+
+  // 初始化路由系统：解析URL → 导航到对应页面
+  initRouter(() => navigateTo('courses'));
+
+  // 启动通知轮询
+  if (window._currentUser) {
+    refreshNotifBadge();
+    if (!window._notifInterval) window._notifInterval = setInterval(refreshNotifBadge, 30000);
+  }
+});

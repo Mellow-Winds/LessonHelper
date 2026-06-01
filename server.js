@@ -124,6 +124,13 @@ async function start() {
   migrateTable('users', 'qq', "TEXT DEFAULT ''");
   migrateTable('users', 'privacy_show_profile', "INTEGER DEFAULT 1");
   migrateTable('users', 'privacy_allow_match', "INTEGER DEFAULT 1");
+  migrateTable('users', 'wechat', "TEXT DEFAULT ''");
+  migrateTable('users', 'douyin', "TEXT DEFAULT ''");
+  migrateTable('users', 'avatar_desc', "TEXT DEFAULT ''");
+  migrateTable('users', 'mbti', "TEXT DEFAULT ''");
+  migrateTable('users', 'checkin_streak', "INTEGER DEFAULT 0");
+  migrateTable('users', 'last_checkin_date', "TEXT DEFAULT ''");
+  migrateTable('users', 'grace_days', "INTEGER DEFAULT 0");
   migrateTable('courses', 'semester', "TEXT DEFAULT ''");
   migrateTable('courses', 'teacher', "TEXT DEFAULT ''");
 
@@ -254,6 +261,28 @@ async function start() {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES square_posts(id) ON DELETE CASCADE,
     FOREIGN KEY (author_id) REFERENCES users(id)
+  )`);
+
+  // New table: follows (关注关系)
+  db.run(`CREATE TABLE IF NOT EXISTS follows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    follower_id INTEGER NOT NULL,
+    following_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(follower_id, following_id)
+  )`);
+
+  // New table: feedback (问题反馈)
+  db.run(`CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    content TEXT NOT NULL,
+    contact TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
   db.save();

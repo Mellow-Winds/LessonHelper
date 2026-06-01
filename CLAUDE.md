@@ -21,6 +21,10 @@ Lessonhelper/
 ├── package.json           # 依赖配置
 ├── themerules             # 前端设计规范（颜色/排版/间距/组件）
 ├── CLAUDE.md              # 本文件 — 项目指南
+├── data/                  # 📦 数据文件
+│   └── schedule/          #   课表导入相关
+│       ├── notes.md       #     导入说明（Markdown 格式，支持预览）
+│       └── pre-notes.md   #     使用须知（Markdown 格式，支持预览）
 ├── docs/                  # 📚 项目文档
 │   ├── requirements.md    #   开发需求文档
 │   ├── tech-spec.md       #   技术规范（数据库/API/安全）
@@ -39,7 +43,18 @@ Lessonhelper/
 ├── public/                # 前端静态文件
 │   ├── index.html         #   SPA 入口
 │   ├── css/style.css      #   样式
-│   └── js/app.js          #   客户端逻辑
+│   └── js/                #   客户端逻辑（ES6 Modules）
+│       ├── main.js        #     全局入口：i18n + 跨层函数 + DOMContentLoaded
+│       ├── core/
+│       │   ├── api.js     #     Fetch 请求拦截器 + Token 管理
+│       │   └── router.js  #     路由系统 + URL映射 + 动效引擎
+│       ├── components/
+│       │   └── ui.js      #     MD3 组件工厂 + Toast + Modal + 工具函数
+│       └── pages/
+│           ├── auth.js    #     登录/注册 + 通知 + 搜索
+│           ├── profile.js #     个人中心 + 编辑资料
+│           ├── courses.js #     课程列表/详情/论坛/资料/成员/导入/发帖
+│           └── square.js  #     交友广场 + 自习邀约
 └── uploads/               # 上传文件存储（未来使用）
 ```
 
