@@ -218,6 +218,44 @@ async function start() {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
+  // New table: square_posts (交友广场帖子)
+  db.run(`CREATE TABLE IF NOT EXISTS square_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    max_people INTEGER DEFAULT 1,
+    current_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'open',
+    expires_at TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_id) REFERENCES users(id)
+  )`);
+
+  // New table: square_interests (感兴趣记录)
+  db.run(`CREATE TABLE IF NOT EXISTS square_interests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES square_posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(post_id, user_id)
+  )`);
+
+  // New table: square_comments (广场评论)
+  db.run(`CREATE TABLE IF NOT EXISTS square_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    author_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES square_posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (author_id) REFERENCES users(id)
+  )`);
+
   db.save();
 
   // --- Middleware ---
@@ -233,12 +271,14 @@ async function start() {
   const invitesRouter = require('./routes/invites')(db);
   const notificationsRouter = require('./routes/notifications')(db);
   const searchRouter = require('./routes/search')(db);
+  const squareRouter = require('./routes/square')(db);
 
   app.use('/api/courses', coursesRouter);
   app.use('/api/materials', materialsRouter);
   app.use('/api/invites', invitesRouter);
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/search', searchRouter);
+  app.use('/api/square', squareRouter);
   app.use('/api/user', userRouter);
   app.use('/api/schedule', scheduleRouter);
   app.use('/api/auth', authRouter);
