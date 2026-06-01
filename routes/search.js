@@ -53,7 +53,25 @@ module.exports = function (db) {
       `, [keyword, keyword, limit]);
     }
 
-    const total = (results.courses?.length || 0) + (results.materials?.length || 0) + (results.posts?.length || 0);
+    if (type === 'all' || type === 'squarePosts') {
+      results.squarePosts = db.all(`
+        SELECT sp.id, sp.title, sp.description, sp.category, sp.status,
+          sp.max_people, sp.current_count, sp.expires_at, sp.created_at,
+          u.nickname AS creator_name
+        FROM square_posts sp
+        JOIN users u ON sp.creator_id = u.id
+        WHERE (sp.title LIKE ? OR sp.description LIKE ?)
+          AND sp.expires_at > datetime('now')
+          AND sp.status != 'expired'
+        ORDER BY sp.created_at DESC
+        LIMIT ?
+      `, [keyword, keyword, limit]);
+    }
+
+    const total = (results.courses?.length || 0)
+      + (results.materials?.length || 0)
+      + (results.posts?.length || 0)
+      + (results.squarePosts?.length || 0);
     res.json({ ...results, total, q: q.trim() });
   });
 
