@@ -3,7 +3,7 @@
  * registerPage: profile（含auth入口）, search
  */
 
-import { apiPost, apiGet, apiPut, saveToken, clearToken, isLoggedIn } from '../core/api.js';
+import { apiPost, apiGet, saveToken, clearToken, isLoggedIn } from '../core/api.js';
 import { registerPage, navigateTo, animIn, animOut, bindRipples } from '../core/router.js';
 import { showToast, closeModal, createMdInput, escHtml, formatTime } from '../components/ui.js';
 
@@ -358,112 +358,9 @@ export async function refreshNotifBadge() {
   } catch { /* ignore */ }
 }
 
-export function toggleNotificationPanel() {
-  const existing = document.getElementById('notification-panel');
-  if (existing) {
-    existing.remove();
-    return;
-  }
-  renderNotificationPanel();
-}
-
-async function renderNotificationPanel() {
-  const bell = document.getElementById('notification-bell');
-  if (!bell) return;
-
-  const panel = document.createElement('div');
-  panel.id = 'notification-panel';
-  panel.className = 'notification-panel';
-  panel.innerHTML = '<p style="text-align:center;padding:24px;color:var(--md-on-surface-variant)">加载中...</p>';
-  document.body.appendChild(panel);
-
-  try {
-    const data = await apiGet('/api/notifications');
-    const notifs = data?.notifications || [];
-
-    if (notifs.length === 0) {
-      panel.innerHTML = '<p style="text-align:center;padding:32px;color:var(--md-on-surface-variant)">暂无通知</p>';
-      return;
-    }
-
-    panel.innerHTML = `
-      <div class="notif-header">
-        <span style="font-weight:600">通知</span>
-        ${data.unread > 0 ? `<button class="notif-read-all" onclick="markAllRead()">全部已读</button>` : ''}
-      </div>
-      <div class="notif-list">
-        ${notifs.map(n => `
-          <div class="notif-item ${n.is_read ? '' : 'notif-unread'}" onclick="handleNotifClick(${n.id}, '${n.related_type || ''}', ${n.related_id || 0}, ${n.course_id || 0}, ${n.is_read})">
-            <div class="notif-icon">${getNotifIcon(n.type)}</div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:13px;font-weight:${n.is_read ? '400' : '600'}">${escHtml(n.title)}</div>
-              <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:2px">${escHtml(n.message)}</div>
-              <div style="font-size:11px;color:var(--md-outline);margin-top:4px">${formatTime(n.created_at)}</div>
-            </div>
-            ${!n.is_read ? '<div class="notif-dot"></div>' : ''}
-          </div>
-        `).join('')}
-      </div>
-    `;
-  } catch {
-    panel.innerHTML = '<p style="text-align:center;padding:24px;color:var(--md-on-surface-variant)">加载失败</p>';
-  }
-}
-
-function getNotifIcon(type) {
-  const icons = {
-    new_post: 'forum',
-    new_comment: 'chat',
-    new_material: 'folder',
-    invite_join: 'person_add',
-    invite_cancel: 'event_busy',
-  };
-  return `<span class="mi" style="font-size:20px">${icons[type] || 'notifications'}</span>`;
-}
-
-export async function handleNotifClick(notifId, relatedType, relatedId, courseId, isRead) {
-  if (!isRead) {
-    await apiPut(`/api/notifications/${notifId}/read`, {});
-    refreshNotifBadge();
-  }
-  document.getElementById('notification-panel')?.remove();
-  if (relatedType === 'post' && courseId) {
-    navigateTo('course', courseId);
-  } else if (relatedType === 'invite') {
-    navigateTo('invites');
-  } else if (relatedType === 'material' && courseId) {
-    navigateTo('course', courseId);
-  }
-}
-
-export async function markAllRead() {
-  await apiPut('/api/notifications/read-all', {});
-  refreshNotifBadge();
-  document.getElementById('notification-panel')?.remove();
-  showToast('全部已读');
-}
-
-// 点击外部关闭通知面板
-document.addEventListener('click', (e) => {
-  const panel = document.getElementById('notification-panel');
-  const bell = document.getElementById('notification-bell');
-  if (panel && bell && !panel.contains(e.target) && !bell.contains(e.target)) {
-    panel.remove();
-  }
-});
-
 /* =============================================
    Global Search
    ============================================= */
-
-export function handleSidebarSearchKey(e) {
-  if (e.key === 'Enter') {
-    const q = e.target.value.trim();
-    if (q.length >= 2) {
-      navigateTo('search', { q });
-    }
-  }
-}
 
 export function handleSearchPageKey(e) {
   if (e.key === 'Enter') executeSearch();
@@ -587,7 +484,7 @@ registerPage('search', async (container, data) => {
 
   container.innerHTML = `
     <div class="page-header">
-      <h1 class="page-title">搜索结果</h1>
+      <h1 class="page-title">${q ? '搜索结果' : '搜索'}</h1>
     </div>
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;gap:8px;align-items:flex-start">
@@ -614,8 +511,30 @@ registerPage('search', async (container, data) => {
   bindRipples(container);
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
+  // 自动聚焦搜索输入框
+  const searchInput = container.querySelector('#search-page-input');
+  if (searchInput) searchInput.focus();
+
   if (q.length >= 2) {
     await executeSearch(activeTab);
+  } else if (!q) {
+    // 无查询时显示搜索历史
+    let history = [];
+    try { history = JSON.parse(localStorage.getItem('search_history') || '[]'); } catch {}
+    const resultsEl = container.querySelector('#search-results');
+    if (resultsEl && history.length > 0) {
+      resultsEl.innerHTML = `
+        <div style="margin-top:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;color:var(--md-on-surface-variant)">
+            <span class="mi" style="font-size:18px">history</span>
+            <span style="font-size:14px;font-weight:500">最近搜索</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${history.map(h => `<button class="btn btn-outline" style="font-size:13px;padding:6px 14px" onclick="navigateTo('search',{q:'${h.replace(/'/g, "\\'")}'})">${escHtml(h)}</button>`).join('')}
+          </div>
+        </div>
+      `;
+    }
   }
 
   if (q) saveSearchHistory(q);

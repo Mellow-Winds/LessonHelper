@@ -86,8 +86,8 @@ import { showToast } from './components/ui.js';
 
 import {
   switchAuthTab, handleLogin, handleRegister, handleVerify, resendCode,
-  refreshNotifBadge, toggleNotificationPanel, handleNotifClick, markAllRead,
-  handleSidebarSearchKey, handleSearchPageKey, executeSearch, switchSearchTab,
+  refreshNotifBadge,
+  handleSearchPageKey, executeSearch, switchSearchTab,
 } from './pages/auth.js';
 
 import {
@@ -95,6 +95,9 @@ import {
   openEditProfileModal, handleEditProfile, handlePrivacyChange,
   handleCheckin, handleSaveProfile, handlePrivacyToggle, showFeedbackModal,
 } from './pages/profile.js';
+
+import './pages/my_posts.js';
+import './pages/notifications.js';
 
 import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
@@ -105,13 +108,16 @@ import {
   filterMembers, filterMembersTab,
 } from './pages/courses.js';
 
+import { switchExploreTab } from './pages/explore.js';
 import {
   refreshInvites, respondInvite, cancelInvite,
-  openCreateInviteModal, handleCreateInvite, switchMyTab,
-  refreshSquarePosts, openCreateSquarePostModal, handleCreateSquarePost,
+  switchMyTab,
+} from './pages/explore/invites.js';
+import {
+  refreshSquarePosts,
   submitSquareInterest, handleSquareInterest, submitSquareComment,
   switchSquareMyTab,
-} from './pages/square.js';
+} from './pages/explore/square.js';
 
 /* =============================================
    注册 Profile 子页面（必须在路由初始化前完成）
@@ -148,6 +154,19 @@ function logout() {
   showToast('已退出登录');
 }
 
+function updateSidebarAvatar() {
+  const el = document.getElementById('sidebar-avatar');
+  if (!el) return;
+  const user = window._currentUser;
+  if (user?.avatar_url) {
+    const img = document.createElement('img');
+    img.src = user.avatar_url;
+    img.alt = user.nickname || '头像';
+    img.className = 'sidebar-avatar-img';
+    el.replaceWith(img);
+  }
+}
+
 // 挂载到 window 供页面模块和 HTML 内联事件使用
 window.loadCurrentUser = loadCurrentUser;
 window.logout = logout;
@@ -166,11 +185,7 @@ Object.assign(window, {
   resendCode,
   // notifications
   refreshNotifBadge,
-  toggleNotificationPanel,
-  handleNotifClick,
-  markAllRead,
   // search
-  handleSidebarSearchKey,
   handleSearchPageKey,
   executeSearch,
   switchSearchTab,
@@ -197,17 +212,15 @@ Object.assign(window, {
   handleUploadMaterial,
   filterMembers,
   filterMembersTab,
+  // explore
+  switchExploreTab,
   // invites
   refreshInvites,
   respondInvite,
   cancelInvite,
-  openCreateInviteModal,
-  handleCreateInvite,
   switchMyTab,
   // square
   refreshSquarePosts,
-  openCreateSquarePostModal,
-  handleCreateSquarePost,
   submitSquareInterest,
   handleSquareInterest,
   submitSquareComment,
@@ -221,6 +234,9 @@ Object.assign(window, {
 document.addEventListener('DOMContentLoaded', async () => {
   // 加载当前用户
   await loadCurrentUser();
+
+  // 更新侧边栏头像
+  updateSidebarAvatar();
 
   // 绑定侧边栏导航（点击时同步更新URL）
   document.querySelectorAll('.nav-item[data-page]').forEach(item => {

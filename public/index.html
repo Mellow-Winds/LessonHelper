@@ -29,36 +29,40 @@
       <span>课搭子</span>
     </div>
 
-    <div class="sidebar-search" id="sidebar-search">
-      <span class="mi sidebar-search-icon">search</span>
-      <input type="text" class="sidebar-search-input" id="sidebar-search-input" placeholder="搜索课程、资料、帖子..." onkeydown="handleSidebarSearchKey(event)">
-    </div>
-
     <nav class="nav-menu">
-      <a class="nav-item active" data-page="courses">
-        <span class="mi">menu_book</span>
-        <span>课程列表</span>
-      </a>
-      <a class="nav-item" data-page="invites">
-        <span class="mi">groups</span>
-        <span>自习邀约</span>
-      </a>
-      <a class="nav-item" data-page="square">
-        <span class="mi">explore</span>
-        <span>交友广场</span>
-      </a>
-      <a class="nav-item" data-page="profile">
-        <span class="mi">person</span>
-        <span>个人空间</span>
-      </a>
-    </nav>
+      <section class="nav-section">
+        <span class="nav-section-label">功能</span>
+        <a class="nav-item" data-page="search">
+          <span class="mi">search</span>
+          <span>搜索</span>
+        </a>
+        <a class="nav-item" data-page="explore">
+          <span class="mi">explore</span>
+          <span>探索</span>
+        </a>
+        <a class="nav-item active" data-page="courses">
+          <span class="mi">menu_book</span>
+          <span>课程列表</span>
+        </a>
+      </section>
 
-    <div class="sidebar-bottom">
-      <div class="notification-bell" id="notification-bell" onclick="toggleNotificationPanel()">
-        <span class="mi">notifications</span>
-        <span class="notif-badge" id="notif-badge" style="display:none">0</span>
-      </div>
-    </div>
+      <section class="nav-section">
+        <span class="nav-section-label">个人</span>
+        <a class="nav-item" data-page="profile">
+          <span class="mi sidebar-avatar-icon" id="sidebar-avatar">person</span>
+          <span>个人中心</span>
+        </a>
+        <a class="nav-item" data-page="my_post">
+          <span class="mi">edit_note</span>
+          <span>我的创作</span>
+        </a>
+        <a class="nav-item" data-page="notifications" id="notification-bell">
+          <span class="mi">notifications</span>
+          <span>通知</span>
+          <span class="notif-badge" id="notif-badge" style="display:none">0</span>
+        </a>
+      </section>
+    </nav>
   </aside>
 
   <main class="main-content" id="main-content">

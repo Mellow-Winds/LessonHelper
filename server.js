@@ -301,6 +301,7 @@ async function start() {
   const notificationsRouter = require('./routes/notifications')(db);
   const searchRouter = require('./routes/search')(db);
   const squareRouter = require('./routes/square')(db);
+  const myPostsRouter = require('./routes/my_posts')(db);
 
   app.use('/api/courses', coursesRouter);
   app.use('/api/materials', materialsRouter);
@@ -311,6 +312,7 @@ async function start() {
   app.use('/api/user', userRouter);
   app.use('/api/schedule', scheduleRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/my-posts', myPostsRouter);
 
   // --- SPA Fallback ---
   app.get('*', (req, res) => {

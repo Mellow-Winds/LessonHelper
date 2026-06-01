@@ -196,34 +196,6 @@ select::-ms-expand {
   font-size: 26px;
 }
 
-/* ---- Sidebar: Search ---- */
-.sidebar-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.sidebar-search-icon {
-  position: absolute;
-  left: 10px;
-  font-size: 18px;
-  color: var(--md-on-surface-variant);
-  pointer-events: none;
-}
-.sidebar-search-input {
-  width: 100%;
-  padding: 8px 12px 8px 36px;
-  font-size: 13px;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--radius-sm, 6px);
-  background: var(--md-surface, #fff);
-  color: var(--md-on-surface);
-  outline: none;
-  transition: border-color 0.2s;
-}
-.sidebar-search-input:focus {
-  border-color: var(--md-primary);
-}
-
 /* ---- Sidebar: Navigation ---- */
 .nav-menu {
   display: flex;
@@ -1256,33 +1228,9 @@ select::-ms-expand {
   padding: 6px 14px;
 }
 
-/* ---- Notification Bell ---- */
-.sidebar-bottom {
-  margin-top: auto;
-  padding: 16px;
-}
-
-.notification-bell {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  color: var(--md-on-surface-variant);
-  transition: background 0.2s, color 0.2s;
-}
-.notification-bell:hover {
-  background: var(--md-surface-variant, #f0f0f0);
-  color: var(--md-primary);
-}
-
+/* ---- Notification Badge (inline in nav-item) ---- */
 .notif-badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
+  margin-left: auto;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -1291,82 +1239,10 @@ select::-ms-expand {
   color: #fff;
   font-size: 11px;
   font-weight: 600;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
-}
-
-/* ---- Notification Panel ---- */
-.notification-panel {
-  position: fixed;
-  bottom: 24px;
-  left: 256px;
-  width: 340px;
-  max-height: 420px;
-  background: var(--md-surface, #fff);
-  border-radius: var(--radius-md, 12px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-  overflow: hidden;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-}
-.notif-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--md-outline-variant);
-  font-size: 15px;
-}
-.notif-read-all {
-  font-size: 12px;
-  color: var(--md-primary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-weight: 500;
-}
-.notif-read-all:hover {
-  text-decoration: underline;
-}
-.notif-list {
-  overflow-y: auto;
-  flex: 1;
-}
-.notif-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.notif-item:hover {
-  background: var(--md-surface-variant, #f5f5f5);
-}
-.notif-unread {
-  background: rgba(74, 144, 217, 0.04);
-}
-.notif-icon {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--md-surface-variant, #f0f0f0);
-  color: var(--md-on-surface-variant);
-}
-.notif-dot {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--md-primary);
-  margin-top: 6px;
 }
 
 /* ---- Search Results ---- */
@@ -1872,9 +1748,9 @@ select::-ms-expand {
 }
 
 .profile-field-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  display: flex !important;
+  align-items: center !important;
+  min-height: 44px;
   padding: var(--space-3) 0;
   border-bottom: 1px solid var(--md-outline-variant);
 }
@@ -1884,9 +1760,19 @@ select::-ms-expand {
 }
 
 .profile-field-icon {
+  width: 24px !important;
+  height: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-right: 12px !important;
+  flex-shrink: 0 !important;
   font-size: 20px;
   color: var(--md-on-surface-variant);
-  flex-shrink: 0;
+}
+
+.profile-field-icon.remix-align {
+  font-size: 18px !important;
 }
 
 .profile-field-label {
@@ -1938,6 +1824,15 @@ select::-ms-expand {
 }
 
 /* ---- Inline Edit Input ---- */
+.profile-field-value input,
+.md-input-group input,
+.md-input-group textarea,
+input {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  color: inherit !important;
+}
+
 .profile-inline-input {
   width: 100%;
   padding: 6px 10px;
@@ -1947,7 +1842,6 @@ select::-ms-expand {
   color: var(--md-on-surface);
   background: var(--md-surface-container-lowest);
   outline: none;
-  font-family: inherit;
 }
 
 /* ---- MBTI Dropdown ---- */
@@ -2353,4 +2247,373 @@ select::-ms-expand {
   .profile-mbti-dropdown {
     grid-template-columns: repeat(4, 1fr);
   }
+}
+
+/* ==========================================================================
+   Explore — 探索板块 MD3 扁平选项卡
+   ========================================================================== */
+
+.md-tabs {
+  display: flex;
+  gap: var(--space-6);
+  border-bottom: 1px solid var(--md-outline-variant);
+  margin-bottom: var(--space-6);
+  padding: 0 var(--space-4);
+}
+
+.md-tab-btn {
+  position: relative;
+  padding: 12px 4px;
+  border: none;
+  background: none;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color var(--dur-normal) var(--ease-standard),
+    font-weight var(--dur-normal) var(--ease-standard);
+}
+
+.md-tab-btn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: transparent;
+  transition:
+    background var(--dur-normal) var(--ease-standard),
+    transform var(--dur-normal) var(--ease-decelerate);
+  transform: scaleX(0);
+}
+
+.md-tab-btn:hover {
+  color: var(--md-on-surface);
+}
+
+.md-tab-btn.active {
+  color: var(--md-primary);
+  font-weight: 600;
+}
+
+.md-tab-btn.active::after {
+  background: var(--md-primary);
+  transform: scaleX(1);
+}
+
+/* ==========================================================================
+   Explore Header Actions — 右上角操作栏
+   ========================================================================== */
+
+.explore-header-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Post Form — 发布面板
+   ========================================================================== */
+
+.post-form-container {
+  max-width: 600px;
+}
+
+.post-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* 确保发布面板内输入字体原生继承 */
+.post-form .md-input-group .md-input,
+.post-form input,
+.post-form textarea,
+.post-form select {
+  font-family: inherit !important;
+  font-size: inherit !important;
+}
+
+/* ==========================================================================
+   Post Chips — 标签胶囊输入系统
+   ========================================================================== */
+
+.post-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.post-field-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.post-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--md-outline);
+  border-radius: 8px;
+  transition: border-color 200ms var(--ease-standard);
+}
+
+.post-chips-container:focus-within {
+  border-color: var(--md-primary);
+  border-width: 2px;
+}
+
+.post-chips-container:hover {
+  border-color: var(--md-on-surface);
+}
+
+.post-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.post-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  animation: chipIn 200ms var(--ease-spring);
+}
+
+@keyframes chipIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.post-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--md-on-primary-container);
+  opacity: 0.6;
+  transition: opacity var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+
+.post-chip-remove:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.post-chip-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+  flex-shrink: 0;
+}
+
+.post-chip-add:hover {
+  background: var(--md-surface-container-high);
+  color: var(--md-primary);
+}
+
+.post-chip-input {
+  flex: 1;
+  min-width: 100px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: var(--text-sm);
+  color: var(--md-on-surface);
+  padding: 4px 0;
+  font-family: inherit !important;
+}
+
+/* ==========================================================================
+   Post Switch & Radio — 开关与单选
+   ========================================================================== */
+
+.post-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  cursor: pointer;
+}
+
+.post-switch-text {
+  font-size: var(--text-sm);
+  color: var(--md-on-surface-variant);
+}
+
+.post-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.post-radio-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--md-on-surface);
+}
+
+.post-radio-item input[type="radio"] {
+  accent-color: var(--md-primary);
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.post-radio-label {
+  font-size: var(--text-sm);
+}
+
+.explore-content-container {
+  min-height: 200px;
+}
+
+/* ==========================================================================
+   Sidebar Avatar — 侧边栏头像
+   ========================================================================== */
+
+.sidebar-avatar-icon {
+  font-size: 22px;
+}
+
+.sidebar-avatar-img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   My Posts — 我的创作
+   ========================================================================== */
+
+.my-post-content {
+  min-height: 200px;
+}
+
+.my-post-section {
+  margin-bottom: var(--space-2);
+}
+
+.my-post-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--md-on-surface);
+  margin-bottom: var(--space-4);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.my-post-card {
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.my-post-card + .my-post-card {
+  margin-top: 8px;
+}
+
+.my-post-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================================================
+   Sidebar Nav Sections — 分区导航
+   ========================================================================== */
+
+.nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-section + .nav-section {
+  margin-top: var(--space-6);
+}
+
+.nav-section-label {
+  display: block;
+  padding: 0 16px;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--md-on-surface-variant);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* ==========================================================================
+   Notifications Page — 通知中心
+   ========================================================================== */
+
+.notif-page-item {
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.notif-page-item + .notif-page-item {
+  margin-top: 8px;
+}
+
+.notif-page-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.notif-page-unread {
+  border-left: 3px solid var(--md-primary);
+}
+
+.notif-page-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--md-surface-container);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--md-on-surface-variant);
+}
+
+.notif-page-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--md-primary);
+  flex-shrink: 0;
+  margin-top: 6px;
 }
