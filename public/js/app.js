@@ -1712,6 +1712,282 @@ async function filterMembers(courseId) {
   }
 }
 
+/* =============================================
+   Page: Invites (自习邀约)
+   ============================================= */
+
+registerPage('invites', async (container) => {
+  if (!window._currentUser) {
+    await loadCurrentUser();
+  }
+  if (!window._currentUser) {
+    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录后查看自习邀约</p></div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">自习邀约</h1>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="navigateTo('invites-my')">
+          <span class="mi">person</span> 我的
+        </button>
+        <button class="btn btn-primary" onclick="openCreateInviteModal()">
+          <span class="mi">add</span> 发布邀约
+        </button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+      <select id="invite-filter-date" class="member-filter-select" style="width:auto;min-width:100px;margin-bottom:0" onchange="refreshInvites()">
+        <option value="all">全部日期</option>
+        <option value="today">今天</option>
+        <option value="week">近7天</option>
+      </select>
+      <select id="invite-filter-status" class="member-filter-select" style="width:auto;min-width:100px;margin-bottom:0" onchange="refreshInvites()">
+        <option value="all">全部状态</option>
+        <option value="open">招募中</option>
+        <option value="full">已满</option>
+        <option value="closed">已关闭</option>
+      </select>
+    </div>
+    <div id="invites-list"></div>
+  `;
+
+  bindRipples(container);
+  animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
+  await refreshInvites();
+});
+
+async function refreshInvites() {
+  const date = document.getElementById('invite-filter-date')?.value || 'all';
+  const status = document.getElementById('invite-filter-status')?.value || 'all';
+  const params = new URLSearchParams();
+  if (date !== 'all') params.set('date', date);
+  if (status !== 'all') params.set('status', status);
+
+  const listEl = document.getElementById('invites-list');
+  if (listEl) listEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
+
+  try {
+    const data = await apiGet(`/api/invites?${params.toString()}`);
+    const invites = data?.invites || [];
+    if (listEl) listEl.innerHTML = renderInvitesList(invites);
+
+    const cards = listEl?.querySelectorAll('.invite-card');
+    if (cards?.length) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });
+  } catch {
+    if (listEl) listEl.innerHTML = '<div class="card"><p class="text-secondary">加载失败</p></div>';
+  }
+}
+
+function renderInvitesList(invites) {
+  if (invites.length === 0) {
+    return `
+      <div class="card" style="text-align:center;padding:48px">
+        <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">event_available</span>
+        <p class="text-secondary" style="margin-top:12px">暂无自习邀约，来发布第一个吧</p>
+      </div>
+    `;
+  }
+
+  return invites.map(inv => {
+    const statusMap = { open: '招募中', full: '已满', closed: '已关闭', expired: '已过期' };
+    const statusClass = { open: 'status-open', full: 'status-full', closed: 'status-closed', expired: 'status-closed' };
+    const isCreator = inv.creator_id === window._currentUser?.id;
+    const isJoined = inv.my_status === 'accepted' || isCreator;
+    const isFull = inv.participant_count >= inv.max_participants;
+
+    return `
+      <div class="card invite-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <h3 style="font-size:var(--text-lg);font-weight:600">${escHtml(inv.title)}</h3>
+              <span class="status-badge ${statusClass[inv.status] || ''}">${statusMap[inv.status] || inv.status}</span>
+            </div>
+            <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap;font-size:14px;color:var(--md-on-surface-variant)">
+              <span><span class="mi" style="font-size:16px;vertical-align:-3px">event</span> ${escHtml(inv.study_date)}</span>
+              <span><span class="mi" style="font-size:16px;vertical-align:-3px">schedule</span> ${escHtml(inv.start_time)} - ${escHtml(inv.end_time)}</span>
+              ${inv.location ? `<span><span class="mi" style="font-size:16px;vertical-align:-3px">location_on</span> ${escHtml(inv.location)}</span>` : ''}
+              <span><span class="mi" style="font-size:16px;vertical-align:-3px">people</span> ${inv.participant_count}/${inv.max_participants}人</span>
+            </div>
+            ${inv.description ? `<p style="margin-top:8px;font-size:14px;color:var(--md-on-surface-variant)">${escHtml(inv.description)}</p>` : ''}
+            <div style="margin-top:8px;font-size:12px;color:var(--md-outline)">发起人: ${escHtml(inv.creator_name)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+            ${!isCreator && !isJoined && inv.status === 'open' && !isFull ? `<button class="btn btn-primary" style="font-size:12px;padding:6px 16px" onclick="respondInvite(${inv.id}, 'join')">加入</button>` : ''}
+            ${isJoined && !isCreator ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 16px" onclick="respondInvite(${inv.id}, 'cancel')">取消参与</button>` : ''}
+            ${isCreator ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 16px" onclick="cancelInvite(${inv.id})">取消邀约</button>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function respondInvite(inviteId, action) {
+  const result = await apiPost(`/api/invites/${inviteId}/respond`, { action });
+  if (result.error) {
+    showToast(result.error);
+    return;
+  }
+  showToast(result.message);
+  await refreshInvites();
+}
+
+async function cancelInvite(inviteId) {
+  if (!confirm('确定取消这个邀约？')) return;
+  const result = await apiDelete(`/api/invites/${inviteId}`);
+  if (result.error) {
+    showToast(result.error);
+    return;
+  }
+  showToast('已取消');
+  await refreshInvites();
+}
+
+function openCreateInviteModal() {
+  const today = new Date().toISOString().split('T')[0];
+  const html = `
+    <form id="create-invite-form" onsubmit="handleCreateInvite(event)" style="display:flex;flex-direction:column;gap:16px">
+      <div class="md-input-group">
+        <input class="md-input" name="title" placeholder=" " required>
+        <label class="md-label">邀约标题</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>邀约标题</span></legend></fieldset>
+      </div>
+      <div class="md-input-group">
+        <textarea class="md-input md-textarea" name="description" placeholder=" " rows="2"></textarea>
+        <label class="md-label">描述（可选）</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>描述</span></legend></fieldset>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div class="md-input-group" style="flex:1">
+          <input class="md-input" type="date" name="study_date" value="${today}" required>
+          <label class="md-label">日期</label>
+          <fieldset class="md-border" aria-hidden="true"><legend><span>日期</span></legend></fieldset>
+        </div>
+        <div class="md-input-group" style="flex:1">
+          <input class="md-input" type="number" name="max_participants" value="4" min="2" max="20" placeholder=" ">
+          <label class="md-label">人数上限</label>
+          <fieldset class="md-border" aria-hidden="true"><legend><span>人数上限</span></legend></fieldset>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div class="md-input-group" style="flex:1">
+          <input class="md-input" type="time" name="start_time" value="14:00" required>
+          <label class="md-label">开始时间</label>
+          <fieldset class="md-border" aria-hidden="true"><legend><span>开始时间</span></legend></fieldset>
+        </div>
+        <div class="md-input-group" style="flex:1">
+          <input class="md-input" type="time" name="end_time" value="17:00" required>
+          <label class="md-label">结束时间</label>
+          <fieldset class="md-border" aria-hidden="true"><legend><span>结束时间</span></legend></fieldset>
+        </div>
+      </div>
+      <div class="md-input-group">
+        <input class="md-input" name="location" placeholder=" ">
+        <label class="md-label">地点（如：图书馆3楼）</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>地点</span></legend></fieldset>
+      </div>
+      <div class="form-error" id="create-invite-error" style="display:none"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">发布</button>
+    </form>
+  `;
+  openModal('发布自习邀约', html);
+}
+
+async function handleCreateInvite(e) {
+  e.preventDefault();
+  const form = e.target;
+  const errEl = document.getElementById('create-invite-error');
+
+  const data = {
+    title: form.title.value.trim(),
+    description: form.description.value.trim(),
+    study_date: form.study_date.value,
+    start_time: form.start_time.value,
+    end_time: form.end_time.value,
+    location: form.location.value.trim(),
+    max_participants: Number(form.max_participants.value) || 4,
+  };
+
+  if (data.start_time >= data.end_time) {
+    if (errEl) { errEl.textContent = '结束时间必须晚于开始时间'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  const btn = form.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = '发布中...';
+
+  const result = await apiPost('/api/invites', data);
+
+  if (result.error) {
+    if (errEl) { errEl.textContent = result.error; errEl.style.display = 'block'; }
+    btn.disabled = false;
+    btn.textContent = '发布';
+    return;
+  }
+
+  closeModal();
+  showToast('发布成功');
+  await refreshInvites();
+}
+
+// ===== 我的邀约 =====
+registerPage('invites-my', async (container) => {
+  if (!window._currentUser) {
+    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录</p></div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="page-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('invites')"><span class="mi">arrow_back</span></button>
+        <h1 class="page-title">我的邀约</h1>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn btn-primary tab-btn active" id="my-tab-created" onclick="switchMyTab('created')">我发起的</button>
+      <button class="btn btn-secondary tab-btn" id="my-tab-joined" onclick="switchMyTab('joined')">我参与的</button>
+    </div>
+    <div id="my-invites-list"></div>
+  `;
+
+  bindRipples(container);
+  await loadMyInvites('created');
+});
+
+async function switchMyTab(type) {
+  document.getElementById('my-tab-created')?.classList.toggle('active', type === 'created');
+  document.getElementById('my-tab-created')?.classList.toggle('btn-primary', type === 'created');
+  document.getElementById('my-tab-created')?.classList.toggle('btn-secondary', type !== 'created');
+  document.getElementById('my-tab-joined')?.classList.toggle('active', type === 'joined');
+  document.getElementById('my-tab-joined')?.classList.toggle('btn-primary', type === 'joined');
+  document.getElementById('my-tab-joined')?.classList.toggle('btn-secondary', type !== 'joined');
+  await loadMyInvites(type);
+}
+
+async function loadMyInvites(type) {
+  const listEl = document.getElementById('my-invites-list');
+  if (listEl) listEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
+
+  const invites = await apiGet(`/api/invites/my?type=${type}`);
+  if (!invites || invites.length === 0) {
+    const emptyMsg = type === 'created' ? '你还没有发布过邀约' : '你还没有参与过邀约';
+    if (listEl) listEl.innerHTML = `
+      <div class="card" style="text-align:center;padding:48px">
+        <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">event_available</span>
+        <p class="text-secondary" style="margin-top:12px">${emptyMsg}</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (listEl) listEl.innerHTML = renderInvitesList(invites);
+}
+
 // ===== Post & Comment Helpers =====
 
 async function openCreatePostModal(courseId) {

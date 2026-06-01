@@ -1229,3 +1229,34 @@ select.input {
   border-radius: var(--radius-sm, 6px);
   background: var(--md-surface);
 }
+
+/* ---- Invite Card ---- */
+.invite-card + .invite-card {
+  margin-top: 12px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-open {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.status-full {
+  background: #fff3e0;
+  color: #e65100;
+}
+.status-closed {
+  background: #f5f5f5;
+  color: #757575;
+}
+
+.tab-btn {
+  font-size: 13px;
+  padding: 6px 14px;
+}

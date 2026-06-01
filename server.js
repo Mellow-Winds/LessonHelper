@@ -173,6 +173,36 @@ async function start() {
     UNIQUE(material_id, user_id)
   )`);
 
+  // New table: study_invites (自习邀约)
+  db.run(`CREATE TABLE IF NOT EXISTS study_invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id INTEGER NOT NULL,
+    course_id INTEGER,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    study_date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    location TEXT DEFAULT '',
+    max_participants INTEGER DEFAULT 4,
+    status TEXT DEFAULT 'open',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_id) REFERENCES users(id),
+    FOREIGN KEY (course_id) REFERENCES courses(id)
+  )`);
+
+  // New table: study_invite_responses (邀约响应)
+  db.run(`CREATE TABLE IF NOT EXISTS study_invite_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invite_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'accepted',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invite_id) REFERENCES study_invites(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(invite_id, user_id)
+  )`);
+
   db.save();
 
   // --- Middleware ---
@@ -185,9 +215,11 @@ async function start() {
   const scheduleRouter = require('./routes/schedule')(db);
   const authRouter = require('./routes/auth')(db);
   const materialsRouter = require('./routes/materials')(db);
+  const invitesRouter = require('./routes/invites')(db);
 
   app.use('/api/courses', coursesRouter);
   app.use('/api/materials', materialsRouter);
+  app.use('/api/invites', invitesRouter);
   app.use('/api/user', userRouter);
   app.use('/api/schedule', scheduleRouter);
   app.use('/api/auth', authRouter);
