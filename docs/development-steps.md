@@ -130,3 +130,16 @@
 - [x] `style.css`：toggle-switch 开关组件和 privacy-toggle-row 样式
 
 **验证**：注册→编辑资料填 QQ→保存→刷新后 QQ 仍在；关闭隐私开关→成员列表隐藏敏感信息
+
+---
+
+## 第8轮：同课程同学匹配 ✅
+
+**目标**：成员列表支持筛选，快速找到契合的学习伙伴
+
+- [x] `routes/courses.js`：GET `/:id/members` 支持 `major`/`grade` 查询参数筛选，`match_only=1` 过滤隐私屏蔽用户
+- [x] `routes/courses.js`：新增 GET `/:id/members/stats` 返回专业和年级分布
+- [x] `app.js`：成员侧栏增加专业/年级下拉筛选框，提取 `renderMembersList` 和 `filterMembers` 函数
+- [x] `style.css`：`member-filter-select` 和 `member-item` 样式
+
+**验证**：进入课程空间→成员侧栏显示筛选器→选择专业筛选→列表实时更新
