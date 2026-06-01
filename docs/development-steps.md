@@ -227,3 +227,46 @@
 - [x] 列表查询自动过滤过期帖子
 
 **验证**：发帖→广场列表可见→其他用户感兴趣→发帖人收到通知→接受→双方可见QQ→评论正常
+
+---
+
+## 第14轮：前端 ES6 模块化重构 ✅
+
+**目标**：将单文件 app.js 拆分为 ES6 模块架构
+
+- [x] `public/js/main.js`（新建）：全局入口，i18n，跨层桥接函数
+- [x] `public/js/core/api.js`（新建）：Fetch 请求层 + Token 管理
+- [x] `public/js/core/router.js`（新建）：路由系统 + URL 映射 + 动效引擎
+- [x] `public/js/components/ui.js`（新建）：MD3 组件工厂 + Toast + Modal
+- [x] `public/js/pages/auth.js`（新建）：登录/注册 + 搜索页
+- [x] `public/js/pages/profile.js`（新建）：个人中心
+- [x] `public/js/pages/courses/my_courses.js`（新建）：我的课程
+- [x] `public/js/pages/courses/plaza.js`（新建）：课程广场
+- [x] `public/js/pages/courses/publish.js`（新建）：统一发布页
+- [x] `public/js/pages/explore.js`（新建）：探索页入口
+- [x] `public/js/pages/explore/invites.js`（新建）：自习邀约
+- [x] `public/js/pages/explore/square.js`（新建）：交友广场
+- [x] `public/js/pages/explore/posts.js`（新建）：统一发布页
+- [x] `public/js/pages/my_posts.js`（新建）：我的创作
+- [x] `public/js/pages/notifications.js`（新建）：通知中心
+- [x] `public/index.html`：更新脚本引用
+
+---
+
+## 第15轮：个人空间模块重构 ✅
+
+**目标**：个人空间升级为 MD3 质感仪表盘
+
+- [x] `server.js`：users 表新增 7 列（wechat/douyin/avatar_desc/mbti/checkin_streak/last_checkin_date/grace_days）+ follows 表 + feedback 表
+- [x] `routes/auth.js`：POST /checkin 签到 API（双重宽限期保护）
+- [x] `routes/user.js`：公开名片 + 关注/取关 + 粉丝/关注列表 + 问题反馈
+- [x] `public/js/pages/profile.js`：三栖视角（编辑/预览/公开）、签到勋章、完整度进度条、原位编辑、MBTI 选择器、关注系统、设置列表、子页面（edit/privacy/data/user）
+- [x] `public/css/style.css`：~500 行 profile 专用样式
+
+---
+
+## 维护记录：课表导入文件迁移 ✅
+
+- [x] `notes.md` → `data/schedule/notes.md`
+- [x] `pre-notes.md` → `data/schedule/pre-notes.md`
+- [x] `routes/schedule.js`：更新文件读取路径
