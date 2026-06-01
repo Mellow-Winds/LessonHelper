@@ -572,7 +572,7 @@ select::-ms-expand {
 .md-input-group textarea.md-input {
   height: auto;
   min-height: 56px;
-  resize: vertical;
+  resize: none;
   padding-top: 20px;
 }
 
@@ -1539,6 +1539,7 @@ select::-ms-expand {
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
+  resize: none;
 }
 
 .rte-editor:empty::before {
