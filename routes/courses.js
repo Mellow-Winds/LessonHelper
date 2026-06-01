@@ -289,6 +289,10 @@ module.exports = function (db) {
       cleanupUploadedFiles(req.files);
       return res.status(404).json({ error: '课程不存在' });
     }
+    if (!isEnrolled(req.user.userId, courseId)) {
+      cleanupUploadedFiles(req.files);
+      return res.status(403).json({ error: '只有课程成员可以发布帖子' });
+    }
 
     const result = db.run(
       'INSERT INTO posts (course_id, author_id, title, content) VALUES (?, ?, ?, ?)',
