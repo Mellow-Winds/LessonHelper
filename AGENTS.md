@@ -39,7 +39,11 @@ Lessonhelper/
 ├── public/                # 前端静态文件
 │   ├── index.html         #   SPA 入口
 │   ├── css/style.css      #   样式
-│   └── js/app.js          #   客户端逻辑
+│   └── js/                #   客户端逻辑（ES6 Modules）
+│       ├── main.js        #     全局入口
+│       ├── core/          #     api.js + router.js
+│       ├── components/    #     ui.js
+│       └── pages/         #     auth.js / profile.js / courses.js / square.js
 └── uploads/               # 上传文件存储（未来使用）
 ```
 

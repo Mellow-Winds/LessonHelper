@@ -64,14 +64,14 @@ module.exports = function (db) {
 
   // GET /api/schedule/notes
   router.get('/notes', (req, res) => {
-    const notesPath = path.join(__dirname, '..', 'notes.md');
+    const notesPath = path.join(__dirname, '..', 'data', 'schedule', 'notes.md');
     if (!fs.existsSync(notesPath)) return res.json({ content: '' });
     res.json({ content: fs.readFileSync(notesPath, 'utf-8') });
   });
 
   // GET /api/schedule/pre-notes
   router.get('/pre-notes', (req, res) => {
-    const filePath = path.join(__dirname, '..', 'pre-notes.md');
+    const filePath = path.join(__dirname, '..', 'data', 'schedule', 'pre-notes.md');
     if (!fs.existsSync(filePath)) return res.json({ content: '' });
     res.json({ content: fs.readFileSync(filePath, 'utf-8') });
   });

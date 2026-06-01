@@ -36,10 +36,68 @@ Buttons:
 - Hover: darken by 10%, not color switch
 - No rounded-full on rectangular buttons
 
-Inputs:
-- Border: 1px solid #d1d5db
-- Border radius: 6px
-- Focus: border-color change + outline, no glow
+### Inputs (Material Design 3 Outlined Style)
+Use `createMdInput()` function to generate MD3 inputs. NEVER use native `<input class="input">`.
+
+**Structure:**
+```html
+<div class="md-input-group">
+  <input class="md-input" placeholder=" ">
+  <label class="md-label">Label</label>
+  <fieldset class="md-border"><legend><span>Label</span></legend></fieldset>
+</div>
+```
+
+**Style Properties:**
+- Height: 56px
+- Border: 1px solid var(--md-outline)
+- Border radius: 8px
+- Padding: 16px
+- Background: transparent
+
+**States:**
+- Hover: border-color → var(--md-on-surface)
+- Focus/Filled: border-color → var(--md-primary), border-width → 2px, label floats up (0.75rem)
+- Error: border-color + label → var(--md-error)
+
+**JS Helper:**
+```js
+createMdInput({ id, label, type, value, required, style, onchange, placeholder })
+```
+
+### Select (Material Design 3 Outlined Style)
+Use `createMdSelect()` function to generate MD3 selects. NEVER use native `<select>`.
+
+**Style Properties:**
+- Height: 56px
+- Border: 1px solid var(--md-outline)
+- Border radius: 8px
+- Padding: 16px
+- Background: transparent
+
+**States:**
+- Hover: border-color → var(--md-on-surface)
+- Open: border-color → var(--md-primary), border-width → 2px, arrow rotates 180°
+- Selected option: color → var(--md-primary), background → var(--md-primary-container)
+
+**Dropdown Menu:**
+- Background: var(--md-surface-container-lowest)
+- Border radius: 12px
+- Shadow: 0 4px 20px rgba(0,0,0,0.15)
+- Max height: 240px (scrollable)
+
+**JS Helper:**
+```js
+createMdSelect({ id, label, options, selected, style, onchange })
+// options: [{ text: '显示文本', value: '值' }]
+// onchange: 函数名字符串，如 'refreshList()'
+```
+
+### Tables
+- Border: 1px solid var(--md-outline-variant)
+- Header: background var(--md-surface-container), font-weight 600
+- Row hover: background var(--md-surface-container-low)
+- Cell padding: 12px 16px
 
 ## Icons
 - Use one icon set consistently: Lucide / Heroicons / Phosphor
