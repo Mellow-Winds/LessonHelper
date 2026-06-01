@@ -1228,6 +1228,7 @@ registerPage('course', async (container, courseId) => {
 
     const posts = await apiGet(`/api/courses/${courseId}/posts`);
     const members = await apiGet(`/api/courses/${courseId}/members`);
+    const stats = await apiGet(`/api/courses/${courseId}/members/stats`);
 
     container.innerHTML = `
       <div class="page-header">
@@ -1268,20 +1269,23 @@ registerPage('course', async (container, courseId) => {
 
         <!-- 成员侧栏 -->
         <div style="width:220px;flex-shrink:0">
-          <div class="card">
+          <div class="card" id="members-sidebar">
             <h3 style="font-size:var(--text-sm);font-weight:600;margin-bottom:12px;color:var(--md-on-surface-variant)">
-              <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 课程成员 (${members.length})
+              <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 课程成员 (<span id="member-count">${members.length}</span>)
             </h3>
-            ${members.map(m => `
-              <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--md-outline-variant);border-bottom-color:transparent">
-                <div class="avatar-small">${(m.nickname || '?')[0]}</div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:var(--text-sm);font-weight:500">${escHtml(m.nickname)}</div>
-                  ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
-                  ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">tag</span> ${escHtml(m.qq)}</div>` : ''}
-                </div>
-              </div>
-            `).join('')}
+            <div id="member-filters" style="margin-bottom:12px">
+              <select id="filter-major" class="member-filter-select" onchange="filterMembers(${courseId})">
+                <option value="">全部专业</option>
+                ${(stats?.majors || []).map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('')}
+              </select>
+              <select id="filter-grade" class="member-filter-select" onchange="filterMembers(${courseId})">
+                <option value="">全部年级</option>
+                ${(stats?.grades || []).map(g => `<option value="${escHtml(g)}">${escHtml(g)}</option>`).join('')}
+              </select>
+            </div>
+            <div id="members-list">
+              ${renderMembersList(members)}
+            </div>
           </div>
         </div>
       </div>
@@ -1297,6 +1301,42 @@ registerPage('course', async (container, courseId) => {
     container.innerHTML = `<div class="card"><p class="text-secondary">加载失败: ${e.message}</p></div>`;
   }
 });
+
+function renderMembersList(members) {
+  if (members.length === 0) {
+    return '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">暂无匹配成员</p>';
+  }
+  return members.map(m => `
+    <div class="member-item">
+      <div class="avatar-small">${(m.nickname || '?')[0]}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:var(--text-sm);font-weight:500">${escHtml(m.nickname)}</div>
+        ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
+        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">tag</span> ${escHtml(m.qq)}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function filterMembers(courseId) {
+  const major = document.getElementById('filter-major')?.value || '';
+  const grade = document.getElementById('filter-grade')?.value || '';
+  const params = new URLSearchParams();
+  if (major) params.set('major', major);
+  if (grade) params.set('grade', grade);
+
+  const listEl = document.getElementById('members-list');
+  if (listEl) listEl.innerHTML = '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">加载中...</p>';
+
+  try {
+    const members = await apiGet(`/api/courses/${courseId}/members?${params.toString()}`);
+    if (listEl) listEl.innerHTML = renderMembersList(members);
+    const countEl = document.getElementById('member-count');
+    if (countEl) countEl.textContent = members.length;
+  } catch {
+    if (listEl) listEl.innerHTML = '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">加载失败</p>';
+  }
+}
 
 // ===== Post & Comment Helpers =====
 

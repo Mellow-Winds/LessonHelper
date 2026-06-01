@@ -103,23 +103,43 @@ module.exports = function (db) {
     res.json({ message: '已退出课程' });
   });
 
-  // GET /api/courses/:id/members — 课程成员列表
+  // GET /api/courses/:id/members — 课程成员列表（支持 major/grade 筛选）
   router.get('/:id/members', (req, res) => {
     const courseId = Number(req.params.id);
     const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: '课程不存在' });
 
-    const members = db.all(`
-      SELECT u.id AS user_id, u.nickname, u.major, u.grade, u.avatar_url, u.qq, u.privacy_show_profile
+    const { major, grade, match_only } = req.query;
+
+    let sql = `
+      SELECT u.id AS user_id, u.nickname, u.major, u.grade, u.avatar_url, u.qq, u.privacy_show_profile, u.privacy_allow_match
       FROM user_courses uc
       JOIN users u ON uc.user_id = u.id
       WHERE uc.course_id = ?
-      ORDER BY uc.enrolled_at ASC
-    `, [courseId]);
+    `;
+    const params = [courseId];
+
+    // match_only=1 时过滤掉不允许匹配的用户
+    if (match_only === '1') {
+      sql += ' AND u.privacy_allow_match = 1';
+    }
+
+    if (major) {
+      sql += ' AND u.major LIKE ?';
+      params.push(`%${major}%`);
+    }
+    if (grade) {
+      sql += ' AND u.grade = ?';
+      params.push(grade);
+    }
+
+    sql += ' ORDER BY uc.enrolled_at ASC';
+
+    const members = db.all(sql, params);
 
     // 隐私过滤：privacy_show_profile=0 时隐藏敏感信息
     const result = members.map(m => {
-      const { privacy_show_profile, ...rest } = m;
+      const { privacy_show_profile, privacy_allow_match, ...rest } = m;
       if (!privacy_show_profile) {
         return { ...rest, major: '', grade: '', qq: '' };
       }
@@ -127,6 +147,34 @@ module.exports = function (db) {
     });
 
     res.json(result);
+  });
+
+  // GET /api/courses/:id/members/stats — 成员专业和年级分布
+  router.get('/:id/members/stats', (req, res) => {
+    const courseId = Number(req.params.id);
+    const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    if (!course) return res.status(404).json({ error: '课程不存在' });
+
+    const majors = db.all(`
+      SELECT DISTINCT u.major FROM user_courses uc
+      JOIN users u ON uc.user_id = u.id
+      WHERE uc.course_id = ? AND u.major != '' AND u.privacy_allow_match = 1
+      ORDER BY u.major ASC
+    `, [courseId]).map(r => r.major);
+
+    const grades = db.all(`
+      SELECT DISTINCT u.grade FROM user_courses uc
+      JOIN users u ON uc.user_id = u.id
+      WHERE uc.course_id = ? AND u.grade != '' AND u.privacy_allow_match = 1
+      ORDER BY u.grade DESC
+    `, [courseId]).map(r => r.grade);
+
+    const total = db.get(
+      'SELECT COUNT(*) AS cnt FROM user_courses WHERE course_id = ?',
+      [courseId]
+    ).cnt;
+
+    res.json({ majors, grades, total });
   });
 
   // GET /api/courses/:id/posts — 帖子列表
