@@ -130,3 +130,100 @@
 - [x] `style.css`：toggle-switch 开关组件和 privacy-toggle-row 样式
 
 **验证**：注册→编辑资料填 QQ→保存→刷新后 QQ 仍在；关闭隐私开关→成员列表隐藏敏感信息
+
+---
+
+## 第8轮：同课程同学匹配 ✅
+
+**目标**：成员列表支持筛选，快速找到契合的学习伙伴
+
+- [x] `routes/courses.js`：GET `/:id/members` 支持 `major`/`grade` 查询参数筛选，`match_only=1` 过滤隐私屏蔽用户
+- [x] `routes/courses.js`：新增 GET `/:id/members/stats` 返回专业和年级分布
+- [x] `app.js`：成员侧栏增加专业/年级下拉筛选框，提取 `renderMembersList` 和 `filterMembers` 函数
+- [x] `style.css`：`member-filter-select` 和 `member-item` 样式
+
+**验证**：进入课程空间→成员侧栏显示筛选器→选择专业筛选→列表实时更新
+
+---
+
+## 第9轮：学习资料共享 ✅
+
+**目标**：用户上传资料，分类浏览，评分筛选
+
+- [x] `server.js`：新建 `materials` 表（id, course_id, uploader_id, title, description, file_path, file_name, file_type, file_size, chapter, category, avg_rating, rating_count, download_count）和 `material_ratings` 表
+- [x] `routes/materials.js`（新建）：POST 上传、GET 列表（筛选排序分页）、GET 详情、GET 下载、POST 评分、DELETE 删除
+- [x] `app.js`：课程空间增加论坛/资料/成员标签页切换；资料卡片列表（类型图标、章节标签、评分星星、下载次数）；上传弹窗（拖拽+点击选择文件、标题、描述、章节、分类）；筛选排序；下载/删除
+- [x] `style.css`：course-tabs 标签页、material-card 资料卡片、stars-row 评分星星、upload-drop-zone 拖拽上传区、member-card-grid 成员网格
+
+**验证**：进课程空间→切换到资料标签→上传 PDF→填写信息→上传成功→其他用户可浏览/下载/评分
+
+---
+
+## 第10轮：自习搭子邀约 ✅
+
+**目标**：发布自习邀约，浏览和响应邀约
+
+- [x] `server.js`：新建 `study_invites` 表和 `study_invite_responses` 表
+- [x] `routes/invites.js`（新建）：POST 发布、GET 列表（筛选）、GET 我的邀约、GET 详情+参与者、POST 响应（加入/取消）、PUT 编辑、DELETE 取消
+- [x] `app.js`：新增 `invites` 和 `invites-my` 页面、发布邀约弹窗（标题/描述/日期/时间/地点/人数）、筛选（日期/状态）、加入/取消、我的邀约标签切换（发起/参与）
+- [x] `index.html`：导航栏增加「自习邀约」入口
+- [x] `style.css`：invite-card 邀约卡片、status-badge 状态标签、tab-btn 标签按钮
+
+**验证**：发布邀约→出现在列表→其他用户可加入→满员自动标记「已满」→取消参与→我的邀约可查看发起和参与的
+
+---
+
+## 维护记录：下载文件名修复 ✅
+
+- [x] 下载文件中文名乱码：改用标题+扩展名作为下载文件名（RFC 5987 编码）
+- [x] multer 中文文件名编码：增加 Latin-1 → UTF-8 转换
+
+---
+
+## 第11轮：消息提醒 ✅
+
+**目标**：新帖、评论、邀约回复、新资料实时提醒
+
+- [x] `server.js`：新建 `notifications` 表
+- [x] `routes/notifications.js`（新建）：GET 通知列表、GET 未读数量、PUT 标记已读、PUT 全部已读；导出 `createNotification` 和 `notifyCourseMembers` 辅助函数
+- [x] 通知触发点：发帖→通知课程成员；评论→通知帖子作者；加入邀约→通知创建者；取消邀约→通知参与者；上传资料→通知课程成员
+- [x] `app.js`：铃铛图标+未读角标+通知面板（下拉）+30秒轮询+点击跳转+全部已读
+- [x] `index.html`：侧栏底部增加铃铛入口
+- [x] `style.css`：notification-bell、notif-badge、notification-panel、notif-item、notif-unread 样式
+
+**验证**：用户 A 发帖→用户 B 收到通知→铃铛显示角标→点击展开面板→点击通知跳转→全部已读
+
+---
+
+## 第12轮：全局搜索 ✅
+
+**目标**：搜索课程、资料、帖子
+
+- [x] `routes/search.js`（新建）：GET `/api/search?q=xxx&type=all|courses|materials|posts`，返回分组结果
+- [x] `app.js`：侧栏搜索框（回车触发）、`search` 页面、搜索结果分 Tab（全部/课程/资料/帖子）、关键词高亮、搜索历史（localStorage 最近 5 条）
+- [x] `index.html`：侧栏品牌下方增加搜索框
+- [x] `style.css`：sidebar-search 搜索框、search-result-card 结果卡片、search-highlight 关键词高亮、search-tabs
+
+**验证**：侧栏输入关键词回车→搜索结果页→分 Tab 展示→关键词高亮→点击跳转
+
+---
+
+## 第13轮：交友广场 ✅
+
+**目标**：学习导向的轻社交广场，基于需求精准匹配
+
+### 第 1 轮：后端 API
+- [x] `server.js`：新建 `square_posts`、`square_interests`、`square_comments` 表
+- [x] `routes/square.js`（新建）：POST 发帖（7天过期）、GET 列表（自动过滤过期+类型筛选）、GET 详情（含已确认成员+待处理）、DELETE 删除、POST 感兴趣、PUT 接受/拒绝、GET 我的广场、POST/GET 评论
+- [x] 通知触发：有人感兴趣→通知发帖人；接受→通知申请人
+
+### 第 2 轮：前端页面
+- [x] `index.html`：导航栏增加「交友广场」入口
+- [x] `app.js`：`square` 广场主页（列表+类型筛选+发帖弹窗）、`square-post` 帖子详情（感兴趣/接受拒绝/已确认成员含QQ/评论）、`square-my` 我的广场（发起/感兴趣 Tab）
+- [x] `style.css`：square-post-card、square-category-tag 样式
+
+### 第 3 轮：通知 + 过期
+- [x] 通知触发已内置在路由中
+- [x] 列表查询自动过滤过期帖子
+
+**验证**：发帖→广场列表可见→其他用户感兴趣→发帖人收到通知→接受→双方可见QQ→评论正常

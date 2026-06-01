@@ -1,5 +1,6 @@
 const express = require('express');
 const { authMiddleware } = require('./middleware/auth');
+const { createNotification, notifyCourseMembers } = require('./notifications');
 
 module.exports = function (db) {
   const router = express.Router();
@@ -103,23 +104,43 @@ module.exports = function (db) {
     res.json({ message: '已退出课程' });
   });
 
-  // GET /api/courses/:id/members — 课程成员列表
+  // GET /api/courses/:id/members — 课程成员列表（支持 major/grade 筛选）
   router.get('/:id/members', (req, res) => {
     const courseId = Number(req.params.id);
     const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: '课程不存在' });
 
-    const members = db.all(`
-      SELECT u.id AS user_id, u.nickname, u.major, u.grade, u.avatar_url, u.qq, u.privacy_show_profile
+    const { major, grade, match_only } = req.query;
+
+    let sql = `
+      SELECT u.id AS user_id, u.nickname, u.major, u.grade, u.avatar_url, u.qq, u.privacy_show_profile, u.privacy_allow_match
       FROM user_courses uc
       JOIN users u ON uc.user_id = u.id
       WHERE uc.course_id = ?
-      ORDER BY uc.enrolled_at ASC
-    `, [courseId]);
+    `;
+    const params = [courseId];
+
+    // match_only=1 时过滤掉不允许匹配的用户
+    if (match_only === '1') {
+      sql += ' AND u.privacy_allow_match = 1';
+    }
+
+    if (major) {
+      sql += ' AND u.major LIKE ?';
+      params.push(`%${major}%`);
+    }
+    if (grade) {
+      sql += ' AND u.grade = ?';
+      params.push(grade);
+    }
+
+    sql += ' ORDER BY uc.enrolled_at ASC';
+
+    const members = db.all(sql, params);
 
     // 隐私过滤：privacy_show_profile=0 时隐藏敏感信息
     const result = members.map(m => {
-      const { privacy_show_profile, ...rest } = m;
+      const { privacy_show_profile, privacy_allow_match, ...rest } = m;
       if (!privacy_show_profile) {
         return { ...rest, major: '', grade: '', qq: '' };
       }
@@ -127,6 +148,34 @@ module.exports = function (db) {
     });
 
     res.json(result);
+  });
+
+  // GET /api/courses/:id/members/stats — 成员专业和年级分布
+  router.get('/:id/members/stats', (req, res) => {
+    const courseId = Number(req.params.id);
+    const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    if (!course) return res.status(404).json({ error: '课程不存在' });
+
+    const majors = db.all(`
+      SELECT DISTINCT u.major FROM user_courses uc
+      JOIN users u ON uc.user_id = u.id
+      WHERE uc.course_id = ? AND u.major != '' AND u.privacy_allow_match = 1
+      ORDER BY u.major ASC
+    `, [courseId]).map(r => r.major);
+
+    const grades = db.all(`
+      SELECT DISTINCT u.grade FROM user_courses uc
+      JOIN users u ON uc.user_id = u.id
+      WHERE uc.course_id = ? AND u.grade != '' AND u.privacy_allow_match = 1
+      ORDER BY u.grade DESC
+    `, [courseId]).map(r => r.grade);
+
+    const total = db.get(
+      'SELECT COUNT(*) AS cnt FROM user_courses WHERE course_id = ?',
+      [courseId]
+    ).cnt;
+
+    res.json({ majors, grades, total });
   });
 
   // GET /api/courses/:id/posts — 帖子列表
@@ -157,6 +206,17 @@ module.exports = function (db) {
       'INSERT INTO posts (course_id, author_id, title, content) VALUES (?, ?, ?, ?)',
       [courseId, req.user.userId, title, content]
     );
+    db.save();
+
+    // 通知：课程有新帖
+    const author = db.get('SELECT nickname FROM users WHERE id = ?', [req.user.userId]);
+    const courseInfo = db.get('SELECT title FROM courses WHERE id = ?', [courseId]);
+    notifyCourseMembers(db, {
+      courseId, excludeUserId: req.user.userId,
+      type: 'new_post', title: '新帖子',
+      message: `${author?.nickname || '匿名'} 在「${courseInfo?.title || ''}」发布了「${title}」`,
+      relatedType: 'post', relatedId: result.lastInsertRowid
+    });
     db.save();
 
     res.status(201).json({
@@ -196,6 +256,18 @@ module.exports = function (db) {
       [postId, req.user.userId, content]
     );
     db.save();
+
+    // 通知：帖子有新评论（通知帖子作者）
+    const postDetail = db.get('SELECT author_id, title, course_id FROM posts WHERE id = ?', [postId]);
+    const commenter = db.get('SELECT nickname FROM users WHERE id = ?', [req.user.userId]);
+    if (postDetail && postDetail.author_id !== req.user.userId) {
+      createNotification(db, {
+        userId: postDetail.author_id, type: 'new_comment', title: '新评论',
+        message: `${commenter?.nickname || '匿名'} 评论了你的帖子「${postDetail.title}」`,
+        relatedType: 'post', relatedId: postId, courseId: postDetail.course_id
+      });
+      db.save();
+    }
 
     res.status(201).json({
       id: result.lastInsertRowid,
