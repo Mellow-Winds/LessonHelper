@@ -1426,3 +1426,21 @@ select.input {
   margin-bottom: 16px;
   border-bottom: 1px solid var(--md-outline-variant);
 }
+
+/* ---- Square ---- */
+.square-post-card {
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.square-post-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.square-category-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--md-primary-container, #e3f2fd);
+  color: var(--md-primary, #1976d2);
+}
