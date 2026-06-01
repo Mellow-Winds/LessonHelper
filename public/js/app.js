@@ -2201,7 +2201,7 @@ async function renderNotificationPanel() {
   panel.id = 'notification-panel';
   panel.className = 'notification-panel';
   panel.innerHTML = '<p style="text-align:center;padding:24px;color:var(--md-on-surface-variant)">加载中...</p>';
-  bell.parentElement.appendChild(panel);
+  document.body.appendChild(panel);
 
   try {
     const data = await apiGet('/api/notifications');

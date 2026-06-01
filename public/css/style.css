@@ -1305,10 +1305,9 @@ select.input {
 
 /* ---- Notification Panel ---- */
 .notification-panel {
-  position: absolute;
-  bottom: 100%;
-  left: 100%;
-  margin-left: 8px;
+  position: fixed;
+  bottom: 24px;
+  left: 256px;
   width: 340px;
   max-height: 420px;
   background: var(--md-surface, #fff);
