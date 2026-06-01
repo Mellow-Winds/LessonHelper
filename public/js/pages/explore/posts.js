@@ -291,7 +291,7 @@ async function renderInviteForm(formEl) {
       <div>
         ${createMdSelect({ id: 'invite-course', label: '关联课程', options: courseOptions })}
       </div>
-      ${createMdInput({ id: 'invite-location', label: '自习地点', placeholder: '如：图书馆3楼' })}
+      ${createMdInput({ id: 'invite-location', label: '自习地点', placeholder: ' ' })}
       <div style="display:flex;gap:12px">
         <div style="flex:1">
           ${createMdSelect({ id: 'invite-date', label: '日期', options: dateOptions, selected: today })}

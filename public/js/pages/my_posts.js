@@ -160,7 +160,7 @@ async function renderCoursePosts(container) {
       <div class="my-post-section">
         <h3 class="my-post-section-title"><span class="mi" style="font-size:18px;vertical-align:-3px">forum</span> 我的帖子 (${postsArr.length})</h3>
         ${postsArr.map(p => `
-          <div class="card my-post-card" onclick="navigateTo('course', ${p.course_id})">
+          <div class="card my-post-card" onclick="navigateTo('mycourse-detail', ${p.course_id})">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
               <div style="flex:1;min-width:0">
                 <h4 style="font-size:var(--text-base);font-weight:600">${escHtml(p.title)}</h4>
@@ -182,7 +182,7 @@ async function renderCoursePosts(container) {
       <div class="my-post-section" ${postsArr.length > 0 ? 'style="margin-top:24px"' : ''}>
         <h3 class="my-post-section-title"><span class="mi" style="font-size:18px;vertical-align:-3px">folder</span> 我的资料 (${materialsArr.length})</h3>
         ${materialsArr.map(m => `
-          <div class="card my-post-card" onclick="navigateTo('course', ${m.course_id})">
+          <div class="card my-post-card" onclick="navigateTo('mycourse-detail', ${m.course_id})">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
               <div style="flex:1;min-width:0">
                 <h4 style="font-size:var(--text-base);font-weight:600">${escHtml(m.title)}</h4>

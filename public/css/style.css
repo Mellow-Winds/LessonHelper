@@ -1109,33 +1109,7 @@ select::-ms-expand {
   border-top: 1px solid var(--md-outline-variant);
 }
 
-/* ---- Course Tabs ---- */
-.course-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--md-outline-variant);
-  padding-bottom: 0;
-}
-.course-tab {
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--md-on-surface-variant);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
-  margin-bottom: -1px;
-}
-.course-tab:hover {
-  color: var(--md-primary);
-}
-.course-tab.active {
-  color: var(--md-primary);
-  border-bottom-color: var(--md-primary);
-}
+/* ---- Course Tabs (uses .md-tabs / .md-tab-btn) ---- */
 
 /* ---- Material Card ---- */
 .material-card {
@@ -1262,12 +1236,7 @@ select::-ms-expand {
   padding: 0 1px;
   border-radius: 2px;
 }
-.search-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--md-outline-variant);
-}
+/* ---- Search Tabs (uses .md-tabs / .md-tab-btn) ---- */
 
 /* ---- Square ---- */
 .square-post-card {
@@ -2616,4 +2585,241 @@ input {
   background: var(--md-primary);
   flex-shrink: 0;
   margin-top: 6px;
+}
+
+/* ==========================================================================
+   双轨制课程系统 — 我的课程 + 课程广场
+   ========================================================================== */
+
+/* ---- MD3 药丸切换器（Pill Tabs）---- */
+
+.md-pills {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+  padding: var(--space-1);
+  background: var(--md-surface-container);
+  border-radius: var(--radius-pill);
+  width: fit-content;
+}
+
+.md-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-normal) var(--ease-standard),
+    color var(--dur-normal) var(--ease-standard),
+    box-shadow var(--dur-normal) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-spring);
+}
+
+.md-pill-btn:hover {
+  background-color: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+.md-pill-btn:active {
+  transform: scale(0.97);
+}
+
+.md-pill-btn.active {
+  background-color: var(--md-surface-container-lowest);
+  color: var(--md-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-1);
+}
+
+/* ---- 课程广场搜索栏 ---- */
+
+.plaza-search-bar {
+  position: relative;
+  margin-bottom: var(--space-6);
+  max-width: 560px;
+}
+
+.plaza-search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 22px;
+  color: var(--md-on-surface-variant);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.plaza-search-input {
+  width: 100%;
+  height: 56px;
+  padding: 16px 16px 16px 48px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--radius-pill);
+  background: var(--md-surface-container-lowest);
+  font-size: var(--text-base);
+  font-family: inherit !important;
+  color: var(--md-on-surface);
+  outline: none;
+  caret-color: var(--md-primary);
+  transition:
+    border-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plaza-search-input:focus {
+  border-color: var(--md-primary);
+  border-width: 2px;
+  box-shadow: 0 2px 8px -2px rgba(74, 144, 217, 0.25);
+}
+
+.plaza-search-input:hover:not(:focus) {
+  border-color: var(--md-on-surface);
+}
+
+.plaza-search-input::placeholder {
+  color: var(--md-on-surface-variant);
+}
+
+/* ---- 课程广场分类标签 ---- */
+
+.plaza-category-chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+/* ---- 课程广场出处追溯角标 ---- */
+
+.plaza-origin-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  background: var(--md-surface-container);
+  color: var(--md-on-surface-variant);
+}
+
+/* ---- 课程广场帖子卡片 ---- */
+
+.plaza-post-card {
+  transition: box-shadow 0.2s;
+}
+
+/* ---- 课程广场分类药丸栏 ---- */
+
+.plaza-pill-bar {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.plaza-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 8px 16px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-normal) var(--ease-standard),
+    border-color var(--dur-normal) var(--ease-standard),
+    color var(--dur-normal) var(--ease-standard);
+}
+
+.plaza-pill:hover {
+  background: var(--md-surface-container-high);
+  border-color: var(--md-outline);
+}
+
+.plaza-pill.active {
+  background: var(--md-primary-container);
+  border-color: var(--md-primary);
+  color: var(--md-on-primary-container);
+  font-weight: 600;
+}
+
+/* ---- 发布表单：附件区域 ---- */
+
+.publish-attach-section {
+  margin-bottom: var(--space-4);
+}
+
+/* ---- 发布表单：同步开关联动 ---- */
+
+.publish-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--radius-md);
+  background: var(--md-surface-container-lowest);
+  transition:
+    border-color var(--dur-normal) var(--ease-standard),
+    background-color var(--dur-normal) var(--ease-standard);
+}
+
+.publish-sync-row.forced {
+  border-color: var(--md-primary);
+  background: var(--md-primary-container);
+}
+
+.publish-sync-row.forced .post-switch-text,
+.publish-sync-row.forced div[style] {
+  color: var(--md-on-primary-container);
+}
+
+/* ---- 禁用态按钮 ---- */
+
+.btn-disabled {
+  background-color: var(--md-surface-container-high);
+  color: var(--md-on-surface-variant);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ---- 原生字体继承（绝杀视觉降级）---- */
+
+/* 所有输入组件在聚焦或激活状态下强行锁死字体继承 */
+input:focus,
+textarea:focus,
+select:focus,
+[contenteditable]:focus,
+.md-input:focus,
+.md-select-trigger,
+.plaza-search-input:focus,
+.plaza-search-input,
+.post-chip-input:focus,
+.rte-editor:focus {
+  font-family: inherit !important;
+}
+
+/* 全局覆盖：确保所有表单元素继承 body 字体 */
+input, textarea, select, button,
+.md-input, .md-select-trigger, .md-select-value,
+.plaza-search-input, .post-chip-input,
+.rte-editor, .rte-toolbar {
+  font-family: inherit !important;
 }

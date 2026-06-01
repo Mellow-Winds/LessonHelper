@@ -70,10 +70,12 @@ export function renderMarkdown(text) {
    ============================================= */
 
 const ROUTES = [
-  { page: 'courses',      pattern: '/courses',             nav: 'courses' },
-  { page: 'course',       pattern: '/course/:id',          nav: 'courses' },
-  { page: 'create-post',  pattern: '/course/:id/new-post', nav: 'courses' },
-  { page: 'profile',      pattern: '/profile',             nav: 'profile' },
+  { page: 'mycourse',       pattern: '/mycourse',              nav: 'mycourse' },
+  { page: 'mycourse-detail',pattern: '/mycourse/:id',          nav: 'mycourse' },
+  { page: 'allcourse',      pattern: '/allcourse',             nav: 'allcourse' },
+  { page: 'plaza-course',   pattern: '/allcourse/:id',         nav: 'allcourse' },
+  { page: 'publish',        pattern: '/course/:id/posts',      nav: null },
+  { page: 'profile',        pattern: '/profile',               nav: 'profile' },
   { page: 'profile-edit', pattern: '/profile/edit',        nav: 'profile' },
   { page: 'profile-privacy', pattern: '/profile/privacy',  nav: 'profile' },
   { page: 'profile-data', pattern: '/profile/data',        nav: 'profile' },
@@ -98,7 +100,7 @@ const ROUTES = [
  */
 function buildPath(pageName, data) {
   const route = ROUTES.find(r => r.page === pageName);
-  if (!route) return '/courses';
+  if (!route) return '/mycourse';
 
   let path = route.pattern;
 
@@ -106,7 +108,7 @@ function buildPath(pageName, data) {
   if (path.includes(':id')) {
     const id = (typeof data === 'number' || typeof data === 'string') ? data : data?.id;
     if (id) path = path.replace(':id', id);
-    else return '/courses'; // 无ID则回退
+    else return '/mycourse'; // 无ID则回退
   }
 
   // search 页面附加 query 参数
@@ -159,7 +161,7 @@ function resolvePath(pathname) {
   }
 
   // 未匹配，返回默认
-  return { page: 'courses', data: null };
+  return { page: 'mycourse', data: null };
 }
 
 /* =============================================
