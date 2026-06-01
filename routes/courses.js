@@ -110,13 +110,23 @@ module.exports = function (db) {
     if (!course) return res.status(404).json({ error: '课程不存在' });
 
     const members = db.all(`
-      SELECT u.id AS user_id, u.nickname, u.major, u.grade, u.avatar_url
+      SELECT u.id AS user_id, u.nickname, u.major, u.grade, u.avatar_url, u.qq, u.privacy_show_profile
       FROM user_courses uc
       JOIN users u ON uc.user_id = u.id
       WHERE uc.course_id = ?
       ORDER BY uc.enrolled_at ASC
     `, [courseId]);
-    res.json(members);
+
+    // 隐私过滤：privacy_show_profile=0 时隐藏敏感信息
+    const result = members.map(m => {
+      const { privacy_show_profile, ...rest } = m;
+      if (!privacy_show_profile) {
+        return { ...rest, major: '', grade: '', qq: '' };
+      }
+      return rest;
+    });
+
+    res.json(result);
   });
 
   // GET /api/courses/:id/posts — 帖子列表

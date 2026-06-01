@@ -116,3 +116,17 @@
 - [x] 增加 autofill 状态选择器，刷新后浏览器自动填充值也能在首帧顶起 Label
 
 **验证**：本地服务 200；CSS 资源已包含新规则
+
+---
+
+## 第7轮：隐私设置 + QQ 号 ✅
+
+**目标**：个人资料扩展，隐私控制基础设施
+
+- [x] `server.js`：users 表新增 `qq`、`privacy_show_profile`、`privacy_allow_match` 字段
+- [x] `routes/auth.js`：GET/PUT `/me` 支持 qq 和隐私字段
+- [x] `routes/courses.js`：成员列表返回 qq，`privacy_show_profile=0` 时隐藏敏感信息
+- [x] `app.js`：个人中心增加 QQ 展示和隐私开关，编辑资料增加 QQ 输入，成员侧栏显示 QQ（可复制）
+- [x] `style.css`：toggle-switch 开关组件和 privacy-toggle-row 样式
+
+**验证**：注册→编辑资料填 QQ→保存→刷新后 QQ 仍在；关闭隐私开关→成员列表隐藏敏感信息
