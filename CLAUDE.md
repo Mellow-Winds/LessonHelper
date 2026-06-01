@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-**课搭子**（LessonHelper）是一个面向大学生的同课程学习互助平台。当前处于 MVP 第一阶段，聚焦三个核心功能：用户系统、课程界面、课程空间论坛。
+**课搭子**（LessonHelper）是一个面向大学生的同课程学习互助平台。核心功能包括：用户系统、课程管理、学习资料共享、自习邀约、交友广场、消息通知、全局搜索。品牌以南京大学蓝鲸文化为背景。
 
 ## 技术栈
 
@@ -10,53 +10,96 @@
 |------|------|
 | 后端 | Express 4.x + SQLite (sql.js WASM) |
 | 认证 | JWT (jsonwebtoken) + bcryptjs |
-| 前端 | 原生 JavaScript SPA + Material Design 3 |
-| 样式 | 自定义 CSS（遵循 themerules 设计规范） |
+| 邮件 | Resend API（验证码注册） |
+| 文件上传 | Multer（磁盘存储） |
+| 课表解析 | xlsx (SheetJS) |
+| 前端 | 原生 JavaScript SPA + ES6 Modules |
+| 设计系统 | Material Design 3（自定义 CSS） |
+| Markdown | markdown-it（本地副本） |
+| 图标 | Material Icons + Remix Icon |
 
 ## 项目结构
 
 ```
 Lessonhelper/
-├── server.js              # Express 入口，数据库初始化，路由挂载
-├── package.json           # 依赖配置
-├── themerules             # 前端设计规范（颜色/排版/间距/组件）
-├── CLAUDE.md              # 本文件 — 项目指南
-├── data/                  # 📦 数据文件
-│   └── schedule/          #   课表导入相关
-│       ├── notes.md       #     导入说明（Markdown 格式，支持预览）
-│       └── pre-notes.md   #     使用须知（Markdown 格式，支持预览）
-├── docs/                  # 📚 项目文档
-│   ├── requirements.md    #   开发需求文档
-│   ├── tech-spec.md       #   技术规范（数据库/API/安全）
-│   ├── design-spec.md     #   设计规范（页面布局/组件风格）
-│   ├── development-steps.md # 分步开发计划（当前进度 + 待办）
-│   └── api-spec.md        #   API 接口规范
-├── devlog/                # 📝 开发日志（每天一个文件）
-│   └── YYYY-MM-DD.md
-├── db/                    # SQLite 数据库文件
-├── routes/                # 后端路由
-│   ├── courses.js         #   课程/帖子/评论 API
-│   ├── user.js            #   用户 API
-│   ├── schedule.js        #   课表导入 API
-│   ├── middleware/         #   中间件（auth.js）
-│   └── auth.js            #   认证 API
-├── public/                # 前端静态文件
-│   ├── index.html         #   SPA 入口
-│   ├── css/style.css      #   样式
-│   └── js/                #   客户端逻辑（ES6 Modules）
-│       ├── main.js        #     全局入口：i18n + 跨层函数 + DOMContentLoaded
+├── server.js                    # Express 入口，数据库初始化，路由挂载
+├── package.json                 # 依赖配置
+├── themerules                   # 前端设计规范（颜色/排版/间距/组件）
+├── CLAUDE.md                    # 本文件 — 项目指南
+├── data/
+│   └── schedule/
+│       ├── notes.md             # 导入说明
+│       └── pre-notes.md         # 使用须知
+├── docs/                        # 📚 项目文档
+│   ├── requirements.md          #   开发需求文档
+│   ├── tech-spec.md             #   技术规范（数据库/API/安全）
+│   ├── design-spec.md           #   设计规范（页面布局/组件风格）
+│   ├── development-steps.md     #   分步开发计划（当前进度 + 待办）
+│   └── api-spec.md              #   API 接口规范
+├── devlog/                      # 📝 开发日志（每天一个文件）
+├── todolist/                    # 📋 待规划功能清单
+├── db/                          # SQLite 数据库文件
+├── routes/                      # 后端路由（10 个文件）
+│   ├── auth.js                  #   注册/登录/个人信息/签到
+│   ├── courses.js               #   课程/帖子/评论/成员
+│   ├── user.js                  #   用户公开名片/关注/反馈
+│   ├── schedule.js              #   课表导入
+│   ├── materials.js             #   学习资料上传/下载/评分
+│   ├── invites.js               #   自习邀约
+│   ├── notifications.js         #   消息通知
+│   ├── search.js                #   全局搜索
+│   ├── square.js                #   交友广场
+│   ├── my_posts.js              #   我的创作
+│   └── middleware/
+│       ├── auth.js              #   JWT 中间件
+│       └── email.js             #   Resend 邮件服务
+├── public/                      # 前端静态文件
+│   ├── index.html               #   SPA 入口
+│   ├── css/style.css            #   样式
+│   └── js/
+│       ├── main.js              #   全局入口：i18n + 跨层函数 + 初始化
 │       ├── core/
-│       │   ├── api.js     #     Fetch 请求拦截器 + Token 管理
-│       │   └── router.js  #     路由系统 + URL映射 + 动效引擎
+│       │   ├── api.js           #   Fetch 请求层 + Token 管理
+│       │   └── router.js        #   路由系统 + 动效引擎
 │       ├── components/
-│       │   └── ui.js      #     MD3 组件工厂 + Toast + Modal + 工具函数
+│       │   └── ui.js            #   MD3 组件工厂 + Toast + Modal
 │       └── pages/
-│           ├── auth.js    #     登录/注册 + 通知 + 搜索
-│           ├── profile.js #     个人中心 + 编辑资料
-│           ├── courses.js #     课程列表/详情/论坛/资料/成员/导入/发帖
-│           └── square.js  #     交友广场 + 自习邀约
-└── uploads/               # 上传文件存储（未来使用）
+│           ├── auth.js          #   登录/注册 + 搜索页
+│           ├── profile.js       #   个人中心（三栖视角 + 签到 + 关注）
+│           ├── notifications.js #   通知中心
+│           ├── my_posts.js      #   我的创作
+│           ├── explore.js       #   探索页入口
+│           ├── explore/
+│           │   ├── invites.js   #   自习邀约
+│           │   ├── square.js    #   交友广场
+│           │   └── posts.js     #   统一发布页
+│           └── courses/
+│               ├── my_courses.js #   我的课程（导入/列表/详情）
+│               ├── plaza.js     #   课程广场（大课聚合）
+│               └── publish.js   #   发布（富文本+附件）
+└── uploads/                     # 上传文件存储
+    └── materials/               #   学习资料文件
 ```
+
+## 数据库表（15 张）
+
+| 表名 | 说明 |
+|------|------|
+| users | 用户账号（含 wechat/douyin/mbti/avatar_desc/签到/隐私字段） |
+| courses | 课程目录 |
+| posts | 课程论坛帖子 |
+| comments | 帖子评论 |
+| user_courses | 选课关系（多对多） |
+| materials | 学习资料 |
+| material_ratings | 资料评分 |
+| study_invites | 自习邀约 |
+| study_invite_responses | 邀约响应 |
+| notifications | 消息通知 |
+| square_posts | 交友广场帖子（7天过期） |
+| square_interests | 广场感兴趣记录 |
+| square_comments | 广场评论 |
+| follows | 关注关系 |
+| feedback | 问题反馈 |
 
 ## 文档索引
 
@@ -84,19 +127,12 @@ Lessonhelper/
 - 密码用 bcryptjs 哈希（cost=10）
 - 前端样式遵循 themerules（无渐变、无玻璃态、色值用设计Token）
 - 新页面用 `registerPage(name, renderFn)` 注册
+- 输入框必须用 `createMdInput()` / `createMdSelect()` 工厂，禁止原生 `<select>`
 
 ### 启动命令
 ```bash
 npm install          # 安装依赖
 npm run dev          # 启动服务器 http://localhost:3000
-```
-
-### 测试 API
-```bash
-# 注册
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"test","password":"123456","nickname":"测试","major":"计算机","grade":"2024级"}'
 ```
 
 ## 日志规则
@@ -107,4 +143,4 @@ curl -X POST http://localhost:3000/api/auth/register \
 
 ---
 
-> 创建于 2026-05-30
+> 创建于 2026-05-30 | 最后更新：2026-06-01
