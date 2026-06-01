@@ -6,6 +6,7 @@
 import { apiGet, apiPut, apiPost, apiDelete } from '../core/api.js';
 import { navigateTo, animIn, animStagger } from '../core/router.js';
 import { showToast, openModal, closeModal, escHtml, createMdInput, createMdSelect } from '../components/ui.js';
+import { renderAuth } from './auth.js';
 
 /* =============================================
    常量
@@ -119,6 +120,7 @@ async function renderProfilePage(container) {
 
   if (!window._currentUser) {
     container.innerHTML = renderLoginPrompt();
+    container.querySelector('.btn-primary')?.addEventListener('click', () => renderAuth(container));
     return;
   }
 
@@ -143,7 +145,7 @@ function renderLoginPrompt() {
         <span class="mi profile-empty-icon">person_off</span>
         <h2 class="profile-empty-title">尚未登录</h2>
         <p class="profile-empty-desc">登录后即可管理你的个人空间</p>
-        <button class="btn btn-primary" onclick="document.getElementById('sidebar-search-input').focus()">
+        <button class="btn btn-primary">
           <span class="mi">login</span>
           前往登录
         </button>

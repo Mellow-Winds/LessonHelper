@@ -78,12 +78,16 @@ const ROUTES = [
   { page: 'profile-privacy', pattern: '/profile/privacy',  nav: 'profile' },
   { page: 'profile-data', pattern: '/profile/data',        nav: 'profile' },
   { page: 'profile-user', pattern: '/profile/:id',         nav: 'profile' },
-  { page: 'square',       pattern: '/square',              nav: 'square' },
-  { page: 'square-post',  pattern: '/square/post/:id',     nav: 'square' },
-  { page: 'square-my',    pattern: '/square/my',           nav: 'square' },
-  { page: 'invites',      pattern: '/invites',             nav: 'invites' },
-  { page: 'invites-my',   pattern: '/invites/my',          nav: 'invites' },
-  { page: 'search',       pattern: '/search',              nav: null },
+  { page: 'explore',      pattern: '/explore',             nav: 'explore' },
+  { page: 'explore-posts',pattern: '/explore/posts',       nav: 'explore' },
+  { page: 'square-post',  pattern: '/explore/square/post/:id', nav: 'explore' },
+  { page: 'square-my',    pattern: '/explore/square/my',  nav: 'explore' },
+  { page: 'invites-my',   pattern: '/explore/invites/my', nav: 'explore' },
+  { page: 'my_post',      pattern: '/my_post',             nav: 'my_post' },
+  { page: 'my_post-course',pattern: '/my_post/course',     nav: 'my_post' },
+  { page: 'my_post-explore',pattern: '/my_post/explore',   nav: 'my_post' },
+  { page: 'notifications',pattern: '/notifications',       nav: 'notifications' },
+  { page: 'search',       pattern: '/search',              nav: 'search' },
 ];
 
 /**
