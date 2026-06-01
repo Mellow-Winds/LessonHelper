@@ -7,6 +7,7 @@ import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../../core/router.js';
 import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, formatTime, formatFileSize } from '../../components/ui.js';
 import { getFavoriteCourseIds, getFavoritePostIds, renderCourseFavoriteButton, renderPostFavoriteButton } from '../favorites.js';
+import { renderPostAttachments } from './post_attachments.js';
 
 /* =============================================
    学期工具函数
@@ -483,6 +484,7 @@ async function renderMyForumTab(contentEl, courseId) {
           <div class="card mb-4 post-card clickable" id="post-${p.id}">
             <h3 class="card-title" style="cursor:pointer" onclick="toggleComments(${p.id})">${escHtml(p.title)}</h3>
             <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
+            ${renderPostAttachments(p.attachments)}
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
               <span>${escHtml(p.author_name)} · ${formatTime(p.created_at)}</span>
               ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}

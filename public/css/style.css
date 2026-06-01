@@ -2823,3 +2823,55 @@ input, textarea, select, button,
 .rte-editor, .rte-toolbar {
   font-family: inherit !important;
 }
+.post-image-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+  max-width: 540px;
+}
+
+.post-image-grid.count-1 {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 420px;
+}
+
+.post-image-grid.count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.post-image-link {
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  aspect-ratio: 1;
+  background: var(--md-surface-container);
+}
+
+.post-image-grid.count-1 .post-image-link {
+  aspect-ratio: auto;
+}
+
+.post-image-link img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 520px;
+  object-fit: cover;
+}
+
+.post-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.post-attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-primary);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
