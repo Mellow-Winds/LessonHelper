@@ -34,6 +34,10 @@ const upload = multer({
   storage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (req, file, cb) => {
+    // Windows 下 multer 的 originalname 可能是 Latin-1 编码，需要转 UTF-8
+    try {
+      file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    } catch (e) { /* ignore */ }
     const ext = path.extname(file.originalname).toLowerCase();
     cb(null, ALLOWED_EXTENSIONS.has(ext));
   }
@@ -116,8 +120,10 @@ module.exports = function (db) {
     db.run('UPDATE materials SET download_count = download_count + 1 WHERE id = ?', [material.id]);
     db.save();
 
-    // 中文文件名需要 RFC 5987 编码
-    const encodedName = encodeURIComponent(material.file_name);
+    // 用标题+扩展名作为下载文件名，避免原始文件名编码问题
+    const ext = path.extname(material.file_name);
+    const downloadName = material.title + ext;
+    const encodedName = encodeURIComponent(downloadName);
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedName}`);
     res.sendFile(filePath);
   });
