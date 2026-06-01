@@ -98,6 +98,9 @@ import {
 
 import './pages/my_posts.js';
 import './pages/notifications.js';
+import {
+  toggleCourseFavorite, togglePostFavorite,
+} from './pages/favorites.js';
 
 import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
@@ -199,6 +202,8 @@ Object.assign(window, {
   executeSearch,
   switchSearchTab,
   navigateToCourseResult,
+  toggleCourseFavorite,
+  togglePostFavorite,
   // profile
   openEditProfileModal,
   handleEditProfile,
