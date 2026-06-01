@@ -54,6 +54,7 @@ Use `createMdInput()` function to generate MD3 inputs. NEVER use native `<input 
 - Border radius: 8px
 - Padding: 16px
 - Background: transparent
+- **resize: none** — ALL input fields and textarea MUST NOT be resizable by users. NEVER use `resize: vertical` or `resize: both`. This is mandatory for all form elements.
 
 **States:**
 - Hover: border-color → var(--md-on-surface)

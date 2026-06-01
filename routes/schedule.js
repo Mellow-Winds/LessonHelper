@@ -65,6 +65,8 @@ module.exports = function (db) {
   // GET /api/schedule/notes
   router.get('/notes', (req, res) => {
     const notesPath = path.join(__dirname, '..', 'data', 'schedule', 'notes.md');
+    console.log('[DEBUG] notesPath:', notesPath);
+    console.log('[DEBUG] exists:', fs.existsSync(notesPath));
     if (!fs.existsSync(notesPath)) return res.json({ content: '' });
     res.json({ content: fs.readFileSync(notesPath, 'utf-8') });
   });
@@ -72,6 +74,8 @@ module.exports = function (db) {
   // GET /api/schedule/pre-notes
   router.get('/pre-notes', (req, res) => {
     const filePath = path.join(__dirname, '..', 'data', 'schedule', 'pre-notes.md');
+    console.log('[DEBUG] pre-notes filePath:', filePath);
+    console.log('[DEBUG] exists:', fs.existsSync(filePath));
     if (!fs.existsSync(filePath)) return res.json({ content: '' });
     res.json({ content: fs.readFileSync(filePath, 'utf-8') });
   });

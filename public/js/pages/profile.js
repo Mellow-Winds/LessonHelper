@@ -113,7 +113,7 @@ async function fetchPublicUserData(userId) {
 async function renderProfilePage(container) {
   const sub = getProfilePath();
   if (sub && PROFILE_SUB_PAGES[sub]) {
-    PROFILE_SUB_PAGES[sub](container);
+    await PROFILE_SUB_PAGES[sub](container);
     return;
   }
 
@@ -921,8 +921,8 @@ async function renderEditPage(container) {
       <div class="profile-card">
         <h2 class="profile-section-title">个性资料</h2>
         <div class="md-input-group">
-          <textarea class="md-input" id="edit-avatar-desc" placeholder=" " rows="3" maxlength="80" style="resize:vertical">${escHtml(data.avatar_desc || '')}</textarea>
-          <label class="md-label">个人肖像描述（80字以内）</label>
+          <textarea class="md-input" id="edit-avatar-desc" placeholder=" " rows="3" maxlength="200" style="resize:none">${escHtml(data.avatar_desc || '')}</textarea>
+          <label class="md-label">个人肖像描述</label>
           <fieldset class="md-border" aria-hidden="true"><legend><span>个人肖像描述</span></legend></fieldset>
         </div>
         ${createMdSelect({
@@ -948,40 +948,50 @@ async function renderEditPage(container) {
   animIn(container.querySelector('.profile-card'));
 
   // 绑定保存
-  document.getElementById('profile-save-btn').addEventListener('click', handleSaveProfile);
+  const saveBtn = document.getElementById('profile-save-btn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', handleSaveProfile);
+  }
 }
 
 async function handleSaveProfile() {
-  const nickname = document.getElementById('edit-nickname')?.value?.trim();
-  if (!nickname) {
-    showToast('昵称不能为空');
-    return;
-  }
+  try {
+    const nickname = document.getElementById('edit-nickname')?.value?.trim();
+    if (!nickname) {
+      showToast('昵称不能为空');
+      return;
+    }
 
-  const updates = {
-    nickname,
-    major:    document.getElementById('edit-major')?.value?.trim() || '',
-    grade:    document.getElementById('edit-grade')?.value?.trim() || '',
-    qq:       document.getElementById('edit-qq')?.value?.trim() || '',
-    wechat:   document.getElementById('edit-wechat')?.value?.trim() || '',
-    douyin:   document.getElementById('edit-douyin')?.value?.trim() || '',
-    avatar_desc: document.getElementById('edit-avatar-desc')?.value?.trim() || '',
-    mbti:     document.getElementById('edit-mbti')?.value || '',
-  };
+    const updates = {
+      nickname,
+      major:    document.getElementById('edit-major')?.value?.trim() || '',
+      grade:    document.getElementById('edit-grade')?.value?.trim() || '',
+      qq:       document.getElementById('edit-qq')?.value?.trim() || '',
+      wechat:   document.getElementById('edit-wechat')?.value?.trim() || '',
+      douyin:   document.getElementById('edit-douyin')?.value?.trim() || '',
+      avatar_desc: document.getElementById('edit-avatar-desc')?.value?.trim() || '',
+      mbti:     document.getElementById('edit-mbti')?.value?.trim() || '',
+    };
 
-  const btn = document.getElementById('profile-save-btn');
-  if (btn) btn.disabled = true;
+    const btn = document.getElementById('profile-save-btn');
+    if (btn) btn.disabled = true;
 
-  const result = await apiPut('/api/auth/me', updates);
-  if (result.error) {
-    showToast('保存失败：' + result.error);
+    const result = await apiPut('/api/auth/me', updates);
+    if (result.error) {
+      showToast('保存失败：' + result.error);
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    window._currentUser = result;
+    showToast('资料已保存');
+    navigateTo('profile');
+  } catch (err) {
+    console.error('[Profile] 保存失败:', err);
+    showToast('保存异常：' + (err.message || '未知错误'));
+    const btn = document.getElementById('profile-save-btn');
     if (btn) btn.disabled = false;
-    return;
   }
-
-  window._currentUser = result;
-  showToast('资料已保存');
-  navigateTo('profile');
 }
 
 /* =============================================
@@ -1197,7 +1207,7 @@ export async function showFeedbackModal() {
         selected: 'bug'
       })}
       <div class="md-input-group">
-        <textarea class="md-input" id="feedback-content" placeholder=" " rows="5" required style="resize:vertical"></textarea>
+        <textarea class="md-input" id="feedback-content" placeholder=" " rows="5" required style="resize:none"></textarea>
         <label class="md-label">详细描述</label>
         <fieldset class="md-border" aria-hidden="true"><legend><span>详细描述</span></legend></fieldset>
       </div>

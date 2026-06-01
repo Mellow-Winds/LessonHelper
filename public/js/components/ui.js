@@ -100,7 +100,7 @@ export function createMdTextarea(config) {
   const reqAttr = required ? 'required' : '';
   return `
     <div class="md-input-group">
-      <textarea class="md-input" ${idAttr} placeholder=" " rows="${rows}" ${reqAttr} style="resize:vertical" ${attrs}></textarea>
+      <textarea class="md-input" ${idAttr} placeholder=" " rows="${rows}" ${reqAttr} style="resize:none" ${attrs}></textarea>
       <label class="md-label">${escHtml(label)}</label>
       <fieldset class="md-border" aria-hidden="true"><legend><span>${escHtml(label)}</span></legend></fieldset>
     </div>
