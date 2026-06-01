@@ -59,6 +59,13 @@ function getSemesterKey() {
   return `${y}-closed`;
 }
 
+function findExistingCourse(db, course) {
+  return db.get(
+    'SELECT id FROM courses WHERE description LIKE ? AND title = ? AND teacher = ?',
+    [`${course.courseId} · %`, course.className, course.teacher]
+  );
+}
+
 module.exports = function (db) {
   const router = express.Router();
 
@@ -144,10 +151,7 @@ module.exports = function (db) {
       db.run('BEGIN TRANSACTION');
       try {
         for (const c of parsed) {
-          const existing = db.get(
-            'SELECT id FROM courses WHERE description LIKE ? AND teacher = ?',
-            [`%${c.courseId}%`, c.teacher]
-          );
+          const existing = findExistingCourse(db, c);
 
           let courseId;
           if (existing) {
@@ -234,6 +238,8 @@ module.exports = function (db) {
 
   return router;
 };
+
+module.exports.findExistingCourse = findExistingCourse;
 
 // ===== 解析引擎 =====
 

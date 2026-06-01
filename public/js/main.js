@@ -113,7 +113,7 @@ import {
 } from './pages/courses/my_courses.js';
 
 import {
-  switchPlazaTab, filterPlazaCourses, handlePlazaPublish,
+  switchPlazaTab, filterPlazaCourses,
 } from './pages/courses/plaza.js';
 
 import {
@@ -231,7 +231,6 @@ Object.assign(window, {
   // plaza
   switchPlazaTab,
   filterPlazaCourses,
-  handlePlazaPublish,
   // publish
   onPublishFileSelected,
   // explore

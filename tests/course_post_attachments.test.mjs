@@ -42,6 +42,7 @@ function createDb(SQL) {
       file_name TEXT, file_type TEXT, file_size INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
     INSERT INTO users VALUES (1, 'u1', '小林');
+    INSERT INTO users VALUES (2, 'u2', '小周');
     INSERT INTO courses VALUES (10, '线性代数');
     INSERT INTO user_courses VALUES (1, 1, 10);
   `);
@@ -87,6 +88,7 @@ async function withServer(db, run) {
 const SQL = await initSqlJs();
 const token = generateToken({ id: 1, username: 'u1' });
 const headers = { Authorization: `Bearer ${token}` };
+const outsiderHeaders = { Authorization: `Bearer ${generateToken({ id: 2, username: 'u2' })}` };
 
 test('course posts still accept JSON requests', async () => {
   await withServer(createDb(SQL), async (baseUrl) => {
@@ -96,6 +98,17 @@ test('course posts still accept JSON requests', async () => {
       body: JSON.stringify({ title: '纯文本', content: '内容' }),
     });
     assert.equal(response.status, 201);
+  });
+});
+
+test('users outside a course cannot publish posts into it', async () => {
+  await withServer(createDb(SQL), async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/courses/10/posts`, {
+      method: 'POST',
+      headers: { ...outsiderHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '越权发帖', content: '内容' }),
+    });
+    assert.equal(response.status, 403);
   });
 });
 

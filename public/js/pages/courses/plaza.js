@@ -6,9 +6,9 @@
  * 物理只读：绝不加载成员。
  */
 
-import { apiGet, apiPost, isLoggedIn } from '../../core/api.js';
+import { apiGet } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../../core/router.js';
-import { showToast, escHtml, formatTime, formatFileSize } from '../../components/ui.js';
+import { escHtml, formatTime, formatFileSize } from '../../components/ui.js';
 import { getFavoriteCourseIds, getFavoritePostIds, renderCourseFavoriteButton, renderPostFavoriteButton } from '../favorites.js';
 import { renderPostAttachments } from './post_attachments.js';
 
@@ -187,17 +187,6 @@ registerPage('plaza-course', async (container, dataIdx) => {
   const favoriteCourseId = window._plazaCourseId || bigCourse.courseIds[0];
   const favoriteCourseIds = await getFavoriteCourseIds();
 
-  // 检查发布权限：用户是否加入了该大课旗下任意小班
-  let _canPublish = false;
-  if (isLoggedIn() && window._currentUser) {
-    try {
-      const myCourses = await apiGet('/api/courses');
-      const myIds = new Set(myCourses.map(c => c.id));
-      _canPublish = bigCourse.courseIds.some(id => myIds.has(id));
-    } catch {}
-  }
-  window._plazaSpace._canPublish = _canPublish;
-
   container.innerHTML = `
     <div class="page-header">
       <div style="flex:1;min-width:0">
@@ -207,9 +196,6 @@ registerPage('plaza-course', async (container, dataIdx) => {
         </p>
       </div>
       ${renderCourseFavoriteButton(favoriteCourseId, favoriteCourseIds.has(favoriteCourseId))}
-      <button class="btn ${_canPublish ? 'btn-primary' : 'btn-disabled'} btn-compact" id="plaza-publish-btn" onclick="handlePlazaPublish()">
-        <span class="mi">edit</span> 发布
-      </button>
     </div>
     <div class="md-pills" id="plaza-pills">
       <button class="md-pill-btn active" data-tab="forum" onclick="switchPlazaTab('forum')">
@@ -228,23 +214,6 @@ registerPage('plaza-course', async (container, dataIdx) => {
 
   await switchPlazaTab('forum');
 });
-
-/* ---- 发布权限熔断 ---- */
-
-export function handlePlazaPublish() {
-  if (!isLoggedIn()) {
-    showToast('请先登录');
-    navigateTo('profile');
-    return;
-  }
-  if (!window._plazaSpace._canPublish) {
-    showToast('课程广场为只读档案馆。你未修读本门课程的任何班级，暂无发布权限。');
-    return;
-  }
-  // 跳转到第一个小课的发布页
-  const firstId = window._plazaSpace.bigCourse.courseIds[0];
-  navigateTo('publish', firstId);
-}
 
 /* ---- Tab切换 ---- */
 
