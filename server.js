@@ -232,11 +232,13 @@ async function start() {
   const materialsRouter = require('./routes/materials')(db);
   const invitesRouter = require('./routes/invites')(db);
   const notificationsRouter = require('./routes/notifications')(db);
+  const searchRouter = require('./routes/search')(db);
 
   app.use('/api/courses', coursesRouter);
   app.use('/api/materials', materialsRouter);
   app.use('/api/invites', invitesRouter);
   app.use('/api/notifications', notificationsRouter);
+  app.use('/api/search', searchRouter);
   app.use('/api/user', userRouter);
   app.use('/api/schedule', scheduleRouter);
   app.use('/api/auth', authRouter);

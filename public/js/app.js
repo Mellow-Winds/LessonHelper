@@ -2282,3 +2282,169 @@ document.addEventListener('click', (e) => {
     panel.remove();
   }
 });
+
+/* =============================================
+   Global Search
+   ============================================= */
+
+function handleSidebarSearchKey(e) {
+  if (e.key === 'Enter') {
+    const q = e.target.value.trim();
+    if (q.length >= 2) {
+      navigateTo('search', { q });
+    }
+  }
+}
+
+registerPage('search', async (container, data) => {
+  const q = data?.q || '';
+  const activeTab = data?.type || 'all';
+
+  container.innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">搜索结果</h1>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="mi" style="font-size:20px;color:var(--md-on-surface-variant)">search</span>
+        <input type="text" id="search-page-input" class="sidebar-search-input" style="flex:1" placeholder="搜索课程、资料、帖子..." value="${escHtml(q)}" onkeydown="handleSearchPageKey(event)">
+        <button class="btn btn-primary" onclick="executeSearch()">搜索</button>
+      </div>
+    </div>
+    <div class="search-tabs" id="search-tabs">
+      <button class="course-tab ${activeTab === 'all' ? 'active' : ''}" data-tab="all" onclick="switchSearchTab('all')">全部</button>
+      <button class="course-tab ${activeTab === 'courses' ? 'active' : ''}" data-tab="courses" onclick="switchSearchTab('courses')">课程</button>
+      <button class="course-tab ${activeTab === 'materials' ? 'active' : ''}" data-tab="materials" onclick="switchSearchTab('materials')">资料</button>
+      <button class="course-tab ${activeTab === 'posts' ? 'active' : ''}" data-tab="posts" onclick="switchSearchTab('posts')">帖子</button>
+    </div>
+    <div id="search-results"></div>
+  `;
+
+  bindRipples(container);
+  animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
+
+  if (q.length >= 2) {
+    await executeSearch(activeTab);
+  }
+
+  // 保存搜索历史
+  if (q) saveSearchHistory(q);
+});
+
+function handleSearchPageKey(e) {
+  if (e.key === 'Enter') executeSearch();
+}
+
+async function executeSearch(type) {
+  const input = document.getElementById('search-page-input');
+  const q = input?.value?.trim() || '';
+  if (q.length < 2) {
+    showToast('关键词至少 2 个字符');
+    return;
+  }
+
+  const activeTab = type || document.querySelector('#search-tabs .course-tab.active')?.dataset?.tab || 'all';
+  const resultsEl = document.getElementById('search-results');
+  if (resultsEl) resultsEl.innerHTML = '<div class="card"><p class="text-secondary">搜索中...</p></div>';
+
+  try {
+    const data = await apiGet(`/api/search?q=${encodeURIComponent(q)}&type=${activeTab}`);
+    if (resultsEl) resultsEl.innerHTML = renderSearchResults(data, q);
+  } catch {
+    if (resultsEl) resultsEl.innerHTML = '<div class="card"><p class="text-secondary">搜索失败</p></div>';
+  }
+
+  // 更新 tab 高亮
+  document.querySelectorAll('#search-tabs .course-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === activeTab);
+  });
+}
+
+function switchSearchTab(type) {
+  executeSearch(type);
+}
+
+function renderSearchResults(data, q) {
+  const { courses = [], materials = [], posts = [] } = data;
+  const total = courses.length + materials.length + posts.length;
+
+  if (total === 0) {
+    return `
+      <div class="card" style="text-align:center;padding:48px">
+        <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">search_off</span>
+        <p class="text-secondary" style="margin-top:12px">没有找到与「${escHtml(q)}」相关的内容</p>
+      </div>
+    `;
+  }
+
+  let html = '';
+
+  if (courses.length > 0) {
+    html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">menu_book</span> 课程 (${courses.length})</h3>`;
+    html += courses.map(c => `
+      <div class="card search-result-card" onclick="navigateTo('course', ${c.id})">
+        <div style="font-weight:600">${highlight(c.title, q)}</div>
+        <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">
+          ${c.teacher ? escHtml(c.teacher) + ' · ' : ''}${c.enrollment_count || 0} 人选课
+        </div>
+      </div>
+    `).join('');
+  }
+
+  if (materials.length > 0) {
+    html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料 (${materials.length})</h3>`;
+    html += materials.map(m => `
+      <div class="card search-result-card" onclick="navigateTo('course', ${m.course_id})">
+        <div style="font-weight:600">${highlight(m.title, q)}</div>
+        <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">
+          ${escHtml(m.course_title)} · ${escHtml(m.category)}${m.chapter ? ' · ' + escHtml(m.chapter) : ''} · ${escHtml(m.uploader_name)}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  if (posts.length > 0) {
+    html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">forum</span> 帖子 (${posts.length})</h3>`;
+    html += posts.map(p => {
+      const snippet = getSnippet(p.content, q, 80);
+      return `
+        <div class="card search-result-card" onclick="navigateTo('course', ${p.course_id})">
+          <div style="font-weight:600">${highlight(p.title, q)}</div>
+          <div style="font-size:13px;color:var(--md-on-surface-variant);margin-top:4px">${highlight(snippet, q)}</div>
+          <div style="font-size:12px;color:var(--md-outline);margin-top:4px">
+            ${escHtml(p.course_title)} · ${escHtml(p.author_name)}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  return html;
+}
+
+function highlight(text, q) {
+  if (!text || !q) return escHtml(text);
+  const escaped = escHtml(text);
+  const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return escaped.replace(regex, '<mark class="search-highlight">$1</mark>');
+}
+
+function getSnippet(text, q, len) {
+  if (!text) return '';
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return text.slice(0, len);
+  const start = Math.max(0, idx - 30);
+  const end = Math.min(text.length, idx + q.length + 50);
+  return (start > 0 ? '...' : '') + text.slice(start, end) + (end < text.length ? '...' : '');
+}
+
+// 搜索历史
+function saveSearchHistory(q) {
+  try {
+    let history = JSON.parse(localStorage.getItem('search_history') || '[]');
+    history = history.filter(h => h !== q);
+    history.unshift(q);
+    if (history.length > 5) history = history.slice(0, 5);
+    localStorage.setItem('search_history', JSON.stringify(history));
+  } catch { /* ignore */ }
+}
