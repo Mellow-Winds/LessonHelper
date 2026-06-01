@@ -143,3 +143,16 @@
 - [x] `style.css`：`member-filter-select` 和 `member-item` 样式
 
 **验证**：进入课程空间→成员侧栏显示筛选器→选择专业筛选→列表实时更新
+
+---
+
+## 第9轮：学习资料共享 ✅
+
+**目标**：用户上传资料，分类浏览，评分筛选
+
+- [x] `server.js`：新建 `materials` 表（id, course_id, uploader_id, title, description, file_path, file_name, file_type, file_size, chapter, category, avg_rating, rating_count, download_count）和 `material_ratings` 表
+- [x] `routes/materials.js`（新建）：POST 上传、GET 列表（筛选排序分页）、GET 详情、GET 下载、POST 评分、DELETE 删除
+- [x] `app.js`：课程空间增加论坛/资料/成员标签页切换；资料卡片列表（类型图标、章节标签、评分星星、下载次数）；上传弹窗（拖拽+点击选择文件、标题、描述、章节、分类）；筛选排序；下载/删除
+- [x] `style.css`：course-tabs 标签页、material-card 资料卡片、stars-row 评分星星、upload-drop-zone 拖拽上传区、member-card-grid 成员网格
+
+**验证**：进课程空间→切换到资料标签→上传 PDF→填写信息→上传成功→其他用户可浏览/下载/评分
