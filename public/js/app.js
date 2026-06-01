@@ -1198,7 +1198,7 @@ registerPage('course', async (container, courseId) => {
             ${course.enrollment_count || 0} 人选课
           </p>
         </div>
-        <button class="btn btn-primary" onclick="openCreatePostModal(${courseId})">
+        <button class="btn btn-primary" onclick="navigateTo('create-post', ${courseId})">
           <span class="mi">edit</span> 发帖
         </button>
       </div>
@@ -1214,7 +1214,7 @@ registerPage('course', async (container, courseId) => {
           ` : posts.map(p => `
             <div class="card mb-4 post-card clickable">
               <h3 class="card-title" style="cursor:pointer" onclick="toggleComments(${p.id})">${escHtml(p.title)}</h3>
-              <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
+              <div class="post-content" style="margin-top:8px;white-space:pre-wrap;line-height:1.6">${p.content}</div>
               <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
                 <span>${escHtml(p.author_name)} · ${formatTime(p.created_at)}</span>
                 <span style="cursor:pointer;color:var(--md-primary);font-weight:500" onclick="toggleComments(${p.id})">
@@ -1257,56 +1257,151 @@ registerPage('course', async (container, courseId) => {
   }
 });
 
-// ===== Post & Comment Helpers =====
+// ===== Create Post Page =====
 
-async function openCreatePostModal(courseId) {
+registerPage('create-post', async (container, courseId) => {
   if (!isLoggedIn()) {
     showToast('请先登录');
     navigateTo('profile');
     return;
   }
-  const html = `
-    <form id="create-post-form" onsubmit="handleCreatePost(event, ${courseId})" style="display:flex;flex-direction:column;gap:16px">
-      <div class="md-input-group">
-        <input class="md-input" type="text" name="title" placeholder=" " required>
+
+  // Fetch course title for breadcrumb context
+  const course = await apiGet(`/api/courses/${courseId}`);
+  const courseTitle = course.error ? '课程' : course.title;
+
+  container.innerHTML = `
+    <div class="create-post-page">
+      <!-- Header: back button + breadcrumb -->
+      <div class="create-post-header">
+        <button class="btn btn-icon" onclick="navigateTo('course', ${courseId})" title="返回课程空间">
+          <span class="mi">arrow_back</span>
+        </button>
+        <div class="create-post-breadcrumb">
+          <span class="text-secondary">${escHtml(courseTitle)}</span>
+          <span class="mi" style="font-size:18px;color:var(--md-outline)">chevron_right</span>
+          <span style="font-weight:600">发帖</span>
+        </div>
+      </div>
+
+      <!-- Title input: MD3 Outlined Text Field -->
+      <div class="md-input-group" style="--md-field-bg: var(--md-surface)">
+        <input class="md-input" type="text" id="post-title" placeholder=" " required>
         <label class="md-label">${window.t('title')}</label>
         <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('title')}</span></legend></fieldset>
       </div>
-      <div class="md-input-group">
-        <textarea class="md-input" name="content" placeholder=" " rows="5" required style="resize:vertical"></textarea>
-        <label class="md-label">${window.t('content')}</label>
-        <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('content')}</span></legend></fieldset>
+
+      <!-- Rich text toolbar -->
+      <div class="rte-toolbar" role="toolbar" aria-label="文本格式化">
+        <button type="button" class="rte-btn" data-cmd="bold" title="加粗 (Ctrl+B)">
+          <span class="mi">format_bold</span>
+        </button>
+        <button type="button" class="rte-btn" data-cmd="italic" title="斜体 (Ctrl+I)">
+          <span class="mi">format_italic</span>
+        </button>
+        <button type="button" class="rte-btn" data-cmd="underline" title="下划线 (Ctrl+U)">
+          <span class="mi">format_underlined</span>
+        </button>
       </div>
+
+      <!-- Rich text editor -->
+      <div class="rte-wrapper">
+        <div class="rte-editor" contenteditable="true" id="post-content" role="textbox" aria-multiline="true" aria-label="帖子内容"></div>
+        <label class="rte-label">${window.t('content')}</label>
+        <fieldset class="rte-border" aria-hidden="true"><legend><span>${window.t('content')}</span></legend></fieldset>
+      </div>
+
+      <!-- Error message -->
       <div class="form-error" id="create-post-error" style="display:none"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">发布</button>
-    </form>
+
+      <!-- Submit -->
+      <button class="btn btn-primary" id="submit-post-btn" style="width:100%;justify-content:center">
+        <span class="mi">send</span> 发布
+      </button>
+    </div>
   `;
-  openModal('发帖', html);
-}
 
-async function handleCreatePost(e, courseId) {
-  e.preventDefault();
-  const form = e.target;
-  const title = form.title.value.trim();
-  const content = form.content.value.trim();
+  // --- Rich Text Editor Logic ---
+  const editor = container.querySelector('#post-content');
+  const toolbar = container.querySelector('.rte-toolbar');
 
-  if (!title || !content) return;
+  // Prevent toolbar clicks from stealing editor focus
+  toolbar.addEventListener('mousedown', (e) => e.preventDefault());
 
-  const errEl = document.getElementById('create-post-error');
-  errEl.style.display = 'none';
+  // Sync toolbar border highlight with editor focus
+  editor.addEventListener('focus', () => {
+    toolbar.style.borderColor = 'var(--md-primary)';
+    toolbar.style.transition = 'border-color 200ms cubic-bezier(0.4, 0, 0.2, 1)';
+  });
+  editor.addEventListener('blur', () => {
+    toolbar.style.borderColor = '';
+  });
 
-  const result = await apiPost(`/api/courses/${courseId}/posts`, { title, content });
+  toolbar.addEventListener('click', (e) => {
+    const btn = e.target.closest('.rte-btn');
+    if (!btn) return;
+    const cmd = btn.dataset.cmd;
+    document.execCommand(cmd, false, null);
+    editor.focus();
+    syncToolbarState();
+  });
 
-  if (result.error) {
-    errEl.textContent = result.error;
-    errEl.style.display = 'block';
-    return;
+  // Sync toolbar active states with current selection
+  function syncToolbarState() {
+    toolbar.querySelectorAll('.rte-btn').forEach(btn => {
+      const cmd = btn.dataset.cmd;
+      btn.classList.toggle('active', document.queryCommandState(cmd));
+    });
   }
 
-  closeModal();
-  showToast('发帖成功');
-  navigateTo('course', courseId);
-}
+  editor.addEventListener('keyup', syncToolbarState);
+  editor.addEventListener('mouseup', syncToolbarState);
+
+  // Toggle .has-content on wrapper for floating label effect
+  const editorWrapper = container.querySelector('.rte-wrapper');
+  function syncEditorContent() {
+    editorWrapper.classList.toggle('has-content', editor.textContent.trim().length > 0);
+  }
+  editor.addEventListener('input', syncEditorContent);
+  editor.addEventListener('blur', syncEditorContent);
+
+  // --- Submit Handler ---
+  container.querySelector('#submit-post-btn').addEventListener('click', async () => {
+    const title = container.querySelector('#post-title').value.trim();
+    const content = editor.innerHTML.trim();
+    const errEl = container.querySelector('#create-post-error');
+    errEl.style.display = 'none';
+
+    if (!title) {
+      errEl.textContent = '请输入标题';
+      errEl.style.display = 'block';
+      return;
+    }
+    // contenteditable may contain only <br> or empty tags when "empty"
+    const textContent = editor.textContent.trim();
+    if (!textContent) {
+      errEl.textContent = '请输入内容';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    const result = await apiPost(`/api/courses/${courseId}/posts`, { title, content });
+    if (result.error) {
+      errEl.textContent = result.error;
+      errEl.style.display = 'block';
+      return;
+    }
+
+    showToast('发帖成功');
+    navigateTo('course', courseId);
+  });
+
+  // --- Animations ---
+  bindRipples(container);
+  animIn(container.querySelector('.create-post-header'), { y: 16, dur: 380 });
+});
+
+// ===== Post & Comment Helpers =====
 
 let loadedComments = {};
 
