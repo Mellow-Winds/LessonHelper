@@ -5,6 +5,13 @@ const { createNotification, notifyCourseMembers } = require('./notifications');
 module.exports = function (db) {
   const router = express.Router();
 
+  function isEnrolled(userId, courseId) {
+    return !!db.get(
+      'SELECT 1 FROM user_courses WHERE user_id = ? AND course_id = ?',
+      [userId, courseId]
+    );
+  }
+
   // GET /api/courses/semesters — 当前用户已选课程涉及的学期列表
   router.get('/semesters', authMiddleware, (req, res) => {
     const userId = req.user.userId;
@@ -116,10 +123,13 @@ module.exports = function (db) {
   });
 
   // GET /api/courses/:id/members — 课程成员列表（支持 major/grade 筛选）
-  router.get('/:id/members', (req, res) => {
+  router.get('/:id/members', authMiddleware, (req, res) => {
     const courseId = Number(req.params.id);
     const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: '课程不存在' });
+    if (!isEnrolled(req.user.userId, courseId)) {
+      return res.status(403).json({ error: '只有课程成员可以查看成员列表' });
+    }
 
     const { major, grade, match_only } = req.query;
 
@@ -162,10 +172,13 @@ module.exports = function (db) {
   });
 
   // GET /api/courses/:id/members/stats — 成员专业和年级分布
-  router.get('/:id/members/stats', (req, res) => {
+  router.get('/:id/members/stats', authMiddleware, (req, res) => {
     const courseId = Number(req.params.id);
     const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: '课程不存在' });
+    if (!isEnrolled(req.user.userId, courseId)) {
+      return res.status(403).json({ error: '只有课程成员可以查看成员统计' });
+    }
 
     const majors = db.all(`
       SELECT DISTINCT u.major FROM user_courses uc

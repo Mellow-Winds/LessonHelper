@@ -87,7 +87,7 @@ import { showToast } from './components/ui.js';
 import {
   switchAuthTab, handleLogin, handleRegister, handleVerify, resendCode,
   refreshNotifBadge,
-  handleSearchPageKey, executeSearch, switchSearchTab,
+  handleSearchPageKey, executeSearch, switchSearchTab, navigateToCourseResult,
 } from './pages/auth.js';
 
 import {
@@ -198,6 +198,7 @@ Object.assign(window, {
   handleSearchPageKey,
   executeSearch,
   switchSearchTab,
+  navigateToCourseResult,
   // profile
   openEditProfileModal,
   handleEditProfile,

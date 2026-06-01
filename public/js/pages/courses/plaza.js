@@ -68,6 +68,15 @@ async function loadPlazaDataOnce() {
   _plazaLoaded = true;
 }
 
+export async function navigateToPlazaCourseById(courseId, postId) {
+  await loadPlazaDataOnce();
+  const idx = _bigCoursesList.findIndex(item => item.courseIds.includes(Number(courseId)));
+  if (idx < 0) return false;
+  window._plazaTargetPostId = postId || null;
+  navigateTo('plaza-course', idx);
+  return true;
+}
+
 /* =============================================
    Page: 课程广场列表
    ============================================= */
