@@ -203,6 +203,21 @@ async function start() {
     UNIQUE(invite_id, user_id)
   )`);
 
+  // New table: notifications (消息提醒)
+  db.run(`CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    related_type TEXT,
+    related_id INTEGER,
+    course_id INTEGER,
+    is_read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+
   db.save();
 
   // --- Middleware ---
@@ -216,10 +231,12 @@ async function start() {
   const authRouter = require('./routes/auth')(db);
   const materialsRouter = require('./routes/materials')(db);
   const invitesRouter = require('./routes/invites')(db);
+  const notificationsRouter = require('./routes/notifications')(db);
 
   app.use('/api/courses', coursesRouter);
   app.use('/api/materials', materialsRouter);
   app.use('/api/invites', invitesRouter);
+  app.use('/api/notifications', notificationsRouter);
   app.use('/api/user', userRouter);
   app.use('/api/schedule', scheduleRouter);
   app.use('/api/auth', authRouter);

@@ -1,5 +1,6 @@
 const express = require('express');
 const { authMiddleware } = require('./middleware/auth');
+const { createNotification, notifyCourseMembers } = require('./notifications');
 
 module.exports = function (db) {
   const router = express.Router();
@@ -207,6 +208,17 @@ module.exports = function (db) {
     );
     db.save();
 
+    // 通知：课程有新帖
+    const author = db.get('SELECT nickname FROM users WHERE id = ?', [req.user.userId]);
+    const courseInfo = db.get('SELECT title FROM courses WHERE id = ?', [courseId]);
+    notifyCourseMembers(db, {
+      courseId, excludeUserId: req.user.userId,
+      type: 'new_post', title: '新帖子',
+      message: `${author?.nickname || '匿名'} 在「${courseInfo?.title || ''}」发布了「${title}」`,
+      relatedType: 'post', relatedId: result.lastInsertRowid
+    });
+    db.save();
+
     res.status(201).json({
       id: result.lastInsertRowid,
       course_id: courseId,
@@ -244,6 +256,18 @@ module.exports = function (db) {
       [postId, req.user.userId, content]
     );
     db.save();
+
+    // 通知：帖子有新评论（通知帖子作者）
+    const postDetail = db.get('SELECT author_id, title, course_id FROM posts WHERE id = ?', [postId]);
+    const commenter = db.get('SELECT nickname FROM users WHERE id = ?', [req.user.userId]);
+    if (postDetail && postDetail.author_id !== req.user.userId) {
+      createNotification(db, {
+        userId: postDetail.author_id, type: 'new_comment', title: '新评论',
+        message: `${commenter?.nickname || '匿名'} 评论了你的帖子「${postDetail.title}」`,
+        relatedType: 'post', relatedId: postId, courseId: postDetail.course_id
+      });
+      db.save();
+    }
 
     res.status(201).json({
       id: result.lastInsertRowid,

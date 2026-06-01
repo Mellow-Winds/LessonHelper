@@ -201,6 +201,7 @@ select::-ms-expand {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
 }
 
 .nav-item {
@@ -1259,4 +1260,118 @@ select.input {
 .tab-btn {
   font-size: 13px;
   padding: 6px 14px;
+}
+
+/* ---- Notification Bell ---- */
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 16px;
+}
+
+.notification-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  transition: background 0.2s, color 0.2s;
+}
+.notification-bell:hover {
+  background: var(--md-surface-variant, #f0f0f0);
+  color: var(--md-primary);
+}
+
+.notif-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #e53935;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* ---- Notification Panel ---- */
+.notification-panel {
+  position: absolute;
+  bottom: 100%;
+  left: 100%;
+  margin-left: 8px;
+  width: 340px;
+  max-height: 420px;
+  background: var(--md-surface, #fff);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  overflow: hidden;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+.notif-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  font-size: 15px;
+}
+.notif-read-all {
+  font-size: 12px;
+  color: var(--md-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+.notif-read-all:hover {
+  text-decoration: underline;
+}
+.notif-list {
+  overflow-y: auto;
+  flex: 1;
+}
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notif-item:hover {
+  background: var(--md-surface-variant, #f5f5f5);
+}
+.notif-unread {
+  background: rgba(74, 144, 217, 0.04);
+}
+.notif-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--md-surface-variant, #f0f0f0);
+  color: var(--md-on-surface-variant);
+}
+.notif-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--md-primary);
+  margin-top: 6px;
 }

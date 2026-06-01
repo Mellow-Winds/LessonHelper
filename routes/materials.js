@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { authMiddleware } = require('./middleware/auth');
+const { notifyCourseMembers } = require('./notifications');
 
 // 文件类型映射
 const FILE_TYPE_MAP = {
@@ -68,6 +69,18 @@ module.exports = function (db) {
        FILE_TYPE_MAP[ext] || 'other', req.file.size, (chapter || '').trim(), category || '其他']
     );
     db.save();
+
+    // 通知：课程有新资料
+    const uploader = db.get('SELECT nickname FROM users WHERE id = ?', [userId]);
+    const courseInfo = db.get('SELECT title FROM courses WHERE id = ?', [courseId]);
+    notifyCourseMembers(db, {
+      courseId, excludeUserId: userId,
+      type: 'new_material', title: '新资料',
+      message: `${uploader?.nickname || '匿名'} 在「${courseInfo?.title || ''}」上传了「${title.trim()}」`,
+      relatedType: 'material', relatedId: result.lastInsertRowid
+    });
+    db.save();
+
     res.status(201).json({ id: result.lastInsertRowid, message: '上传成功' });
   });
 
