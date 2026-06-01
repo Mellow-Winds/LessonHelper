@@ -113,3 +113,67 @@ createMdSelect({ id, label, options, selected, style, onchange })
 - No inline styles for color, spacing, or typography
 - No magic numbers — every value must reference a design token
 - No more than 2 shadow depth levels per page
+
+---
+
+## Additional Components
+
+### Pill Tab (`.md-pills`, `.md-pill-btn`)
+- 胶囊形标签页切换
+- 选中态：背景 var(--md-primary-container)，颜色 var(--md-primary)
+- 未选中态：透明背景，颜色 var(--md-on-surface-variant)
+- 圆角：999px（pill shape）
+- 内边距：6px 16px
+
+### Status Badge (`.status-badge`)
+- 圆角 999px，内边距 2px 10px
+- 字号 12px，font-weight 600
+- 状态配色：
+  - 招募中/open：绿色 #e8f5e9 背景，#2e7d32 文字
+  - 已满/full：橙色 #fff3e0 背景，#e65100 文字
+  - 已关闭/过期：灰色 #f5f5f5 背景，#757575 文字
+
+### Category Tag (`.post-chip`, `.square-category-tag`)
+- 圆角 999px，内边距 2px 10px
+- 背景：var(--md-primary-container)
+- 颜色：var(--md-primary)
+- 字号 12px
+
+### Avatar Components
+- `.avatar-small`：32px 圆形，字号 14px，居中字母
+- `.profile-avatar`：64px 圆形，字号 24px
+- `.profile-avatar-letter`：字母占位
+
+### Toggle Switch (`.toggle-switch`)
+- 48px × 28px 圆角矩形
+- 滑块：22px 圆形，白色
+- 关闭态：灰色背景 var(--md-outline)
+- 开启态：主色背景 var(--md-primary)
+
+### Notification Panel (`.notification-panel`)
+- 固定定位，左下角（侧栏右侧）
+- 宽度 340px，最大高度 420px
+- 圆角 12px，阴影 0 8px 24px rgba(0,0,0,0.15)
+- 通知项：图标 + 标题 + 消息 + 时间 + 未读圆点
+
+### Rich Text Editor (`.rte-toolbar`, `.rte-editor`, `.rte-wrapper`)
+- 工具栏：加粗/斜体/下划线按钮
+- 编辑区：contenteditable div
+- 最小高度 200px
+
+### Upload Drop Zone (`.upload-drop-zone`)
+- 虚线边框 2px dashed var(--md-outline-variant)
+- 圆角 8px，内边距 32px
+- hover/drag-over 态：边框变主色，背景微蓝
+
+### Star Rating (`.stars-row`, `.star-icon`)
+- 5 颗星，18px
+- 填充色 #FB8C00
+- 未填充色 var(--md-outline-variant)
+- hover 态变色
+
+### Completion Progress Bar
+- 背景：var(--md-surface-variant)
+- 填充：var(--md-primary)
+- 高度 8px，圆角 4px
+- 数字标签：右侧显示 "5/7"
