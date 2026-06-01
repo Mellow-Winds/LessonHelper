@@ -156,3 +156,24 @@
 - [x] `style.css`：course-tabs 标签页、material-card 资料卡片、stars-row 评分星星、upload-drop-zone 拖拽上传区、member-card-grid 成员网格
 
 **验证**：进课程空间→切换到资料标签→上传 PDF→填写信息→上传成功→其他用户可浏览/下载/评分
+
+---
+
+## 第10轮：自习搭子邀约 ✅
+
+**目标**：发布自习邀约，浏览和响应邀约
+
+- [x] `server.js`：新建 `study_invites` 表和 `study_invite_responses` 表
+- [x] `routes/invites.js`（新建）：POST 发布、GET 列表（筛选）、GET 我的邀约、GET 详情+参与者、POST 响应（加入/取消）、PUT 编辑、DELETE 取消
+- [x] `app.js`：新增 `invites` 和 `invites-my` 页面、发布邀约弹窗（标题/描述/日期/时间/地点/人数）、筛选（日期/状态）、加入/取消、我的邀约标签切换（发起/参与）
+- [x] `index.html`：导航栏增加「自习邀约」入口
+- [x] `style.css`：invite-card 邀约卡片、status-badge 状态标签、tab-btn 标签按钮
+
+**验证**：发布邀约→出现在列表→其他用户可加入→满员自动标记「已满」→取消参与→我的邀约可查看发起和参与的
+
+---
+
+## 维护记录：下载文件名修复 ✅
+
+- [x] 下载文件中文名乱码：改用标题+扩展名作为下载文件名（RFC 5987 编码）
+- [x] multer 中文文件名编码：增加 Latin-1 → UTF-8 转换
