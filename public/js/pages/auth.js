@@ -398,6 +398,19 @@ export function switchSearchTab(type) {
   executeSearch(type);
 }
 
+export async function navigateToCourseResult(courseId, postId) {
+  if (isLoggedIn()) {
+    const myCourses = await apiGet('/api/courses');
+    if (Array.isArray(myCourses) && myCourses.some(course => course.id === Number(courseId))) {
+      window._myCourseTargetPostId = postId || null;
+      navigateTo('mycourse-detail', Number(courseId));
+      return;
+    }
+  }
+  const { navigateToPlazaCourseById } = await import('./courses/plaza.js');
+  await navigateToPlazaCourseById(courseId, postId);
+}
+
 function renderSearchResults(data, q) {
   const { courses = [], materials = [], posts = [], squarePosts = [] } = data;
   const total = courses.length + materials.length + posts.length + squarePosts.length;
@@ -416,7 +429,7 @@ function renderSearchResults(data, q) {
   if (courses.length > 0) {
     html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">menu_book</span> 课程 (${courses.length})</h3>`;
     html += courses.map(c => `
-      <div class="card search-result-card" onclick="navigateTo('mycourse-detail', ${c.id})">
+      <div class="card search-result-card" onclick="navigateToCourseResult(${c.id})">
         <div style="font-weight:600">${highlight(c.title, q)}</div>
         <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">
           ${c.teacher ? escHtml(c.teacher) + ' · ' : ''}${c.enrollment_count || 0} 人选课
@@ -428,7 +441,7 @@ function renderSearchResults(data, q) {
   if (materials.length > 0) {
     html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料 (${materials.length})</h3>`;
     html += materials.map(m => `
-      <div class="card search-result-card" onclick="navigateTo('mycourse-detail', ${m.course_id})">
+      <div class="card search-result-card" onclick="navigateToCourseResult(${m.course_id})">
         <div style="font-weight:600">${highlight(m.title, q)}</div>
         <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">
           ${escHtml(m.course_title)} · ${escHtml(m.category)}${m.chapter ? ' · ' + escHtml(m.chapter) : ''} · ${escHtml(m.uploader_name)}
@@ -442,7 +455,7 @@ function renderSearchResults(data, q) {
     html += posts.map(p => {
       const snippet = getSnippet(p.content, q, 80);
       return `
-        <div class="card search-result-card" onclick="navigateTo('mycourse-detail', ${p.course_id})">
+        <div class="card search-result-card" onclick="navigateToCourseResult(${p.course_id}, ${p.id})">
           <div style="font-weight:600">${highlight(p.title, q)}</div>
           <div style="font-size:13px;color:var(--md-on-surface-variant);margin-top:4px">${highlight(snippet, q)}</div>
           <div style="font-size:12px;color:var(--md-outline);margin-top:4px">
