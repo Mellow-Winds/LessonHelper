@@ -205,3 +205,25 @@
 - [x] `style.css`：sidebar-search 搜索框、search-result-card 结果卡片、search-highlight 关键词高亮、search-tabs
 
 **验证**：侧栏输入关键词回车→搜索结果页→分 Tab 展示→关键词高亮→点击跳转
+
+---
+
+## 第13轮：交友广场 ✅
+
+**目标**：学习导向的轻社交广场，基于需求精准匹配
+
+### 第 1 轮：后端 API
+- [x] `server.js`：新建 `square_posts`、`square_interests`、`square_comments` 表
+- [x] `routes/square.js`（新建）：POST 发帖（7天过期）、GET 列表（自动过滤过期+类型筛选）、GET 详情（含已确认成员+待处理）、DELETE 删除、POST 感兴趣、PUT 接受/拒绝、GET 我的广场、POST/GET 评论
+- [x] 通知触发：有人感兴趣→通知发帖人；接受→通知申请人
+
+### 第 2 轮：前端页面
+- [x] `index.html`：导航栏增加「交友广场」入口
+- [x] `app.js`：`square` 广场主页（列表+类型筛选+发帖弹窗）、`square-post` 帖子详情（感兴趣/接受拒绝/已确认成员含QQ/评论）、`square-my` 我的广场（发起/感兴趣 Tab）
+- [x] `style.css`：square-post-card、square-category-tag 样式
+
+### 第 3 轮：通知 + 过期
+- [x] 通知触发已内置在路由中
+- [x] 列表查询自动过滤过期帖子
+
+**验证**：发帖→广场列表可见→其他用户感兴趣→发帖人收到通知→接受→双方可见QQ→评论正常
