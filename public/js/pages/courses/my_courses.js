@@ -5,7 +5,7 @@
 
 import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../../core/router.js';
-import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, formatTime, formatFileSize, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
+import { showToast, openModal, closeModal, createMdInput, createMdTextarea, createMdSelect, escHtml, formatTime, formatFileSize, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
 import { renderAuth } from '../auth.js';
 import { getFavoriteCourseIds, getFavoritePostIds, renderCourseFavoriteButton, renderPostFavoriteButton } from '../favorites.js';
 import { renderPostAttachments } from './post_attachments.js';
@@ -385,6 +385,7 @@ export async function handleLeaveCourse(courseId) {
 window._myCourseSpace = {};
 
 registerPage('mycourse-detail', async (container, courseId) => {
+  loadedComments = {}; // 切换课程时清空评论缓存
   container.innerHTML = `<div class="card"><p class="text-secondary">加载中...</p></div>`;
 
   try {
@@ -955,11 +956,28 @@ export async function handlePortalToPlaza(cleanName) {
 }
 
 /* =============================================
-   Post & Comment Helpers（共用）
+   Post & Comment Helpers（增强版）
    ============================================= */
 
-let loadedComments = {};
+let loadedComments = {};       // 缓存：postId → { comments, total, page, hasMore }
+let commentImageMap = {};      // 待上传图片：postId → File
+let replyingTo = {};           // 楼中楼回复目标：postId → { id, author_name }
 
+// 格式化相对时间
+function formatRelativeTime(ts) {
+  if (!ts) return '';
+  const now = Date.now();
+  const diff = now - new Date(ts).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return `${min} 分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} 小时前`;
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// 切换评论区显示/隐藏
 export async function toggleComments(postId) {
   const section = document.getElementById(`comments-${postId}`);
   if (!section) return;
@@ -972,62 +990,371 @@ export async function toggleComments(postId) {
   section.style.display = 'block';
 
   if (!loadedComments[postId]) {
-    section.innerHTML = '<p class="text-secondary">加载中...</p>';
+    section.innerHTML = renderCommentSkeleton();
     try {
-      const comments = await apiGet(`/api/courses/posts/${postId}/comments`);
-      loadedComments[postId] = comments;
-      renderComments(section, postId, comments);
+      const data = await apiGet(`/api/courses/posts/${postId}/comments?page=1&pageSize=20`);
+      loadedComments[postId] = {
+        comments: data.comments || [],
+        total: data.total || 0,
+        page: 1,
+        hasMore: (data.comments || []).length < (data.total || 0)
+      };
+      renderComments(section, postId);
     } catch {
-      section.innerHTML = '<p class="text-secondary">加载失败</p>';
+      section.innerHTML = '<div class="comment-error">加载失败，点击重试</div>';
+      section.querySelector('.comment-error')?.addEventListener('click', () => {
+        loadedComments[postId] = null;
+        toggleComments(postId);
+      });
     }
   } else {
-    renderComments(section, postId, loadedComments[postId]);
+    renderComments(section, postId);
   }
 }
 
-function renderComments(section, postId, comments) {
-  section.innerHTML = `
-    ${comments.length === 0 ? '<p class="text-secondary">暂无回复</p>' : comments.map(c => `
-      <div style="padding:10px 0;border-bottom:1px solid var(--md-outline-variant)">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          <button class="user-profile-link" onclick="navigateTo('profile-user', ${c.author_id})">${escHtml(c.author_name)}</button>
-          <span style="font-size:12px;color:var(--md-on-surface-variant)">${formatTime(c.created_at)}</span>
-        </div>
-        <p style="font-size:var(--text-sm);white-space:pre-wrap">${escHtml(c.content)}</p>
+// 骨架屏
+function renderCommentSkeleton() {
+  return Array(3).fill('').map(() => `
+    <div class="comment-skeleton">
+      <div class="comment-skeleton-avatar"></div>
+      <div class="comment-skeleton-lines">
+        <div class="comment-skeleton-line short"></div>
+        <div class="comment-skeleton-line"></div>
       </div>
-    `).join('')}
-    ${isLoggedIn() ? `
-      <form onsubmit="handleAddComment(event, ${postId})" style="display:flex;gap:8px;margin-top:12px;align-items:flex-start">
-        ${createMdInput({
-          label: '写回复',
-          required: true,
-          style: 'flex:1;margin-bottom:0',
-          placeholder: ' '
-        })}
-        <button type="submit" class="btn btn-primary" style="padding:12px 16px;height:56px">
-          <span class="mi">send</span>
-        </button>
-      </form>
-    ` : '<p class="text-secondary" style="margin-top:12px;font-size:var(--text-sm)"><a href="#" onclick="navigateTo(\'profile\')" style="color:var(--md-primary)">登录</a> 后参与讨论</p>'}
+    </div>
+  `).join('');
+}
+
+// 渲染评论区主函数
+function renderComments(section, postId) {
+  const data = loadedComments[postId] || { comments: [], total: 0, page: 1, hasMore: false };
+  const { comments, total, hasMore } = data;
+
+  // 分离主回复和楼中楼
+  const rootComments = comments.filter(c => !c.parent_id);
+  const childMap = {};
+  comments.forEach(c => {
+    if (c.parent_id) {
+      if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
+      childMap[c.parent_id].push(c);
+    }
+  });
+
+  section.innerHTML = `
+    <div class="comment-list" id="comment-list-${postId}">
+      ${rootComments.length === 0 && !hasMore
+        ? '<p class="text-secondary" style="text-align:center;padding:16px;font-size:var(--text-sm)">暂无回复</p>'
+        : rootComments.map((c, idx) => renderSingleComment(c, idx + 1, postId, childMap, 0)).join('')
+      }
+      ${hasMore ? `<div class="comment-load-more" id="comment-load-more-${postId}">加载更多回复</div>` : ''}
+    </div>
+    ${isLoggedIn() ? renderCommentInput(postId) : renderLoginPromptHtml()}
+  `;
+
+  // 绑定事件
+  bindCommentEvents(section, postId);
+}
+
+// 渲染单条评论（递归支持楼中楼）
+function renderSingleComment(comment, floorNum, postId, childMap, depth) {
+  const isDeleted = comment.content === '[已删除]';
+  const isOwner = window._currentUser && comment.author_id === window._currentUser.id;
+  const children = childMap[comment.id] || [];
+  const maxDepth = 3;
+
+  return `
+    <div class="comment-item ${depth > 0 ? 'comment-nested' : ''}" data-comment-id="${comment.id}" data-depth="${depth}">
+      <div class="comment-header">
+        ${depth === 0 ? `<span class="comment-floor">${floorNum} 楼</span>` : ''}
+        ${comment.author_avatar_url
+          ? `<img class="comment-avatar" src="${escHtml(comment.author_avatar_url)}" alt="">`
+          : `<div class="comment-avatar-letter">${isDeleted ? '?' : escHtml((comment.author_name || '?')[0])}</div>`
+        }
+        <div class="comment-meta">
+          <button class="user-profile-link" ${isDeleted ? 'disabled' : `onclick="navigateTo('profile-user', ${comment.author_id})"`}>
+            ${isDeleted ? '已注销用户' : escHtml(comment.author_name)}
+          </button>
+          <span class="comment-time">${formatRelativeTime(comment.created_at)}</span>
+        </div>
+      </div>
+      ${comment.parent_id && depth > 0 ? (() => {
+        const parent = (loadedComments[postId]?.comments || []).find(c => c.id === comment.parent_id);
+        return parent ? `<div class="comment-reply-ref">回复 @${escHtml(parent.author_name || '已注销用户')}</div>` : '';
+      })() : ''}
+      <div class="comment-body">
+        ${isDeleted
+          ? '<p class="comment-deleted">该回复已被删除</p>'
+          : `<p class="comment-content">${escHtml(comment.content)}</p>`
+        }
+        ${comment.image_url ? `<div class="comment-image-wrap"><img src="${escHtml(comment.image_url)}" alt="评论图片" class="comment-image" loading="lazy" onclick="window.open('${escHtml(comment.image_url)}', '_blank')"></div>` : ''}
+      </div>
+      ${!isDeleted ? `
+        <div class="comment-actions">
+          ${isLoggedIn() ? `<button class="comment-action-btn comment-reply-btn" data-comment-id="${comment.id}" data-author="${escHtml(comment.author_name)}"><span class="mi" style="font-size:14px">reply</span> 回复</button>` : ''}
+          ${isOwner ? `<button class="comment-action-btn comment-delete-btn" data-comment-id="${comment.id}" data-post-id="${postId}"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
+        </div>
+      ` : ''}
+      ${children.length > 0 && depth < maxDepth
+        ? children.map(c => renderSingleComment(c, 0, postId, childMap, depth + 1)).join('')
+        : ''
+      }
+      ${children.length > 0 && depth >= maxDepth
+        ? `<button class="comment-load-more-replies" data-parent-id="${comment.id}" data-post-id="${postId}">查看更多回复 (${children.length})</button>`
+        : ''
+      }
+    </div>
   `;
 }
 
-export async function handleAddComment(e, postId) {
-  e.preventDefault();
-  const input = e.target.content;
-  const content = input.value.trim();
-  if (!content) return;
+// 渲染输入区域
+function renderCommentInput(postId) {
+  const replyRef = replyingTo[postId];
+  return `
+    <div class="comment-input-area" id="comment-input-area-${postId}">
+      ${replyRef ? `<div class="comment-reply-ref-bar">回复 @${escHtml(replyRef.author_name)}<button class="comment-cancel-reply" data-post-id="${postId}"><span class="mi" style="font-size:16px">close</span></button></div>` : ''}
+      <div class="comment-input-row">
+        <div class="comment-textarea-wrap">
+          <textarea class="comment-textarea" id="comment-textarea-${postId}" placeholder="写回复..." rows="2" maxlength="500"></textarea>
+          <span class="comment-char-count" id="comment-char-count-${postId}">0/500</span>
+        </div>
+        <div class="comment-input-actions">
+          <label class="comment-action-btn comment-upload-btn" title="上传图片">
+            <span class="mi" style="font-size:20px">add_photo_alternate</span>
+            <input type="file" accept=".jpg,.jpeg,.png" style="display:none" id="comment-image-input-${postId}">
+          </label>
+          <button class="btn btn-primary comment-send-btn" id="comment-send-btn-${postId}" data-post-id="${postId}" disabled>
+            <span class="mi" style="font-size:18px">send</span>
+          </button>
+        </div>
+      </div>
+      <div class="comment-image-preview" id="comment-image-preview-${postId}" style="display:none">
+        <img id="comment-preview-img-${postId}" src="" alt="">
+        <button class="comment-remove-image" data-post-id="${postId}"><span class="mi" style="font-size:16px">close</span></button>
+      </div>
+      <div class="comment-tip">请遵守社区规范，禁止发布违规内容</div>
+    </div>
+  `;
+}
 
-  const result = await apiPost(`/api/courses/posts/${postId}/comments`, { content });
+function renderLoginPromptHtml() {
+  return '<p class="text-secondary" style="margin-top:12px;font-size:var(--text-sm)"><a href="#" onclick="navigateTo(\'profile\')" style="color:var(--md-primary)">登录</a> 后参与讨论</p>';
+}
 
-  if (result.error) {
-    showToast(result.error);
-    return;
+// 绑定评论区所有事件
+function bindCommentEvents(section, postId) {
+  // 回复按钮
+  section.querySelectorAll('.comment-reply-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      replyingTo[postId] = { id: Number(btn.dataset.commentId), author_name: btn.dataset.author };
+      renderComments(section, postId);
+      const textarea = document.getElementById(`comment-textarea-${postId}`);
+      if (textarea) { textarea.focus(); textarea.value = `@${btn.dataset.author} `; updateCharCount(postId); }
+    });
+  });
+
+  // 取消回复
+  section.querySelectorAll('.comment-cancel-reply').forEach(btn => {
+    btn.addEventListener('click', () => {
+      delete replyingTo[postId];
+      renderComments(section, postId);
+    });
+  });
+
+  // 删除按钮
+  section.querySelectorAll('.comment-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openModal('确认删除', `
+        <p style="margin-bottom:24px">确定要删除这条回复吗？删除后无法恢复</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+          <button class="btn btn-primary" id="confirm-delete-comment" data-comment-id="${btn.dataset.commentId}" data-post-id="${btn.dataset.postId}" style="background:var(--md-error,#e53935)">删除</button>
+        </div>
+      `);
+      document.getElementById('confirm-delete-comment')?.addEventListener('click', async () => {
+        const result = await apiDelete(`/api/courses/posts/${btn.dataset.postId}/comments/${btn.dataset.commentId}`);
+        if (result.error) { showToast(result.error); return; }
+        closeModal();
+        loadedComments[postId] = null;
+        toggleComments(postId);
+        setTimeout(() => toggleComments(postId), 50);
+        showToast('已删除');
+      });
+    });
+  });
+
+  // 加载更多
+  const loadMoreBtn = document.getElementById(`comment-load-more-${postId}`);
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', async () => {
+      loadMoreBtn.textContent = '加载中...';
+      loadMoreBtn.disabled = true;
+      const data = loadedComments[postId];
+      const nextPage = data.page + 1;
+      try {
+        const result = await apiGet(`/api/courses/posts/${postId}/comments?page=${nextPage}&pageSize=20`);
+        data.comments.push(...(result.comments || []));
+        data.page = nextPage;
+        data.hasMore = data.comments.length < data.total;
+        renderComments(section, postId);
+      } catch {
+        loadMoreBtn.textContent = '加载失败，点击重试';
+        loadMoreBtn.disabled = false;
+      }
+    });
   }
 
-  input.value = '';
-  loadedComments[postId] = null;
-  toggleComments(postId);
-  setTimeout(() => toggleComments(postId), 50);
-  showToast('回复成功');
+  // 查看更多回复（展开嵌套）
+  section.querySelectorAll('.comment-load-more-replies').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const parentId = Number(btn.dataset.parentId);
+      btn.textContent = '加载中...';
+      try {
+        const replies = await apiGet(`/api/courses/posts/${postId}/comments/${parentId}/replies`);
+        const data = loadedComments[postId];
+        replies.forEach(r => {
+          if (!data.comments.find(c => c.id === r.id)) data.comments.push(r);
+        });
+        renderComments(section, postId);
+      } catch {
+        btn.textContent = '加载失败';
+      }
+    });
+  });
+
+  // 文本输入
+  const textarea = document.getElementById(`comment-textarea-${postId}`);
+  if (textarea) {
+    textarea.addEventListener('input', () => updateCharCount(postId));
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitComment(postId, section);
+      }
+    });
+    textarea.focus();
+  }
+
+  // 发送按钮
+  const sendBtn = document.getElementById(`comment-send-btn-${postId}`);
+  if (sendBtn) {
+    sendBtn.addEventListener('click', () => submitComment(postId, section));
+  }
+
+  // 图片上传
+  const imgInput = document.getElementById(`comment-image-input-${postId}`);
+  if (imgInput) {
+    imgInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 1024 * 1024) { showToast('图片不能超过 1MB'); imgInput.value = ''; return; }
+      commentImageMap[postId] = file;
+      const preview = document.getElementById(`comment-image-preview-${postId}`);
+      const previewImg = document.getElementById(`comment-preview-img-${postId}`);
+      if (preview && previewImg) {
+        previewImg.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+      }
+      updateSendBtn(postId);
+    });
+  }
+
+  // 移除图片
+  section.querySelectorAll('.comment-remove-image').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pid = Number(btn.dataset.postId);
+      delete commentImageMap[pid];
+      const preview = document.getElementById(`comment-image-preview-${pid}`);
+      if (preview) preview.style.display = 'none';
+      const imgInput = document.getElementById(`comment-image-input-${pid}`);
+      if (imgInput) imgInput.value = '';
+      updateSendBtn(pid);
+    });
+  });
+}
+
+// 更新字数计数
+function updateCharCount(postId) {
+  const textarea = document.getElementById(`comment-textarea-${postId}`);
+  const counter = document.getElementById(`comment-char-count-${postId}`);
+  if (!textarea || !counter) return;
+  const len = textarea.value.length;
+  counter.textContent = `${len}/500`;
+  counter.classList.toggle('exceeded', len >= 500);
+  updateSendBtn(postId);
+}
+
+// 更新发送按钮状态
+function updateSendBtn(postId) {
+  const textarea = document.getElementById(`comment-textarea-${postId}`);
+  const sendBtn = document.getElementById(`comment-send-btn-${postId}`);
+  if (!textarea || !sendBtn) return;
+  const hasContent = textarea.value.trim().length > 0;
+  const hasImage = !!commentImageMap[postId];
+  const notExceeded = textarea.value.length <= 500;
+  sendBtn.disabled = !(hasContent || hasImage) || !notExceeded;
+}
+
+// 提交评论
+async function submitComment(postId, section) {
+  const textarea = document.getElementById(`comment-textarea-${postId}`);
+  const sendBtn = document.getElementById(`comment-send-btn-${postId}`);
+  if (!textarea || !sendBtn) return;
+
+  const content = textarea.value.trim();
+  const imageFile = commentImageMap[postId];
+  if (!content && !imageFile) return;
+  if (content.length > 500) { showToast('回复内容不能超过 500 字'); return; }
+
+  // 禁用状态
+  textarea.disabled = true;
+  sendBtn.disabled = true;
+  sendBtn.innerHTML = '<span class="mi" style="font-size:18px">hourglass_empty</span>';
+
+  try {
+    const formData = new FormData();
+    formData.append('content', content);
+    if (replyingTo[postId]) formData.append('parent_id', replyingTo[postId].id);
+    if (imageFile) formData.append('image', imageFile);
+
+    const token = localStorage.getItem('kedazi_token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`/api/courses/posts/${postId}/comments`, { method: 'POST', headers, body: formData });
+    const result = await res.json();
+
+    if (result.error) {
+      showToast(result.error);
+      textarea.disabled = false;
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = '<span class="mi" style="font-size:18px">send</span>';
+      return;
+    }
+
+    // 成功：清空状态
+    textarea.value = '';
+    delete commentImageMap[postId];
+    delete replyingTo[postId];
+    const preview = document.getElementById(`comment-image-preview-${postId}`);
+    if (preview) preview.style.display = 'none';
+    const imgInput = document.getElementById(`comment-image-input-${postId}`);
+    if (imgInput) imgInput.value = '';
+
+    loadedComments[postId] = null;
+    toggleComments(postId);
+    setTimeout(() => {
+      toggleComments(postId);
+      // 滚动到最新回复
+      setTimeout(() => {
+        const list = document.getElementById(`comment-list-${postId}`);
+        if (list) list.scrollTop = list.scrollHeight;
+      }, 100);
+    }, 50);
+    showToast('回复成功');
+  } catch {
+    showToast('发送失败，请重试');
+    textarea.disabled = false;
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = '<span class="mi" style="font-size:18px">send</span>';
+  }
 }

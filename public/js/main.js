@@ -105,7 +105,7 @@ import {
 import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
   openImportModal, handleAgreeAndImport, handleScheduleImport,
-  switchMyCourseTab, toggleComments, handleAddComment,
+  switchMyCourseTab, toggleComments,
   refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
   openUploadMaterialModal, onFileSelected, handleUploadMaterial,
   filterMyMembers, filterMyMembersTab,
@@ -219,7 +219,6 @@ Object.assign(window, {
   handleScheduleImport,
   switchMyCourseTab,
   toggleComments,
-  handleAddComment,
   refreshMyMaterials,
   rateMyMaterial,
   deleteMyMaterial,
