@@ -486,7 +486,7 @@ async function renderMyForumTab(contentEl, courseId) {
             <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
             ${renderPostAttachments(p.attachments)}
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
-              <span>${escHtml(p.author_name)} · ${formatTime(p.created_at)}</span>
+              <span><button class="user-profile-link" onclick="event.stopPropagation();navigateTo('profile-user', ${p.author_id})">${escHtml(p.author_name)}</button> · ${formatTime(p.created_at)}</span>
               ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
               <span style="cursor:pointer;color:var(--md-primary);font-weight:500" onclick="toggleComments(${p.id})">
                 <span class="mi" style="font-size:16px;vertical-align:-3px">chat_bubble_outline</span> ${p.comment_count || 0} 回复
@@ -545,12 +545,12 @@ function renderMyMembersList(members) {
     return '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">暂无匹配成员</p>';
   }
   return members.map(m => `
-    <div class="member-item">
+    <div class="member-item member-profile-link" onclick="navigateTo('profile-user', ${m.user_id})">
       <div class="avatar-small">${(m.nickname || '?')[0]}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:var(--text-sm);font-weight:500">${escHtml(m.nickname)}</div>
         ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
-        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">qq</span> ${escHtml(m.qq)}</div>` : ''}
+        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="event.stopPropagation();navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">qq</span> ${escHtml(m.qq)}</div>` : ''}
       </div>
     </div>
   `).join('');
@@ -664,7 +664,7 @@ function renderMyMaterialsList(materials, courseId) {
           <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;font-size:12px;color:var(--md-on-surface-variant)">
             ${m.chapter ? `<span><span class="mi" style="font-size:14px;vertical-align:-2px">bookmark</span> ${escHtml(m.chapter)}</span>` : ''}
             <span><span class="mi" style="font-size:14px;vertical-align:-2px">category</span> ${escHtml(m.category)}</span>
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> ${escHtml(m.uploader_name)}</span>
+            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.uploader_id})">${escHtml(m.uploader_name)}</button></span>
             <span>${formatFileSize(m.file_size)}</span>
             <span><span class="mi" style="font-size:14px;vertical-align:-2px">download</span> ${m.download_count}</span>
           </div>
@@ -887,12 +887,12 @@ function renderMyMemberCards(members) {
     return '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">暂无匹配成员</p>';
   }
   return members.map(m => `
-    <div class="member-card-grid">
+    <div class="member-card-grid member-profile-link" onclick="navigateTo('profile-user', ${m.user_id})">
       <div class="avatar-small">${(m.nickname || '?')[0]}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:500">${escHtml(m.nickname)}</div>
         ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
-        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">qq</span> ${escHtml(m.qq)}</div>` : ''}
+        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="event.stopPropagation();navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">qq</span> ${escHtml(m.qq)}</div>` : ''}
       </div>
     </div>
   `).join('');
@@ -990,7 +990,7 @@ function renderComments(section, postId, comments) {
     ${comments.length === 0 ? '<p class="text-secondary">暂无回复</p>' : comments.map(c => `
       <div style="padding:10px 0;border-bottom:1px solid var(--md-outline-variant)">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          <span style="font-size:var(--text-sm);font-weight:600">${escHtml(c.author_name)}</span>
+          <button class="user-profile-link" onclick="navigateTo('profile-user', ${c.author_id})">${escHtml(c.author_name)}</button>
           <span style="font-size:12px;color:var(--md-on-surface-variant)">${formatTime(c.created_at)}</span>
         </div>
         <p style="font-size:var(--text-sm);white-space:pre-wrap">${escHtml(c.content)}</p>

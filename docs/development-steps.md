@@ -291,3 +291,23 @@
 - [x] 课程广场只读详情移除发布入口；课程帖子发布接口仅允许精确加入该课程的成员调用。
 - [x] 课表导入复用课程时同时匹配课程号前缀、班级名和教师，避免不同班级错误合并。
 - [x] 增加课程广场只读、非成员越权发帖和课表课程身份回归测试。
+
+---
+
+## 第17轮：关注系统闭环与隐私修复 ✅
+
+**目标**：让用户关注关系产生实际用途，打通“发现同学 → 查看主页 → 关注 → 获取公开学习动态”的完整链路，并修复公开资料接口的隐私绕过问题。
+
+- [x] `routes/middleware/auth.js`：新增 `optionalAuthMiddleware`，公开接口可识别已登录用户，但不强制要求登录。
+- [x] `routes/user.js`：公开主页不再信任 URL 中的 `viewer_id`，仅使用 JWT 判断查看者身份。
+- [x] `routes/user.js`：公开主页增加共同课程查询；关闭“公开个人资料”后，其他用户只能看到昵称和头像。
+- [x] `routes/user.js`：关注用户后创建 `new_follower` 通知；粉丝和关注列表遵守资料隐私开关。
+- [x] `routes/user.js`：新增 GET `/api/user/feed`，聚合已关注用户发布的学习资料、有效自习邀约和未过期广场帖子。
+- [x] `public/js/pages/following_feed.js`（新建）：新增“关注动态”内容面板，按时间倒序展示公开学习动态并支持跳转。
+- [x] `public/js/pages/notifications.js`：通知中心增加“消息通知 / 关注动态”页签，将关注动态整合到通知栏目。
+- [x] `public/js/pages/profile.js`：公开主页增加关注/取消关注、共同课程展示；隐私锁定状态仍允许关注。
+- [x] `public/js/pages/courses/my_courses.js`、`public/js/pages/courses/plaza.js`、`public/js/pages/explore/invites.js`、`public/js/pages/explore/square.js`：课程成员、帖子作者、评论用户、资料上传者、邀约发起人和广场用户昵称支持进入公开主页。
+- [x] `public/js/pages/notification_routes.mjs`、`public/js/pages/notifications.js`：新增关注通知图标和通知点击跳转。
+- [x] `tests/following.test.mjs`、`tests/following_frontend.test.mjs`、`tests/notification_routes.test.mjs`：增加隐私绕过、共同课程、关注通知、动态聚合、侧栏入口和通知跳转回归测试。
+
+**验证**：`npm test` 执行 35 个测试全部通过；`node --check` 检查受影响模块全部通过；本地服务启动后访问首页返回 `HTTP 200`。

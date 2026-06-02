@@ -310,7 +310,7 @@ async function renderPlazaForumTab(contentEl, courseIds) {
         <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
         ${renderPostAttachments(p.attachments)}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
-          <span>${escHtml(p.author_name)} · ${formatTime(p.created_at)}</span>
+          <span><button class="user-profile-link" onclick="event.stopPropagation();navigateTo('profile-user', ${p.author_id})">${escHtml(p.author_name)}</button> · ${formatTime(p.created_at)}</span>
           ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
           <span>
             <span class="mi" style="font-size:16px;vertical-align:-3px">chat_bubble_outline</span> ${p.comment_count || 0} 回复
@@ -359,7 +359,7 @@ async function renderPlazaMaterialsTab(contentEl, courseIds) {
           ${m.description ? `<div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">${escHtml(m.description)}</div>` : ''}
           <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;font-size:12px;color:var(--md-on-surface-variant)">
             ${m._sourceTitle ? `<span class="plaza-origin-tag">来自 ${escHtml(m._sourceTitle)}</span>` : ''}
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> ${escHtml(m.uploader_name)}</span>
+            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.uploader_id})">${escHtml(m.uploader_name)}</button></span>
             <span>${formatFileSize(m.file_size)}</span>
             <span><span class="mi" style="font-size:14px;vertical-align:-2px">download</span> ${m.download_count}</span>
           </div>

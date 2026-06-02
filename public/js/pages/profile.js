@@ -89,7 +89,7 @@ function getProfilePath() {
 async function fetchProfileData() {
   const user = window._currentUser;
   if (!user) return null;
-  const stats = await apiGet(`/api/user/${user.id}/profile?viewer_id=${user.id}`);
+  const stats = await apiGet(`/api/user/${user.id}/profile`);
   if (stats.error) return null;
   return { ...user, ...stats };
 }
@@ -97,14 +97,16 @@ async function fetchProfileData() {
 async function fetchPreviewData() {
   const user = window._currentUser;
   if (!user) return null;
-  const stats = await apiGet(`/api/user/${user.id}/profile?viewer_id=0`);
+  if (user.privacy_show_profile === 0) {
+    return { id: user.id, nickname: user.nickname, avatar_url: user.avatar_url, privacyHidden: true };
+  }
+  const stats = await apiGet(`/api/user/${user.id}/profile`);
   if (stats.error) return null;
   return { ...user, ...stats };
 }
 
 async function fetchPublicUserData(userId) {
-  const viewerId = window._currentUser?.id || 0;
-  return apiGet(`/api/user/${userId}/profile?viewer_id=${viewerId}`);
+  return apiGet(`/api/user/${userId}/profile`);
 }
 
 /* =============================================
@@ -130,7 +132,7 @@ async function renderProfilePage(container) {
   const mode = previewMode ? 'preview' : 'owner';
   const data = previewMode
     ? (await fetchPreviewData().catch(() => null)) || window._currentUser
-    : window._currentUser;
+    : (await fetchProfileData().catch(() => null)) || window._currentUser;
   container.innerHTML = renderProfileCard(data, mode);
   if (previewMode) container.innerHTML += renderPreviewBanner();
   animateProfile(container);
@@ -679,8 +681,7 @@ async function handleFollow(btn) {
   }
 
   showToast('已关注');
-  // 刷新页面
-  navigateTo('profile');
+  navigateTo('profile-user', userId);
 }
 
 async function handleUnfollow(btn) {
@@ -695,7 +696,7 @@ async function handleUnfollow(btn) {
   }
 
   showToast('已取消关注');
-  navigateTo('profile');
+  navigateTo('profile-user', userId);
 }
 
 /* =============================================
@@ -779,6 +780,7 @@ async function renderPublicUserPage(container, userId) {
 
     if (data.privacyHidden) {
       container.innerHTML = renderPrivacyLocked(data);
+      bindProfileInteractions(container);
       return;
     }
 
@@ -844,12 +846,36 @@ function renderPublicProfileCard(data) {
         </div>
       </div>
       <div class="profile-fields">${fieldsHtml}</div>
+      ${renderCommonCourses(data.commonCourses)}
       ${renderStatsRow(data)}
     </div>
   `;
 }
 
+function renderCommonCourses(courses = []) {
+  if (!courses.length) return '';
+  return `
+    <div class="profile-common-courses">
+      <div class="profile-common-title"><span class="mi">school</span>共同课程 ${courses.length} 门</div>
+      <div class="profile-common-list">
+        ${courses.map(course => `
+          <button class="profile-common-course" onclick="navigateTo('mycourse-detail', ${course.id})">
+            ${escHtml(course.title)}${course.teacher ? `<span>${escHtml(course.teacher)}</span>` : ''}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function renderPrivacyLocked(data) {
+  const followBtn = data.isFollowing
+    ? `<button class="btn btn-secondary btn-compact profile-unfollow-btn" data-user-id="${data.id}">
+        <span class="mi">person_remove</span> 取消关注
+      </button>`
+    : `<button class="btn btn-primary btn-compact profile-follow-btn" data-user-id="${data.id}">
+        <span class="mi">person_add</span> 关注
+      </button>`;
   return `
     <div class="profile-page">
       ${renderBackButton()}
@@ -857,6 +883,7 @@ function renderPrivacyLocked(data) {
         <span class="mi profile-empty-icon">lock</span>
         <h2 class="profile-empty-title">该用户已设置隐私</h2>
         <p class="profile-empty-desc">${escHtml(data.nickname || '该用户')} 暂未公开个人资料</p>
+        ${window._currentUser ? followBtn : ''}
       </div>
     </div>
   `;

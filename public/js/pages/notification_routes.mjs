@@ -11,5 +11,9 @@ export function resolveNotificationTarget(relatedType, relatedId, courseId) {
     return { page: 'square-post', data: relatedId };
   }
 
+  if (relatedType === 'user' && relatedId) {
+    return { page: 'profile-user', data: relatedId };
+  }
+
   return null;
 }
