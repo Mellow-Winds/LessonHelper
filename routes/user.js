@@ -1,51 +1,99 @@
 const express = require('express');
-const { authMiddleware } = require('./middleware/auth');
+const { authMiddleware, optionalAuthMiddleware } = require('./middleware/auth');
+const { createNotification } = require('./notifications');
 
 module.exports = function (db) {
   const router = express.Router();
 
+  // GET /api/user/feed — 关注动态 [Auth]
+  router.get('/feed', authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const pageSize = Math.min(Math.max(Number(req.query.pageSize) || 20, 1), 50);
+    const offset = (page - 1) * pageSize;
+
+    const activities = db.all(`
+      SELECT * FROM (
+        SELECT 'material' AS activity_type, m.id AS related_id, m.course_id,
+          u.id AS author_id, u.nickname AS author_name, m.title,
+          c.title AS context_title, m.description AS summary, m.created_at
+        FROM follows f
+        JOIN materials m ON m.uploader_id = f.following_id
+        JOIN users u ON u.id = m.uploader_id
+        JOIN courses c ON c.id = m.course_id
+        WHERE f.follower_id = ?
+
+        UNION ALL
+
+        SELECT 'invite' AS activity_type, si.id AS related_id, si.course_id,
+          u.id AS author_id, u.nickname AS author_name, si.title,
+          COALESCE(c.title, '公开自习邀约') AS context_title, si.description AS summary, si.created_at
+        FROM follows f
+        JOIN study_invites si ON si.creator_id = f.following_id
+        JOIN users u ON u.id = si.creator_id
+        LEFT JOIN courses c ON c.id = si.course_id
+        WHERE f.follower_id = ? AND si.status IN ('open', 'full') AND si.study_date >= date('now')
+
+        UNION ALL
+
+        SELECT 'square_post' AS activity_type, sp.id AS related_id, NULL AS course_id,
+          u.id AS author_id, u.nickname AS author_name, sp.title,
+          sp.category AS context_title, sp.description AS summary, sp.created_at
+        FROM follows f
+        JOIN square_posts sp ON sp.creator_id = f.following_id
+        JOIN users u ON u.id = sp.creator_id
+        WHERE f.follower_id = ? AND sp.status IN ('open', 'full') AND sp.expires_at > datetime('now')
+      ) activities
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `, [userId, userId, userId, pageSize, offset]);
+
+    res.json({ activities, page, pageSize });
+  });
+
   // GET /api/user/:id — 用户公开信息
-  router.get('/:id', (req, res) => {
+  router.get('/:id', optionalAuthMiddleware, (req, res) => {
+    const userId = Number(req.params.id);
     const user = db.get(
-      'SELECT id, username, nickname, major, grade, avatar_url, created_at FROM users WHERE id = ?',
-      [Number(req.params.id)]
+      'SELECT id, nickname, major, grade, avatar_url, privacy_show_profile, created_at FROM users WHERE id = ?',
+      [userId]
     );
     if (!user) return res.status(404).json({ error: '用户不存在' });
-    res.json(user);
+    if (!user.privacy_show_profile && req.user?.userId !== userId) {
+      return res.json({ id: user.id, nickname: user.nickname, avatar_url: user.avatar_url, privacyHidden: true });
+    }
+    const { privacy_show_profile, ...publicUser } = user;
+    res.json(publicUser);
   });
 
   // GET /api/user/:id/courses — 用户参加的课程（通过 user_courses）
-  router.get('/:id/courses', (req, res) => {
+  router.get('/:id/courses', optionalAuthMiddleware, (req, res) => {
+    const userId = Number(req.params.id);
+    const user = db.get('SELECT id, privacy_show_profile FROM users WHERE id = ?', [userId]);
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    if (!user.privacy_show_profile && req.user?.userId !== userId) {
+      return res.status(403).json({ error: '该用户未公开个人资料' });
+    }
     const courses = db.all(`
       SELECT c.*, uc.enrolled_at
       FROM courses c
       JOIN user_courses uc ON c.id = uc.course_id
       WHERE uc.user_id = ?
       ORDER BY uc.enrolled_at DESC
-    `, [Number(req.params.id)]);
+    `, [userId]);
     res.json(courses);
   });
 
   // GET /api/user/:id/profile — 公开名片（含关注计数 + 隐私过滤）
-  router.get('/:id/profile', (req, res) => {
+  router.get('/:id/profile', optionalAuthMiddleware, (req, res) => {
     const userId = Number(req.params.id);
-    const viewerId = req.query.viewer_id ? Number(req.query.viewer_id) : null;
+    const viewerId = req.user?.userId || null;
 
     const user = db.get(
       'SELECT id, nickname, major, grade, avatar_url, avatar_desc, mbti, qq, wechat, douyin, privacy_show_profile, created_at FROM users WHERE id = ?',
       [userId]
     );
     if (!user) return res.status(404).json({ error: '用户不存在' });
-
-    // 隐私过滤：如果设置了不公开且不是本人查看
-    if (!user.privacy_show_profile && viewerId !== userId) {
-      return res.json({
-        id: user.id,
-        nickname: user.nickname,
-        avatar_url: user.avatar_url,
-        privacyHidden: true
-      });
-    }
 
     // 获取关注/粉丝数
     const followingCount = db.get(
@@ -65,11 +113,35 @@ module.exports = function (db) {
       isFollowing = !!follow;
     }
 
+    // 隐私过滤：如果设置了不公开且不是本人查看
+    if (!user.privacy_show_profile && viewerId !== userId) {
+      return res.json({
+        id: user.id,
+        nickname: user.nickname,
+        avatar_url: user.avatar_url,
+        privacyHidden: true,
+        followingCount,
+        followerCount,
+        isFollowing
+      });
+    }
+
+    const commonCourses = viewerId && viewerId !== userId
+      ? db.all(`
+          SELECT c.id, c.title, c.teacher
+          FROM courses c
+          JOIN user_courses mine ON mine.course_id = c.id AND mine.user_id = ?
+          JOIN user_courses theirs ON theirs.course_id = c.id AND theirs.user_id = ?
+          ORDER BY c.title ASC
+        `, [viewerId, userId])
+      : [];
+
     res.json({
       ...user,
       followingCount,
       followerCount,
-      isFollowing
+      isFollowing,
+      commonCourses
     });
   });
 
@@ -97,6 +169,15 @@ module.exports = function (db) {
       'INSERT INTO follows (follower_id, following_id) VALUES (?, ?)',
       [myId, targetId]
     );
+    const follower = db.get('SELECT nickname FROM users WHERE id = ?', [myId]);
+    createNotification(db, {
+      userId: targetId,
+      type: 'new_follower',
+      title: '新的关注',
+      message: `${follower?.nickname || '一位同学'} 关注了你`,
+      relatedType: 'user',
+      relatedId: myId
+    });
     db.save();
 
     res.json({ success: true });
@@ -123,7 +204,10 @@ module.exports = function (db) {
     const offset = Number(req.query.offset) || 0;
 
     const list = db.all(`
-      SELECT u.id, u.nickname, u.major, u.grade, u.avatar_url
+      SELECT u.id, u.nickname,
+        CASE WHEN u.privacy_show_profile = 1 THEN u.major ELSE '' END AS major,
+        CASE WHEN u.privacy_show_profile = 1 THEN u.grade ELSE '' END AS grade,
+        u.avatar_url
       FROM follows f
       JOIN users u ON f.follower_id = u.id
       WHERE f.following_id = ?
@@ -141,7 +225,10 @@ module.exports = function (db) {
     const offset = Number(req.query.offset) || 0;
 
     const list = db.all(`
-      SELECT u.id, u.nickname, u.major, u.grade, u.avatar_url
+      SELECT u.id, u.nickname,
+        CASE WHEN u.privacy_show_profile = 1 THEN u.major ELSE '' END AS major,
+        CASE WHEN u.privacy_show_profile = 1 THEN u.grade ELSE '' END AS grade,
+        u.avatar_url
       FROM follows f
       JOIN users u ON f.following_id = u.id
       WHERE f.follower_id = ?

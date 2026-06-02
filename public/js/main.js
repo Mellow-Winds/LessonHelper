@@ -183,6 +183,7 @@ function updateSidebarAvatar() {
 window.loadCurrentUser = loadCurrentUser;
 window.logout = logout;
 window.navigateTo = navigateTo;
+window.showToast = showToast;
 
 /* =============================================
    全局函数注册（供 HTML 内联 onclick/onsubmit 使用）
