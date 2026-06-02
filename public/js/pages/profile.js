@@ -5,7 +5,7 @@
 
 import { apiGet, apiPut, apiPost, apiDelete } from '../core/api.js';
 import { navigateTo, animIn, animStagger } from '../core/router.js';
-import { showToast, openModal, closeModal, escHtml, createMdInput, createMdSelect } from '../components/ui.js';
+import { showToast, openModal, closeModal, escHtml, createMdInput, createMdSelect, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
 import { renderAuth } from './auth.js';
 
 /* =============================================
@@ -122,7 +122,7 @@ async function renderProfilePage(container) {
 
   if (!window._currentUser) {
     container.innerHTML = renderLoginPrompt();
-    container.querySelector('.btn-primary')?.addEventListener('click', () => renderAuth(container));
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 
@@ -138,22 +138,6 @@ async function renderProfilePage(container) {
   animateProfile(container);
   bindProfileInteractions(container);
   bindModeSwitch(container);
-}
-
-function renderLoginPrompt() {
-  return `
-    <div class="profile-page">
-      <div class="profile-empty-card">
-        <span class="mi profile-empty-icon">person_off</span>
-        <h2 class="profile-empty-title">尚未登录</h2>
-        <p class="profile-empty-desc">登录后即可管理你的个人空间</p>
-        <button class="btn btn-primary">
-          <span class="mi">login</span>
-          前往登录
-        </button>
-      </div>
-    </div>
-  `;
 }
 
 function renderErrorCard(msg) {
@@ -918,7 +902,11 @@ function renderBackButton() {
    ============================================= */
 
 async function renderEditPage(container) {
-  if (!window._currentUser) { navigateTo('profile'); return; }
+  if (!window._currentUser) {
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
+    return;
+  }
 
   let data;
   try {
@@ -1028,7 +1016,11 @@ async function handleSaveProfile() {
    ============================================= */
 
 async function renderPrivacyPage(container) {
-  if (!window._currentUser) { navigateTo('profile'); return; }
+  if (!window._currentUser) {
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
+    return;
+  }
 
   const user = window._currentUser;
   const showProfile = user.privacy_show_profile !== 0;
@@ -1115,7 +1107,11 @@ async function handlePrivacyToggle(field, value) {
    ============================================= */
 
 async function renderDataPage(container) {
-  if (!window._currentUser) { navigateTo('profile'); return; }
+  if (!window._currentUser) {
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
+    return;
+  }
 
   const user = window._currentUser;
   const joinDate = user.created_at

@@ -5,7 +5,8 @@
 
 import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../../core/router.js';
-import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, formatTime, formatFileSize } from '../../components/ui.js';
+import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, formatTime, formatFileSize, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
+import { renderAuth } from '../auth.js';
 import { getFavoriteCourseIds, getFavoritePostIds, renderCourseFavoriteButton, renderPostFavoriteButton } from '../favorites.js';
 import { renderPostAttachments } from './post_attachments.js';
 
@@ -56,8 +57,8 @@ let _myCurrentSemester = getCurrentSemesterKey();
 
 registerPage('mycourse', async (container) => {
   if (!isLoggedIn()) {
-    showToast('请先登录');
-    navigateTo('profile');
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 
@@ -279,8 +280,7 @@ export async function handleEnrollFromSearch(courseId) {
 
 export async function openImportModal() {
   if (!isLoggedIn()) {
-    showToast('请先登录');
-    navigateTo('profile');
+    showToast('请先登录后再导入课程表');
     return;
   }
 
@@ -696,7 +696,7 @@ function renderMyStars(avgRating, materialId) {
 
 export async function rateMyMaterial(materialId, rating) {
   if (!window._currentUser) {
-    showToast('请先登录');
+    showToast('请先登录后再评分');
     return;
   }
   const result = await apiPost(`/api/materials/${materialId}/rate`, { rating });

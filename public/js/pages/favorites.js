@@ -1,7 +1,7 @@
 import { apiGet, apiPost, apiDelete, isLoggedIn } from '../core/api.js';
 import { registerPage, navigateTo, animStagger, bindRipples } from '../core/router.js';
-import { showToast, escHtml, formatTime } from '../components/ui.js';
-import { navigateToCourseResult } from './auth.js';
+import { showToast, escHtml, formatTime, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
+import { renderAuth, navigateToCourseResult } from './auth.js';
 
 export async function getFavoriteCourseIds() {
   if (!isLoggedIn()) return new Set();
@@ -82,8 +82,8 @@ function renderPostCards(posts) {
 
 registerPage('favorites', async (container) => {
   if (!isLoggedIn()) {
-    showToast('请先登录');
-    navigateTo('profile');
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
   const [courses, posts] = await Promise.all([
