@@ -366,7 +366,7 @@ Body: `{ "content" }`
 
 ---
 
-## 10. 我的创作 `/api/my-posts`
+## 10. 我的发布 `/api/my-posts`
 
 ### 我的课程帖子 [Auth]
 ```
@@ -377,6 +377,50 @@ GET /api/my-posts/course-posts
 ```
 GET /api/my-posts/course-materials
 ```
+
+---
+
+## 11. 收藏 `/api/favorites`
+
+### 收藏课程 [Auth]
+```
+POST /api/favorites/courses/:courseId
+```
+
+### 取消收藏课程 [Auth]
+```
+DELETE /api/favorites/courses/:courseId
+```
+
+### 收藏帖子 [Auth]
+```
+POST /api/favorites/posts/:postId
+```
+
+### 取消收藏帖子 [Auth]
+```
+DELETE /api/favorites/posts/:postId
+```
+
+### 收藏的课程列表 [Auth]
+```
+GET /api/favorites/courses
+```
+
+### 收藏的帖子列表 [Auth]
+```
+GET /api/favorites/posts
+```
+
+---
+
+## 12. 关注动态
+
+### 关注动态 Feed [Auth]
+```
+GET /api/user/feed
+```
+Response: 聚合已关注用户发布的学习资料、有效自习邀约和未过期广场帖子，按时间倒序。
 
 ---
 
@@ -393,4 +437,4 @@ set RESEND_API_KEY=re_xxxxxx
 
 ---
 
-> 最后更新：2026-06-01
+> 最后更新：2026-06-02

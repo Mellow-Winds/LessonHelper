@@ -253,7 +253,7 @@ registerPage('publish', async (container, courseId) => {
       return;
     }
 
-    const category = categoryContainer?.querySelector('.md-select-value')?.textContent?.trim() || '讨论';
+    const category = document.getElementById('publish-category')?.value || '讨论';
     const syncToPlaza = syncToggle.checked;
     const hasFile = fileInput.files.length > 0;
 

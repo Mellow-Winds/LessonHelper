@@ -1,8 +1,47 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { authMiddleware } = require('./middleware/auth');
 const { createNotification } = require('./notifications');
 
 const EXPIRY_DAYS = 7;
+
+const SQUARE_COMMENT_IMAGE_DIR = path.join(__dirname, '..', 'uploads', 'comment-images');
+const SQUARE_COMMENT_IMAGE_MAX = 1 * 1024 * 1024;
+const SQUARE_COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png']);
+
+const squareCommentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(SQUARE_COMMENT_IMAGE_DIR, { recursive: true });
+      cb(null, SQUARE_COMMENT_IMAGE_DIR);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `sq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+    }
+  }),
+  limits: { fileSize: SQUARE_COMMENT_IMAGE_MAX, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, SQUARE_COMMENT_IMAGE_EXT.has(ext));
+  }
+});
+
+function parseSquareCommentImage(req, res, next) {
+  if (!req.is('multipart/form-data')) return next();
+  squareCommentUpload.single('image')(req, res, (error) => {
+    if (!error) return next();
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    const message = error.code === 'LIMIT_FILE_SIZE'
+      ? '图片不能超过 1MB'
+      : error.code === 'LIMIT_FILE_COUNT'
+        ? '只能上传一张图片'
+        : '仅支持 jpg/jpeg/png 格式';
+    return res.status(400).json({ error: message });
+  });
+}
 
 module.exports = function (db) {
   const router = express.Router();
@@ -38,7 +77,7 @@ module.exports = function (db) {
     const { category, page = 1, pageSize = 20 } = req.query;
     const userId = req.user.userId;
 
-    let where = " WHERE sp.expires_at > datetime('now') AND sp.status != 'expired'";
+    let where = " WHERE sp.expires_at > datetime('now', '+8 hours') AND sp.status != 'expired'";
     const params = [];
 
     if (category && category !== 'all') {
@@ -89,6 +128,11 @@ module.exports = function (db) {
     `, [postId]);
 
     if (!post) return res.status(404).json({ error: '帖子不存在' });
+
+    // 检查过期状态
+    if (new Date(post.expires_at) <= new Date()) {
+      post.status = 'expired';
+    }
 
     // 已确认成员（显示 QQ）
     const confirmed = db.all(`
@@ -197,16 +241,21 @@ module.exports = function (db) {
       return res.json({ message: '已拒绝' });
     }
 
-    // accept
-    if (post.current_count >= post.max_people) {
+    // accept — 从实际数据计算当前人数，避免漂移
+    const actualCount = db.get(
+      "SELECT COUNT(*) AS cnt FROM square_interests WHERE post_id = ? AND status = 'accepted'",
+      [post.id]
+    );
+    if (actualCount.cnt >= post.max_people) {
       return res.status(400).json({ error: '人数已满' });
     }
 
     db.run("UPDATE square_interests SET status = 'accepted' WHERE id = ?", [interestId]);
-    db.run('UPDATE square_posts SET current_count = current_count + 1 WHERE id = ?', [post.id]);
+    const newCount = actualCount.cnt + 1;
+    db.run('UPDATE square_posts SET current_count = ? WHERE id = ?', [newCount, post.id]);
 
     // 满员时自动更新状态
-    if (post.current_count + 1 >= post.max_people) {
+    if (newCount >= post.max_people) {
       db.run("UPDATE square_posts SET status = 'full' WHERE id = ?", [post.id]);
     }
     db.save();
@@ -256,37 +305,141 @@ module.exports = function (db) {
     res.status(400).json({ error: 'type 参数无效' });
   });
 
-  // POST /api/square/posts/:id/comments — 发评论 [Auth]
-  router.post('/posts/:id/comments', authMiddleware, (req, res) => {
-    const postId = Number(req.params.id);
-    const userId = req.user.userId;
-    const { content } = req.body;
-
-    if (!content) return res.status(400).json({ error: '评论内容不能为空' });
-
-    const post = db.get('SELECT id FROM square_posts WHERE id = ?', [postId]);
-    if (!post) return res.status(404).json({ error: '帖子不存在' });
-
-    const result = db.run(
-      'INSERT INTO square_comments (post_id, author_id, content) VALUES (?, ?, ?)',
-      [postId, userId, content.trim()]
-    );
-    db.save();
-
-    res.status(201).json({ id: result.lastInsertRowid, message: '评论成功' });
-  });
-
-  // GET /api/square/posts/:id/comments — 评论列表
+  // GET /api/square/posts/:id/comments — 评论列表（分页 + 楼中楼）
   router.get('/posts/:id/comments', (req, res) => {
     const postId = Number(req.params.id);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+    const offset = (page - 1) * pageSize;
+
+    const total = (db.get('SELECT COUNT(*) AS cnt FROM square_comments WHERE post_id = ?', [postId]) || {}).cnt || 0;
+
     const comments = db.all(`
-      SELECT sc.*, u.nickname AS author_name
+      SELECT sc.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
       FROM square_comments sc
       JOIN users u ON sc.author_id = u.id
       WHERE sc.post_id = ?
       ORDER BY sc.created_at ASC
-    `, [postId]);
-    res.json(comments);
+      LIMIT ? OFFSET ?
+    `, [postId, pageSize, offset]);
+
+    res.json({ comments, total, page, pageSize });
+  });
+
+  // POST /api/square/posts/:id/comments — 发评论 [Auth]（支持图片 + 楼中楼）
+  router.post('/posts/:id/comments', authMiddleware, parseSquareCommentImage, (req, res) => {
+    const postId = Number(req.params.id);
+    const userId = req.user.userId;
+    const { content, parent_id } = req.body;
+    const imageFile = req.file;
+
+    // 至少需要文字或图片
+    if ((!content || !content.trim()) && !imageFile) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: '请输入内容或上传图片' });
+    }
+
+    // 字数限制
+    if (content && content.length > 500) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: '回复内容不能超过 500 字' });
+    }
+
+    const post = db.get('SELECT id, creator_id, title FROM square_posts WHERE id = ?', [postId]);
+    if (!post) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(404).json({ error: '帖子不存在' });
+    }
+
+    // 楼中楼：校验 parent_id
+    let parentId = null;
+    if (parent_id) {
+      parentId = Number(parent_id);
+      const parentComment = db.get('SELECT id, post_id FROM square_comments WHERE id = ?', [parentId]);
+      if (!parentComment || parentComment.post_id !== postId) {
+        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+        return res.status(400).json({ error: '被回复的评论不存在' });
+      }
+    }
+
+    const imageUrl = imageFile ? `/uploads/comment-images/${imageFile.filename}` : '';
+
+    const result = db.run(
+      'INSERT INTO square_comments (post_id, author_id, content, parent_id, image_url) VALUES (?, ?, ?, ?, ?)',
+      [postId, userId, (content || '').trim(), parentId, imageUrl]
+    );
+    db.save();
+
+    // 通知逻辑
+    const commenter = db.get('SELECT nickname FROM users WHERE id = ?', [userId]);
+
+    if (parentId) {
+      // 楼中楼回复：通知被回复的用户
+      const parentComment = db.get('SELECT author_id FROM square_comments WHERE id = ?', [parentId]);
+      if (parentComment && parentComment.author_id !== userId) {
+        createNotification(db, {
+          userId: parentComment.author_id, type: 'new_comment', title: '新回复',
+          message: `${commenter?.nickname || '匿名'} 回复了你的评论`,
+          relatedType: 'square_post', relatedId: postId
+        });
+        db.save();
+      }
+    } else {
+      // 主回复：通知帖子作者
+      if (post.creator_id !== userId) {
+        createNotification(db, {
+          userId: post.creator_id, type: 'new_comment', title: '新评论',
+          message: `${commenter?.nickname || '匿名'} 评论了你的帖子「${post.title}」`,
+          relatedType: 'square_post', relatedId: postId
+        });
+        db.save();
+      }
+    }
+
+    res.status(201).json({
+      id: result.lastInsertRowid,
+      post_id: postId,
+      author_id: userId,
+      content: (content || '').trim(),
+      parent_id: parentId,
+      image_url: imageUrl
+    });
+  });
+
+  // DELETE /api/square/posts/:id/comments/:commentId — 删除自己的回复
+  router.delete('/posts/:id/comments/:commentId', authMiddleware, (req, res) => {
+    const commentId = Number(req.params.commentId);
+    const postId = Number(req.params.id);
+    const userId = req.user.userId;
+
+    const comment = db.get('SELECT * FROM square_comments WHERE id = ? AND post_id = ?', [commentId, postId]);
+    if (!comment) return res.status(404).json({ error: '评论不存在' });
+    if (comment.author_id !== userId) return res.status(403).json({ error: '只能删除自己的回复' });
+
+    // 删除图片文件
+    if (comment.image_url) {
+      const imgPath = path.join(__dirname, '..', comment.image_url);
+      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+    }
+
+    // 软删除：标记为已删除，保留楼层号
+    db.run("UPDATE square_comments SET content = '[已删除]', image_url = '' WHERE id = ?", [commentId]);
+    db.save();
+
+    res.json({ message: '已删除' });
+  });
+
+  // GET /api/square/posts/:id/comments/:commentId/replies — 获取楼中楼回复
+  router.get('/posts/:id/comments/:commentId/replies', (req, res) => {
+    const commentId = Number(req.params.commentId);
+    const replies = db.all(`
+      SELECT sc.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
+      FROM square_comments sc
+      JOIN users u ON sc.author_id = u.id
+      WHERE sc.parent_id = ?
+      ORDER BY sc.created_at ASC
+    `, [commentId]);
+    res.json(replies);
   });
 
   return router;

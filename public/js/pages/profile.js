@@ -42,6 +42,10 @@ let previewMode = false;
 
 const CHECKIN_KEY = 'kedazi_checkin';
 
+function getTodayShanghai() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' });
+}
+
 function saveCheckinState(streak, lastDate) {
   try {
     localStorage.setItem(CHECKIN_KEY, JSON.stringify({ streak, lastDate }));
@@ -189,7 +193,7 @@ function renderProfileCard(data, mode) {
     : `<span class="profile-avatar-letter">${(data.nickname || data.username || '?')[0]}</span>`;
 
   const streak = data.checkin_streak || 0;
-  const checkedInToday = data.last_checkin_date === new Date().toISOString().slice(0, 10);
+  const checkedInToday = data.last_checkin_date === getTodayShanghai();
   const streakBadge = renderStreakBadge(streak, checkedInToday, data.grace_days);
 
   const completion = calcCompletion(data);
@@ -476,7 +480,7 @@ async function handleCheckin() {
   if (result.error) {
     console.warn('[Checkin] 后端签到接口未就绪，使用前端模拟数据');
     const saved = loadCheckinState();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getTodayShanghai();
     if (saved.lastDate === today) {
       result = { streak: saved.streak, alreadyCheckedIn: true };
     } else {
@@ -492,9 +496,10 @@ async function handleCheckin() {
   } else {
     showToast(`签到成功！已连续 ${result.streak} 天`);
     window._currentUser.checkin_streak = result.streak;
-    window._currentUser.last_checkin_date = new Date().toISOString().slice(0, 10);
+    const todayStr = getTodayShanghai();
+    window._currentUser.last_checkin_date = todayStr;
     window._currentUser.grace_days = 0;
-    saveCheckinState(result.streak, new Date().toISOString().slice(0, 10));
+    saveCheckinState(result.streak, todayStr);
   }
 
   btn.disabled = false;
@@ -938,7 +943,7 @@ async function renderEditPage(container) {
       <div class="profile-card">
         <h2 class="profile-section-title">个性资料</h2>
         <div class="md-input-group">
-          <textarea class="md-input" id="edit-avatar-desc" placeholder=" " rows="3" maxlength="200" style="resize:none">${escHtml(data.avatar_desc || '')}</textarea>
+          <textarea class="md-input" id="edit-avatar-desc" placeholder=" " rows="3" maxlength="80" style="resize:none">${escHtml(data.avatar_desc || '')}</textarea>
           <label class="md-label">个人肖像描述</label>
           <fieldset class="md-border" aria-hidden="true"><legend><span>个人肖像描述</span></legend></fieldset>
         </div>

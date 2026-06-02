@@ -146,10 +146,11 @@ module.exports = function (db) {
       }
 
       // --- 写入数据库 ---
+      // 注意：sql.js 的 db.run('BEGIN') 是 no-op，需要通过 db.db.run('BEGIN') 操作底层对象
       let importedCount = 0;
 
-      db.run('BEGIN TRANSACTION');
       try {
+        db.db.run('BEGIN');
         for (const c of parsed) {
           const existing = findExistingCourse(db, c);
 
@@ -177,10 +178,10 @@ module.exports = function (db) {
             importedCount++;
           }
         }
-        db.run('COMMIT');
+        db.db.run('COMMIT');
         db.save();
       } catch (dbErr) {
-        db.run('ROLLBACK');
+        try { db.db.run('ROLLBACK'); } catch { /* ignore rollback error */ }
         throw dbErr;
       }
 

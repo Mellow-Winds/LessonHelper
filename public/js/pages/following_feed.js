@@ -19,7 +19,11 @@ export async function renderFollowingFeed(container) {
     </div>
   `;
 
-  container.addEventListener('click', handleFeedClick);
+  // 防止重复绑定事件监听器
+  if (!container._feedBound) {
+    container.addEventListener('click', handleFeedClick);
+    container._feedBound = true;
+  }
   await loadFollowingFeed();
 }
 

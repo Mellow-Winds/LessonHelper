@@ -21,7 +21,7 @@ module.exports = function (db) {
   }
 
   // POST /api/auth/register — 注册（发送验证码）
-  router.post('/register', (req, res) => {
+  router.post('/register', async (req, res) => {
     const { email, password, nickname, major, grade } = req.body;
 
     if (!email || !password || !nickname) {
@@ -34,6 +34,14 @@ module.exports = function (db) {
 
     if (password.length < 6) {
       return res.status(400).json({ error: '密码至少6位' });
+    }
+
+    if (major && major.length > 50) {
+      return res.status(400).json({ error: '专业名称不能超过50字' });
+    }
+
+    if (grade && grade.length > 20) {
+      return res.status(400).json({ error: '年级不能超过20字' });
     }
 
     // 检查邮箱是否已注册
@@ -51,21 +59,30 @@ module.exports = function (db) {
       );
       db.save();
 
-      sendVerificationCode(email, code).then(result => {
+      try {
+        const result = await sendVerificationCode(email, code);
         if (!result.success) {
           return res.status(500).json({ error: '验证码发送失败: ' + result.error });
         }
-        res.json({ message: '验证码已重新发送至 ' + email, debug_code: code });
-      });
+        res.json({ message: '验证码已重新发送至 ' + email });
+      } catch (e) {
+        console.error('验证码发送异常:', e);
+        res.status(500).json({ error: '验证码发送失败，请稍后重试' });
+      }
       return;
     }
 
-    // 新用户注册
-    const password_hash = bcrypt.hashSync(password, SALT_ROUNDS);
+    // 新用户注册：先发验证码，成功后再写库
     const code = generateCode();
     const expires = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
     try {
+      const sendResult = await sendVerificationCode(email, code);
+      if (!sendResult.success) {
+        return res.status(500).json({ error: '验证码发送失败: ' + sendResult.error });
+      }
+
+      const password_hash = bcrypt.hashSync(password, SALT_ROUNDS);
       const result = db.run(
         `INSERT INTO users (username, display_name, email, password_hash, nickname, major, grade, verification_code, verification_code_expires, email_verified)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
@@ -73,16 +90,9 @@ module.exports = function (db) {
       );
       db.save();
 
-      // 发送验证码邮件
-      sendVerificationCode(email, code).then(sendResult => {
-        if (!sendResult.success) {
-          return res.status(500).json({ error: '验证码发送失败: ' + sendResult.error });
-        }
-        console.log(`[Auth] 注册: ${email}, 验证码: ${code}`);
-        res.status(201).json({
-          message: '验证码已发送至 ' + email + '，请查收邮件完成验证',
-          debug_code: code  // 开发环境返回验证码，生产环境删除此行
-        });
+      console.log(`[Auth] 注册: ${email}, 验证码: ${code}`);
+      res.status(201).json({
+        message: '验证码已发送至 ' + email + '，请查收邮件完成验证'
       });
     } catch (e) {
       console.error('注册失败:', e);
@@ -194,7 +204,10 @@ module.exports = function (db) {
       if (!result.success) {
         return res.status(500).json({ error: '验证码发送失败: ' + result.error });
       }
-      res.json({ message: '验证码已重新发送至 ' + email, debug_code: code });
+      res.json({ message: '验证码已重新发送至 ' + email });
+    }).catch(e => {
+      console.error('验证码发送异常:', e);
+      res.status(500).json({ error: '验证码发送失败，请稍后重试' });
     });
   });
 
@@ -265,7 +278,8 @@ module.exports = function (db) {
       return res.status(404).json({ error: '用户不存在' });
     }
 
-    const today = req.body.date || new Date().toISOString().slice(0, 10);
+    // 使用 UTC+8 时区计算今日日期
+    const today = req.body.date || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' });
 
     // 已经今天签到过了
     if (user.last_checkin_date === today) {
