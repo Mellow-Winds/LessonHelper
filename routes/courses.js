@@ -56,6 +56,44 @@ function toAttachmentResponse(attachment) {
   };
 }
 
+// 评论图片上传配置（单张，JPG/PNG，≤1MB）
+const COMMENT_IMAGE_DIR = path.join(__dirname, '..', 'uploads', 'comment-images');
+const COMMENT_IMAGE_MAX = 1 * 1024 * 1024;
+const COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png']);
+
+const commentImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(COMMENT_IMAGE_DIR, { recursive: true });
+      cb(null, COMMENT_IMAGE_DIR);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: COMMENT_IMAGE_MAX, files: 1 },
+  fileFilter: (req, file, cb) => {
+    try { file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8'); } catch {}
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, COMMENT_IMAGE_EXT.has(ext));
+  },
+});
+
+function parseCommentImage(req, res, next) {
+  if (!req.is('multipart/form-data')) return next();
+  commentImageUpload.single('image')(req, res, (error) => {
+    if (!error) return next();
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    const message = error.code === 'LIMIT_FILE_SIZE'
+      ? '图片不能超过 1MB'
+      : error.code === 'LIMIT_FILE_COUNT'
+        ? '只能上传一张图片'
+        : '仅支持 JPG、PNG 格式';
+    res.status(400).json({ error: message });
+  });
+}
+
 module.exports = function (db) {
   const router = express.Router();
 
@@ -347,53 +385,141 @@ module.exports = function (db) {
     res.sendFile(path.join(POST_ATTACHMENT_DIR, attachment.file_path));
   });
 
-  // GET /api/courses/posts/:postId/comments — 评论列表
+  // GET /api/courses/posts/:postId/comments — 评论列表（分页 + 楼中楼）
   router.get('/posts/:postId/comments', (req, res) => {
+    const postId = Number(req.params.postId);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+    const offset = (page - 1) * pageSize;
+
+    const total = (db.get('SELECT COUNT(*) AS cnt FROM comments WHERE post_id = ?', [postId]) || {}).cnt || 0;
+
     const comments = db.all(`
-      SELECT c.*, u.nickname AS author_name
+      SELECT c.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
       FROM comments c
       JOIN users u ON c.author_id = u.id
       WHERE c.post_id = ?
       ORDER BY c.created_at ASC
-    `, [Number(req.params.postId)]);
-    res.json(comments);
+      LIMIT ? OFFSET ?
+    `, [postId, pageSize, offset]);
+
+    res.json({ comments, total, page, pageSize });
   });
 
-  // POST /api/courses/posts/:postId/comments — 发评论 [Auth]
-  router.post('/posts/:postId/comments', authMiddleware, (req, res) => {
-    const { content } = req.body;
-    if (!content) {
-      return res.status(400).json({ error: 'content 为必填项' });
+  // POST /api/courses/posts/:postId/comments — 发评论 [Auth]（支持图片 + 楼中楼）
+  router.post('/posts/:postId/comments', authMiddleware, parseCommentImage, (req, res) => {
+    const { content, parent_id } = req.body;
+    const imageFile = req.file;
+
+    // 至少需要文字或图片
+    if ((!content || !content.trim()) && !imageFile) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: '请输入内容或上传图片' });
+    }
+
+    // 字数限制
+    if (content && content.length > 500) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: '回复内容不能超过 500 字' });
     }
 
     const postId = Number(req.params.postId);
     const post = db.get('SELECT id FROM posts WHERE id = ?', [postId]);
-    if (!post) return res.status(404).json({ error: '帖子不存在' });
+    if (!post) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(404).json({ error: '帖子不存在' });
+    }
+
+    // 楼中楼：校验 parent_id
+    let parentId = null;
+    if (parent_id) {
+      parentId = Number(parent_id);
+      const parentComment = db.get('SELECT id, post_id FROM comments WHERE id = ?', [parentId]);
+      if (!parentComment || parentComment.post_id !== postId) {
+        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+        return res.status(400).json({ error: '被回复的评论不存在' });
+      }
+    }
+
+    const imageUrl = imageFile ? `/uploads/comment-images/${imageFile.filename}` : '';
 
     const result = db.run(
-      'INSERT INTO comments (post_id, author_id, content) VALUES (?, ?, ?)',
-      [postId, req.user.userId, content]
+      'INSERT INTO comments (post_id, author_id, content, parent_id, image_url) VALUES (?, ?, ?, ?, ?)',
+      [postId, req.user.userId, (content || '').trim(), parentId, imageUrl]
     );
     db.save();
 
-    // 通知：帖子有新评论（通知帖子作者）
-    const postDetail = db.get('SELECT author_id, title, course_id FROM posts WHERE id = ?', [postId]);
+    // 通知逻辑
     const commenter = db.get('SELECT nickname FROM users WHERE id = ?', [req.user.userId]);
-    if (postDetail && postDetail.author_id !== req.user.userId) {
-      createNotification(db, {
-        userId: postDetail.author_id, type: 'new_comment', title: '新评论',
-        message: `${commenter?.nickname || '匿名'} 评论了你的帖子「${postDetail.title}」`,
-        relatedType: 'post', relatedId: postId, courseId: postDetail.course_id
-      });
-      db.save();
+
+    if (parentId) {
+      // 楼中楼回复：通知被回复的用户
+      const parentComment = db.get('SELECT author_id FROM comments WHERE id = ?', [parentId]);
+      if (parentComment && parentComment.author_id !== req.user.userId) {
+        createNotification(db, {
+          userId: parentComment.author_id, type: 'new_comment', title: '新回复',
+          message: `${commenter?.nickname || '匿名'} 回复了你的评论`,
+          relatedType: 'post', relatedId: postId
+        });
+        db.save();
+      }
+    } else {
+      // 主回复：通知帖子作者
+      const postDetail = db.get('SELECT author_id, title, course_id FROM posts WHERE id = ?', [postId]);
+      if (postDetail && postDetail.author_id !== req.user.userId) {
+        createNotification(db, {
+          userId: postDetail.author_id, type: 'new_comment', title: '新评论',
+          message: `${commenter?.nickname || '匿名'} 评论了你的帖子「${postDetail.title}」`,
+          relatedType: 'post', relatedId: postId, courseId: postDetail.course_id
+        });
+        db.save();
+      }
     }
 
     res.status(201).json({
       id: result.lastInsertRowid,
       post_id: postId,
       author_id: req.user.userId,
-      content
+      content: (content || '').trim(),
+      parent_id: parentId,
+      image_url: imageUrl
     });
+  });
+
+  // DELETE /api/courses/posts/:postId/comments/:commentId — 删除自己的回复
+  router.delete('/posts/:postId/comments/:commentId', authMiddleware, (req, res) => {
+    const commentId = Number(req.params.commentId);
+    const postId = Number(req.params.postId);
+    const userId = req.user.userId;
+
+    const comment = db.get('SELECT * FROM comments WHERE id = ? AND post_id = ?', [commentId, postId]);
+    if (!comment) return res.status(404).json({ error: '评论不存在' });
+    if (comment.author_id !== userId) return res.status(403).json({ error: '只能删除自己的回复' });
+
+    // 删除图片文件
+    if (comment.image_url) {
+      const imgPath = path.join(__dirname, '..', comment.image_url);
+      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+    }
+
+    // 软删除：标记为已删除，保留楼层号
+    db.run("UPDATE comments SET content = '[已删除]', image_url = '' WHERE id = ?", [commentId]);
+    db.save();
+
+    res.json({ message: '已删除' });
+  });
+
+  // GET /api/courses/posts/:postId/comments/:commentId/replies — 获取楼中楼回复
+  router.get('/posts/:postId/comments/:commentId/replies', (req, res) => {
+    const commentId = Number(req.params.commentId);
+    const replies = db.all(`
+      SELECT c.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
+      FROM comments c
+      JOIN users u ON c.author_id = u.id
+      WHERE c.parent_id = ?
+      ORDER BY c.created_at ASC
+    `, [commentId]);
+    res.json(replies);
   });
 
   return router;
