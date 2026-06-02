@@ -120,11 +120,6 @@
 - **问题**: `container.addEventListener('click', handleFeedClick)` 在每次 `renderFollowingFeed` 调用时都执行，但从不移除。如果用户多次切换到"关注动态" Tab，同一个容器上会叠加多个相同的事件监听器，导致点击一次触发多次导航。
 - **修复**: 用 `container.removeEventListener` 先移除旧监听器，或用 `{ once: true }` 标志，或在容器上设置 `_feedBound` 防重复绑定（类似 invites.js 的做法）。
 
-### BUG-22: `favorites.js` 的 `lastChild` 取值可能取到空白文本节点
-- **文件**: `public/js/pages/favorites.js:43`
-- **问题**: `button.lastChild.textContent = favorited ? '已收藏' : '收藏'` — 按钮 HTML 模板中 `<span class="mi">` 和文字之间有换行，`lastChild` 可能是空白文本节点而非文字节点，导致修改无效。
-- **修复**: 给文字加 `<span class="favorite-label">`，用 `querySelector` 取值。
-
 ---
 
 ## 📊 统计
@@ -133,8 +128,8 @@
 |--------|------|
 | 🔴 严重 | 5 |
 | 🟡 中等 | 7 |
-| 🟢 轻微 | 10 |
-| **合计** | **22** |
+| 🟢 轻微 | 9 |
+| **合计** | **21** |
 
 ---
 
