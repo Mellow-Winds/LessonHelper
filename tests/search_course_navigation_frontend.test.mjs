@@ -14,5 +14,5 @@ test('search results use course-aware navigation for courses, materials, and pos
 test('plaza navigation resolves a course id to its aggregate course index', () => {
   assert.match(plazaSource, /export async function navigateToPlazaCourseById/);
   assert.match(plazaSource, /item\.courseIds\.includes\(Number\(courseId\)\)/);
-  assert.match(plazaSource, /navigateTo\('plaza-course', idx\)/);
+  assert.match(plazaSource, /navigateTo\('plaza-course', Number\(courseId\)\)/);
 });
