@@ -23,8 +23,8 @@ module.exports = function (db) {
         FROM courses c
         WHERE c.title LIKE ? OR c.description LIKE ? OR c.teacher LIKE ?
         ORDER BY c.created_at DESC
-        LIMIT ?
-      `, [keyword, keyword, keyword, limit]);
+        LIMIT ? OFFSET ?
+      `, [keyword, keyword, keyword, limit, offset]);
     }
 
     if (type === 'all' || type === 'materials') {
@@ -36,8 +36,8 @@ module.exports = function (db) {
         JOIN users u ON m.uploader_id = u.id
         WHERE m.title LIKE ? OR m.description LIKE ? OR m.chapter LIKE ?
         ORDER BY m.created_at DESC
-        LIMIT ?
-      `, [keyword, keyword, keyword, limit]);
+        LIMIT ? OFFSET ?
+      `, [keyword, keyword, keyword, limit, offset]);
     }
 
     if (type === 'all' || type === 'posts') {
@@ -49,8 +49,8 @@ module.exports = function (db) {
         JOIN users u ON p.author_id = u.id
         WHERE p.title LIKE ? OR p.content LIKE ?
         ORDER BY p.created_at DESC
-        LIMIT ?
-      `, [keyword, keyword, limit]);
+        LIMIT ? OFFSET ?
+      `, [keyword, keyword, limit, offset]);
     }
 
     if (type === 'all' || type === 'squarePosts') {
@@ -64,8 +64,8 @@ module.exports = function (db) {
           AND sp.expires_at > datetime('now')
           AND sp.status != 'expired'
         ORDER BY sp.created_at DESC
-        LIMIT ?
-      `, [keyword, keyword, limit]);
+        LIMIT ? OFFSET ?
+      `, [keyword, keyword, limit, offset]);
     }
 
     const total = (results.courses?.length || 0)
