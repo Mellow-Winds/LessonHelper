@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-**课搭子**（LessonHelper）是一个面向大学生的同课程学习互助平台。核心功能包括：用户系统、课程管理、学习资料共享、自习邀约、交友广场、消息通知、全局搜索。品牌以南京大学蓝鲸文化为背景。
+**课搭子**（LessonHelper）是一个面向大学生的同课程学习互助平台。核心功能包括：用户系统、课程管理、学习资料共享、自习邀约、交友广场、消息通知、全局搜索、收藏系统、关注动态。品牌以南京大学蓝鲸文化为背景。
 
 ## 技术栈
 
@@ -17,6 +17,7 @@
 | 设计系统 | Material Design 3（自定义 CSS） |
 | Markdown | markdown-it（本地副本） |
 | 图标 | Material Icons + Remix Icon |
+| 测试 | node:test（13 个测试文件） |
 
 ## 项目结构
 
@@ -38,20 +39,22 @@ Lessonhelper/
 │   └── api-spec.md              #   API 接口规范
 ├── devlog/                      # 📝 开发日志（每天一个文件）
 ├── todolist/                    # 📋 待规划功能清单
+├── tests/                       # 🧪 自动化测试（node:test）
 ├── db/                          # SQLite 数据库文件
-├── routes/                      # 后端路由（10 个文件）
-│   ├── auth.js                  #   注册/登录/个人信息/签到
+├── routes/                      # 后端路由（11 个文件）
+│   ├── auth.js                  #   注册/登录/个人信息/签到/数据导出
 │   ├── courses.js               #   课程/帖子/评论/成员
-│   ├── user.js                  #   用户公开名片/关注/反馈
+│   ├── user.js                  #   用户公开名片/关注/反馈/关注动态
 │   ├── schedule.js              #   课表导入
 │   ├── materials.js             #   学习资料上传/下载/评分
 │   ├── invites.js               #   自习邀约
 │   ├── notifications.js         #   消息通知
 │   ├── search.js                #   全局搜索
 │   ├── square.js                #   交友广场
-│   ├── my_posts.js              #   我的创作
+│   ├── favorites.js             #   收藏（课程/帖子）
+│   ├── my_posts.js              #   我的发布
 │   └── middleware/
-│       ├── auth.js              #   JWT 中间件
+│       ├── auth.js              #   JWT 中间件（含 optionalAuth）
 │       └── email.js             #   Resend 邮件服务
 ├── public/                      # 前端静态文件
 │   ├── index.html               #   SPA 入口
@@ -67,21 +70,25 @@ Lessonhelper/
 │           ├── auth.js          #   登录/注册 + 搜索页
 │           ├── profile.js       #   个人中心（三栖视角 + 签到 + 关注）
 │           ├── notifications.js #   通知中心
-│           ├── my_posts.js      #   我的创作
+│           ├── favorites.js     #   我的收藏
+│           ├── following_feed.js #  关注动态
+│           ├── my_posts.js      #   我的发布
 │           ├── explore.js       #   探索页入口
 │           ├── explore/
 │           │   ├── invites.js   #   自习邀约
 │           │   ├── square.js    #   交友广场
 │           │   └── posts.js     #   统一发布页
-│           └── courses/
-│               ├── my_courses.js #   我的课程（导入/列表/详情）
-│               ├── plaza.js     #   课程广场（大课聚合）
-│               └── publish.js   #   发布（富文本+附件）
+│           ├── courses/
+│           │   ├── my_courses.js #   我的课程（导入/列表/详情）
+│           │   ├── plaza.js     #   课程广场（大课聚合）
+│           │   ├── publish.js   #   发布（富文本+附件）
+│           │   └── post_attachments.js # 帖子附件预览
+│           └── notification_routes.mjs # 通知点击路由
 └── uploads/                     # 上传文件存储
     └── materials/               #   学习资料文件
 ```
 
-## 数据库表（15 张）
+## 数据库表（18 张）
 
 | 表名 | 说明 |
 |------|------|
@@ -100,6 +107,9 @@ Lessonhelper/
 | square_comments | 广场评论 |
 | follows | 关注关系 |
 | feedback | 问题反馈 |
+| favorite_courses | 课程收藏 |
+| favorite_posts | 帖子收藏 |
+| post_attachments | 帖子附件 |
 
 ## 文档索引
 
@@ -112,6 +122,8 @@ Lessonhelper/
 | API怎么调用 | [docs/api-spec.md](docs/api-spec.md) |
 | 今天的进度 | [devlog/](devlog/) 最新文件 |
 | 样式规则 | [themerules](themerules) |
+| 待办事项 | [todolist/](todolist/) |
+| 测试文件 | [tests/](tests/) |
 
 ## 开发规则
 
@@ -143,4 +155,4 @@ npm run dev          # 启动服务器 http://localhost:3000
 
 ---
 
-> 创建于 2026-05-30 | 最后更新：2026-06-01
+> 创建于 2026-05-30 | 最后更新：2026-06-02
