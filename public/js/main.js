@@ -105,6 +105,11 @@ import {
 import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
   openImportModal, handleAgreeAndImport, handleScheduleImport,
+  switchMyCourseTab, toggleComments,
+  refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
+  openUploadMaterialModal, onFileSelected, handleUploadMaterial,
+  filterMyMembers, filterMyMembersTab,
+  handlePortalToPlaza,
 } from './pages/courses/my_courses.js';
 
 import {
@@ -129,7 +134,7 @@ import {
 } from './pages/explore/invites.js';
 import {
   refreshSquarePosts,
-  submitSquareInterest, handleSquareInterest, submitSquareComment,
+  submitSquareInterest, handleSquareInterest,
   switchSquareMyTab,
 } from './pages/explore/square.js';
 
@@ -226,7 +231,6 @@ Object.assign(window, {
   showPublishBlockedToast,
   switchDetailTab,
   toggleComments,
-  handleAddComment,
   refreshMyMaterials,
   rateMyMaterial,
   deleteMyMaterial,
@@ -248,7 +252,6 @@ Object.assign(window, {
   refreshSquarePosts,
   submitSquareInterest,
   handleSquareInterest,
-  submitSquareComment,
   switchSquareMyTab,
 });
 

@@ -228,6 +228,40 @@ UNIQUE(follower_id, following_id)
 | contact | TEXT | '' | 联系方式 |
 | created_at | DATETIME | CURRENT_TIMESTAMP | 提交时间 |
 
+### favorite_courses
+
+| 列名 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| id | INTEGER PK | AUTO | 主键 |
+| user_id | INTEGER | — | 用户 ID |
+| course_id | INTEGER | — | 课程 ID |
+| created_at | DATETIME | CURRENT_TIMESTAMP | 收藏时间 |
+
+UNIQUE(user_id, course_id)
+
+### favorite_posts
+
+| 列名 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| id | INTEGER PK | AUTO | 主键 |
+| user_id | INTEGER | — | 用户 ID |
+| post_id | INTEGER | — | 帖子 ID |
+| created_at | DATETIME | CURRENT_TIMESTAMP | 收藏时间 |
+
+UNIQUE(user_id, post_id)
+
+### post_attachments
+
+| 列名 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| id | INTEGER PK | AUTO | 主键 |
+| post_id | INTEGER | — | 帖子 ID |
+| file_path | TEXT | — | 存储文件名 |
+| file_name | TEXT | — | 原始文件名 |
+| file_type | TEXT | — | 文件类型 |
+| file_size | INTEGER | 0 | 文件大小（字节） |
+| created_at | DATETIME | CURRENT_TIMESTAMP | 上传时间 |
+
 ---
 
 ## API 设计规范
@@ -236,6 +270,7 @@ UNIQUE(follower_id, following_id)
 - JWT Token，Header：`Authorization: Bearer <token>`
 - Token 有效期：7 天
 - 需要认证的端点标注 `[Auth]`
+- `optionalAuthMiddleware`：公开接口可识别已登录用户，但不强制要求登录
 
 ### 响应格式
 - 成功：返回数据对象或数组，HTTP 2xx
@@ -246,6 +281,7 @@ UNIQUE(follower_id, following_id)
 2. author_id/owner_id 从 JWT 提取，不从请求体获取
 3. SQL 参数化查询
 4. 所有输入验证
+5. 详细安全审计见 [todolist/security.md](../todolist/security.md)
 
 ---
 
@@ -257,7 +293,8 @@ UNIQUE(follower_id, following_id)
 - API 封装自动附加 Authorization header
 - 通知轮询：每 30 秒检查未读数
 - 样式遵循 [themerules](../themerules)
+- 测试框架：`node:test`，13 个测试文件在 `tests/` 目录
 
 ---
 
-> 最后更新：2026-06-01
+> 最后更新：2026-06-02

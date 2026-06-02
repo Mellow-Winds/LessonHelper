@@ -112,17 +112,7 @@ module.exports = function (db) {
     res.json({ materials: db.all(sql, params), total, page: Number(page), pageSize: Number(pageSize) });
   });
 
-  // GET /api/materials/:id — 资料详情
-  router.get('/:id', (req, res) => {
-    const material = db.get(
-      'SELECT m.*, u.nickname AS uploader_name FROM materials m JOIN users u ON m.uploader_id = u.id WHERE m.id = ?',
-      [Number(req.params.id)]
-    );
-    if (!material) return res.status(404).json({ error: '资料不存在' });
-    res.json(material);
-  });
-
-  // GET /api/materials/:id/download — 下载文件
+  // GET /api/materials/:id/download — 下载文件（必须在 /:id 之前）
   router.get('/:id/download', (req, res) => {
     const material = db.get('SELECT * FROM materials WHERE id = ?', [Number(req.params.id)]);
     if (!material) return res.status(404).json({ error: '资料不存在' });
@@ -141,7 +131,7 @@ module.exports = function (db) {
     res.sendFile(filePath);
   });
 
-  // POST /api/materials/:id/rate — 评分 [Auth]
+  // POST /api/materials/:id/rate — 评分 [Auth]（必须在 /:id 之前）
   router.post('/:id/rate', authMiddleware, (req, res) => {
     const materialId = Number(req.params.id);
     const userId = req.user.userId;
@@ -166,7 +156,7 @@ module.exports = function (db) {
     res.json({ message: '评分成功', avg_rating: Math.round(stats.avg * 10) / 10, rating_count: stats.cnt });
   });
 
-  // DELETE /api/materials/:id — 删除资料 [Auth, 仅上传者]
+  // DELETE /api/materials/:id — 删除资料 [Auth, 仅上传者]（必须在 /:id 之前）
   router.delete('/:id', authMiddleware, (req, res) => {
     const material = db.get('SELECT * FROM materials WHERE id = ?', [Number(req.params.id)]);
     if (!material) return res.status(404).json({ error: '资料不存在' });
@@ -178,6 +168,16 @@ module.exports = function (db) {
     db.run('DELETE FROM materials WHERE id = ?', [material.id]);
     db.save();
     res.json({ message: '删除成功' });
+  });
+
+  // GET /api/materials/:id — 资料详情（通用兜底，必须在最后）
+  router.get('/:id', (req, res) => {
+    const material = db.get(
+      'SELECT m.*, u.nickname AS uploader_name FROM materials m JOIN users u ON m.uploader_id = u.id WHERE m.id = ?',
+      [Number(req.params.id)]
+    );
+    if (!material) return res.status(404).json({ error: '资料不存在' });
+    res.json(material);
   });
 
   return router;

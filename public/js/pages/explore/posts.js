@@ -269,7 +269,7 @@ async function renderInviteForm(formEl) {
     if (Array.isArray(courses)) {
       courseOptions = [
         { text: '不关联课程', value: '' },
-        ...courses.map(c => ({ text: c.name || c.course_name || `课程${c.id}`, value: String(c.id) })),
+        ...courses.map(c => ({ text: c.title || `课程${c.id}`, value: String(c.id) })),
       ];
     }
   } catch { /* fallback to empty */ }
@@ -319,6 +319,7 @@ async function handleInviteSubmit(e) {
   e.preventDefault();
   const errEl = document.getElementById('post-invite-error');
 
+  const courseId = document.getElementById('invite-course')?.value || '';
   const data = {
     title: document.getElementById('invite-title')?.value?.trim() || '',
     description: document.getElementById('invite-requirements')?.value?.trim() || '',
@@ -327,6 +328,7 @@ async function handleInviteSubmit(e) {
     end_time: document.getElementById('invite-end')?.value || '',
     location: document.getElementById('invite-location')?.value?.trim() || '',
     max_participants: 4,
+    ...(courseId ? { course_id: Number(courseId) } : {}),
   };
 
   if (!data.title) {

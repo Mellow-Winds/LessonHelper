@@ -54,6 +54,7 @@ async function start() {
 
   fs.mkdirSync(path.join(__dirname, 'db'), { recursive: true });
   fs.mkdirSync(path.join(__dirname, 'uploads', 'materials'), { recursive: true });
+  fs.mkdirSync(path.join(__dirname, 'uploads', 'comment-images'), { recursive: true });
 
   let sqlDb;
   if (fs.existsSync(DB_PATH)) {
@@ -133,6 +134,10 @@ async function start() {
   migrateTable('users', 'grace_days', "INTEGER DEFAULT 0");
   migrateTable('courses', 'semester', "TEXT DEFAULT ''");
   migrateTable('courses', 'teacher', "TEXT DEFAULT ''");
+  migrateTable('comments', 'parent_id', 'INTEGER');
+  migrateTable('comments', 'image_url', "TEXT DEFAULT ''");
+  migrateTable('square_comments', 'parent_id', 'INTEGER');
+  migrateTable('square_comments', 'image_url', "TEXT DEFAULT ''");
 
   // New table: user_courses (many-to-many enrollment)
   db.run(`CREATE TABLE IF NOT EXISTS user_courses (
@@ -321,6 +326,7 @@ async function start() {
   // --- Middleware ---
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
   // --- API Routes ---
   const coursesRouter = require('./routes/courses')(db);

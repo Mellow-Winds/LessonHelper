@@ -11,12 +11,15 @@ export function clearToken() { localStorage.removeItem(AUTH_KEY); }
 export function isLoggedIn() { return !!getToken(); }
 
 /** 通用 401 处理：清除无效 token */
-function handle401(res) {
+async function handle401(res) {
   if (res.status === 401) {
     clearToken();
     window._currentUser = null;
   }
-  return res.json();
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('json')) return res.json();
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return text || {}; }
 }
 
 export async function apiGet(url) {
