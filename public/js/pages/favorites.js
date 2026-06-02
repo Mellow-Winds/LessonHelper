@@ -19,8 +19,7 @@ export function renderCourseFavoriteButton(courseId, isFavorited) {
   return `
     <button class="btn btn-secondary btn-compact favorite-btn${isFavorited ? ' favorited' : ''}"
       onclick="event.stopPropagation();toggleCourseFavorite(${courseId}, this)">
-      <span class="mi">${isFavorited ? 'bookmark' : 'bookmark_border'}</span>
-      ${isFavorited ? '已收藏' : '收藏'}
+      <span class="mi">${isFavorited ? 'bookmark' : 'bookmark_border'}</span><span class="favorite-label">${isFavorited ? '已收藏' : '收藏'}</span>
     </button>
   `;
 }
@@ -29,8 +28,7 @@ export function renderPostFavoriteButton(postId, isFavorited) {
   return `
     <button class="btn btn-secondary btn-compact favorite-btn${isFavorited ? ' favorited' : ''}"
       onclick="event.stopPropagation();togglePostFavorite(${postId}, this)">
-      <span class="mi">${isFavorited ? 'bookmark' : 'bookmark_border'}</span>
-      ${isFavorited ? '已收藏' : '收藏'}
+      <span class="mi">${isFavorited ? 'bookmark' : 'bookmark_border'}</span><span class="favorite-label">${isFavorited ? '已收藏' : '收藏'}</span>
     </button>
   `;
 }
@@ -40,7 +38,7 @@ async function toggleFavorite(type, id, button) {
   const setState = (favorited) => {
     button.classList.toggle('favorited', favorited);
     button.querySelector('.mi').textContent = favorited ? 'bookmark' : 'bookmark_border';
-    button.lastChild.textContent = favorited ? '已收藏' : '收藏';
+    button.querySelector('.favorite-label').textContent = favorited ? '已收藏' : '收藏';
   };
   setState(!wasFavorited);
   const url = `/api/favorites/${type}/${id}`;

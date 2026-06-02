@@ -938,7 +938,7 @@ async function renderEditPage(container) {
       <div class="profile-card">
         <h2 class="profile-section-title">个性资料</h2>
         <div class="md-input-group">
-          <textarea class="md-input" id="edit-avatar-desc" placeholder=" " rows="3" maxlength="200" style="resize:none">${escHtml(data.avatar_desc || '')}</textarea>
+          <textarea class="md-input" id="edit-avatar-desc" placeholder=" " rows="3" maxlength="80" style="resize:none">${escHtml(data.avatar_desc || '')}</textarea>
           <label class="md-label">个人肖像描述</label>
           <fieldset class="md-border" aria-hidden="true"><legend><span>个人肖像描述</span></legend></fieldset>
         </div>

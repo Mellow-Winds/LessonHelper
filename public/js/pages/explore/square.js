@@ -182,11 +182,14 @@ export async function renderSquarePost(container, postId) {
     bindRipples(container);
     animIn(container.querySelector('.card'), { y: 16, dur: 380 });
 
-    // 评论提交事件委托
-    container.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-action="submit-comment"]');
-      if (btn) submitSquareComment(Number(btn.dataset.postId));
-    });
+    // 评论提交事件委托（防重复绑定）
+    if (!container._squareCommentBound) {
+      container.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action="submit-comment"]');
+        if (btn) submitSquareComment(Number(btn.dataset.postId));
+      });
+      container._squareCommentBound = true;
+    }
 
     loadSquareComments(postId);
   } catch (e) {
