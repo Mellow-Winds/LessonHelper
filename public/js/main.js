@@ -219,7 +219,6 @@ Object.assign(window, {
   handleScheduleImport,
   switchMyCourseTab,
   toggleComments,
-  handleAddComment,
   refreshMyMaterials,
   rateMyMaterial,
   deleteMyMaterial,
