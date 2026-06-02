@@ -551,6 +551,12 @@ registerPage('search', async (container, data) => {
     btn.addEventListener('click', () => switchSearchTab(btn.dataset.tab));
   });
 
+  // 绑定搜索历史按钮（事件委托）
+  container.addEventListener('click', (e) => {
+    const hBtn = e.target.closest('.search-history-btn');
+    if (hBtn) navigateTo('search', { q: hBtn.dataset.q });
+  });
+
   // 自动聚焦搜索输入框
   const searchInput = container.querySelector('#search-page-input');
   if (searchInput) searchInput.focus();
@@ -570,7 +576,7 @@ registerPage('search', async (container, data) => {
             <span style="font-size:14px;font-weight:500">最近搜索</span>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px">
-            ${history.map(h => `<button class="btn btn-outline" style="font-size:13px;padding:6px 14px" onclick="navigateTo('search',{q:'${h.replace(/'/g, "\\'")}'})">${escHtml(h)}</button>`).join('')}
+            ${history.map(h => `<button class="btn btn-outline search-history-btn" style="font-size:13px;padding:6px 14px" data-q="${escHtml(h)}">${escHtml(h)}</button>`).join('')}
           </div>
         </div>
       `;

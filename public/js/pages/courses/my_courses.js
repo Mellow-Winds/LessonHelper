@@ -385,6 +385,7 @@ export async function handleLeaveCourse(courseId) {
 window._myCourseSpace = {};
 
 registerPage('mycourse-detail', async (container, courseId) => {
+  loadedComments = {}; // 切换课程时清空评论缓存
   container.innerHTML = `<div class="card"><p class="text-secondary">加载中...</p></div>`;
 
   try {

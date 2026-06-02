@@ -124,8 +124,8 @@ function renderPlazaList(list) {
     return;
   }
 
-  listEl.innerHTML = list.map((item, idx) => `
-    <div class="card mb-4 clickable plaza-course-card" onclick="navigateTo('plaza-course', ${idx})">
+  listEl.innerHTML = list.map((item) => `
+    <div class="card mb-4 clickable plaza-course-card" onclick="navigateTo('plaza-course', ${item.courseIds[0]})">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="flex:1;min-width:0">
           <h3 class="card-title">${escHtml(item.name)}</h3>
@@ -163,10 +163,16 @@ export function filterPlazaCourses(query) {
 
 window._plazaSpace = {};
 
-registerPage('plaza-course', async (container, dataIdx) => {
+registerPage('plaza-course', async (container, courseIdOrIdx) => {
   await loadPlazaDataOnce();
 
-  const bigCourse = _bigCoursesList[dataIdx];
+  // 兼容：支持 courseId 或索引（旧版）
+  let bigCourse;
+  if (typeof courseIdOrIdx === 'number' && courseIdOrIdx < _bigCoursesList.length && _bigCoursesList[courseIdOrIdx]?.courseIds) {
+    bigCourse = _bigCoursesList[courseIdOrIdx];
+  } else {
+    bigCourse = _bigCoursesList.find(item => item.courseIds.includes(Number(courseIdOrIdx)));
+  }
   if (!bigCourse) {
     container.innerHTML = `
       <div class="card" style="text-align:center;padding:48px">
