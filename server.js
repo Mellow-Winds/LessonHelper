@@ -138,6 +138,8 @@ async function start() {
   migrateTable('comments', 'image_url', "TEXT DEFAULT ''");
   migrateTable('square_comments', 'parent_id', 'INTEGER');
   migrateTable('square_comments', 'image_url', "TEXT DEFAULT ''");
+  migrateTable('square_posts', 'course_id', 'INTEGER');
+  db.run('CREATE INDEX IF NOT EXISTS idx_square_posts_course_id ON square_posts(course_id)');
 
   // New table: user_courses (many-to-many enrollment)
   db.run(`CREATE TABLE IF NOT EXISTS user_courses (

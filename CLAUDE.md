@@ -100,7 +100,7 @@ Lessonhelper/
 | study_invites | 自习邀约 |
 | study_invite_responses | 邀约响应 |
 | notifications | 消息通知 |
-| square_posts | 交友广场帖子（7天过期） |
+| square_posts | 交友广场帖子（7天过期，course_id 课程作用域） |
 | square_interests | 广场感兴趣记录 |
 | square_comments | 广场评论 |
 | follows | 关注关系 |

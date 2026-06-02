@@ -366,6 +366,55 @@ Body: `{ "content" }`
 
 ---
 
+## 9.1 课程搭子帖 `/api/courses/:id/square-posts`
+
+课程作用域的搭子帖，需选课权限。
+
+### 发布搭子帖 [Auth]
+```
+POST /api/courses/:id/square-posts
+```
+Body: `{ "title", "category", "description", "max_people" }`
+
+### 课程搭子帖列表 [Auth]
+```
+GET /api/courses/:id/square-posts?category=考研搭子
+```
+
+### 帖子详情 [Auth]
+```
+GET /api/courses/:id/square-posts/:postId
+```
+
+### 删除帖子 [Auth]
+```
+DELETE /api/courses/:id/square-posts/:postId
+```
+
+### 表示感兴趣 [Auth]
+```
+POST /api/courses/:id/square-posts/:postId/interest
+```
+
+### 接受/拒绝 [Auth]
+```
+PUT /api/courses/:id/square-interests/:interestId
+```
+Body: `{ "action": "accept" | "reject" }`
+
+### 评论列表
+```
+GET /api/courses/:id/square-posts/:postId/comments
+```
+
+### 发评论 [Auth]
+```
+POST /api/courses/:id/square-posts/:postId/comments
+```
+Body: `{ "content", "parent_id" }`
+
+---
+
 ## 10. 我的发布 `/api/my-posts`
 
 ### 我的课程帖子 [Auth]

@@ -105,10 +105,8 @@ import {
 import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
   openImportModal, handleAgreeAndImport, handleScheduleImport,
-  switchMyCourseTab, toggleComments,
-  refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
-  openUploadMaterialModal, onFileSelected, handleUploadMaterial,
-  filterMyMembers, filterMyMembersTab,
+  switchMyCourseTab,
+  filterMyMembers,
   handlePortalToPlaza,
 } from './pages/courses/my_courses.js';
 
@@ -120,7 +118,7 @@ import {
   showPublishBlockedToast, switchDetailTab, toggleComments, handleAddComment,
   refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
   openUploadMaterialModal, onFileSelected, handleUploadMaterial,
-  filterMembers, filterMembersTab,
+  filterMembers,
 } from './pages/courses/detail.js';
 
 import {
@@ -230,6 +228,7 @@ Object.assign(window, {
   // course detail (unified)
   showPublishBlockedToast,
   switchDetailTab,
+  switchMyCourseTab,
   toggleComments,
   refreshMyMaterials,
   rateMyMaterial,
@@ -238,9 +237,11 @@ Object.assign(window, {
   onFileSelected,
   handleUploadMaterial,
   filterMembers,
-  filterMembersTab,
+  filterMyMembers,
   // publish
   onPublishFileSelected,
+  // my course detail extras
+  handlePortalToPlaza,
   // explore
   switchExploreTab,
   // invites

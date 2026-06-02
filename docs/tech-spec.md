@@ -183,6 +183,7 @@ UNIQUE(invite_id, user_id)
 | status | TEXT | 'open' | open/full/closed/expired |
 | expires_at | TEXT | — | 过期时间 |
 | created_at | DATETIME | CURRENT_TIMESTAMP | 创建时间 |
+| course_id | INTEGER | NULL | 所属课程 ID（NULL = 全局广场帖，非 NULL = 课程内搭子帖） |
 
 ### square_interests
 

@@ -522,5 +522,361 @@ module.exports = function (db) {
     res.json(replies);
   });
 
+  /* =============================================
+     课程搭子帖（course-scoped square posts）
+     ============================================= */
+
+  const COURSE_SQ_COMMENT_IMAGE_DIR = path.join(__dirname, '..', 'uploads', 'comment-images');
+  const COURSE_SQ_COMMENT_IMAGE_MAX = 1 * 1024 * 1024;
+  const COURSE_SQ_COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png']);
+
+  const courseSquareCommentUpload = multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => {
+        fs.mkdirSync(COURSE_SQ_COMMENT_IMAGE_DIR, { recursive: true });
+        cb(null, COURSE_SQ_COMMENT_IMAGE_DIR);
+      },
+      filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `csq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+      }
+    }),
+    limits: { fileSize: COURSE_SQ_COMMENT_IMAGE_MAX, files: 1 },
+    fileFilter: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, COURSE_SQ_COMMENT_IMAGE_EXT.has(ext));
+    }
+  });
+
+  function parseCourseSquareCommentImage(req, res, next) {
+    if (!req.is('multipart/form-data')) return next();
+    courseSquareCommentUpload.single('image')(req, res, (error) => {
+      if (!error) return next();
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      const message = error.code === 'LIMIT_FILE_SIZE'
+        ? '图片不能超过 1MB'
+        : error.code === 'LIMIT_FILE_COUNT'
+          ? '只能上传一张图片'
+          : '仅支持 jpg/jpeg/png 格式';
+      return res.status(400).json({ error: message });
+    });
+  }
+
+  const COURSE_SQUARE_CATEGORIES = ['考研搭子', '考公搭子', '考证搭子', '项目组队', '技能交换', '竞赛组队', '其他'];
+  const COURSE_SQUARE_EXPIRY_DAYS = 7;
+
+  // POST /api/courses/:id/square-posts — 发布课程搭子帖 [Auth + 选课]
+  router.post('/:id/square-posts', authMiddleware, (req, res) => {
+    const courseId = Number(req.params.id);
+    const userId = req.user.userId;
+    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+
+    const { title, category, description, max_people } = req.body;
+    if (!title || !category) return res.status(400).json({ error: '标题和类型为必填项' });
+    if (!COURSE_SQUARE_CATEGORIES.includes(category)) return res.status(400).json({ error: '无效的需求类型' });
+
+    const expiresAt = new Date(Date.now() + COURSE_SQUARE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+    const result = db.run(
+      `INSERT INTO square_posts (creator_id, title, category, description, max_people, current_count, status, expires_at, course_id)
+       VALUES (?, ?, ?, ?, ?, 0, 'open', ?, ?)`,
+      [userId, title.trim(), category, (description || '').trim(), max_people || 1, expiresAt, courseId]
+    );
+    db.save();
+
+    res.status(201).json({ id: result.lastInsertRowid, message: '发布成功' });
+  });
+
+  // GET /api/courses/:id/square-posts — 课程搭子帖列表 [Auth + 选课]
+  router.get('/:id/square-posts', authMiddleware, (req, res) => {
+    const courseId = Number(req.params.id);
+    const userId = req.user.userId;
+    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+
+    const { category } = req.query;
+    let where = " WHERE sp.course_id = ? AND sp.expires_at > datetime('now', '+8 hours') AND sp.status != 'expired'";
+    const params = [courseId];
+
+    if (category && category !== 'all') {
+      where += ' AND sp.category = ?';
+      params.push(category);
+    }
+
+    const posts = db.all(`
+      SELECT sp.*,
+        u.nickname AS creator_name,
+        (SELECT COUNT(*) FROM square_interests si WHERE si.post_id = sp.id AND si.status = 'accepted') AS confirmed_count,
+        (SELECT si2.status FROM square_interests si2 WHERE si2.post_id = sp.id AND si2.user_id = ?) AS my_status
+      FROM square_posts sp
+      JOIN users u ON sp.creator_id = u.id
+      ${where}
+      ORDER BY sp.created_at DESC
+    `, [userId, ...params]);
+
+    const result = posts.map(p => {
+      const remaining = Math.max(0, Math.ceil((new Date(p.expires_at) - Date.now()) / (24 * 60 * 60 * 1000)));
+      return { ...p, remaining_days: remaining };
+    });
+
+    res.json({ posts: result });
+  });
+
+  // GET /api/courses/:id/square-posts/:postId — 帖子详情 [Auth + 选课]
+  router.get('/:id/square-posts/:postId', authMiddleware, (req, res) => {
+    const courseId = Number(req.params.id);
+    const postId = Number(req.params.postId);
+    const userId = req.user.userId;
+    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+
+    const post = db.get(`
+      SELECT sp.*, u.nickname AS creator_name, u.major AS creator_major, u.grade AS creator_grade
+      FROM square_posts sp
+      JOIN users u ON sp.creator_id = u.id
+      WHERE sp.id = ? AND sp.course_id = ?
+    `, [postId, courseId]);
+
+    if (!post) return res.status(404).json({ error: '帖子不存在' });
+    if (new Date(post.expires_at) <= new Date()) post.status = 'expired';
+
+    const confirmed = db.all(`
+      SELECT u.id AS user_id, u.nickname, u.major, u.grade, u.avatar_url, u.qq
+      FROM square_interests si
+      JOIN users u ON si.user_id = u.id
+      WHERE si.post_id = ? AND si.status = 'accepted'
+      ORDER BY si.created_at ASC
+    `, [postId]);
+
+    let pending = [];
+    if (post.creator_id === userId) {
+      pending = db.all(`
+        SELECT si.id AS interest_id, si.user_id, si.created_at,
+          u.nickname, u.major, u.grade, u.avatar_url
+        FROM square_interests si
+        JOIN users u ON si.user_id = u.id
+        WHERE si.post_id = ? AND si.status = 'pending'
+        ORDER BY si.created_at ASC
+      `, [postId]);
+    }
+
+    const myInterest = db.get(
+      'SELECT status FROM square_interests WHERE post_id = ? AND user_id = ?',
+      [postId, userId]
+    );
+
+    const remaining = Math.max(0, Math.ceil((new Date(post.expires_at) - Date.now()) / (24 * 60 * 60 * 1000)));
+
+    res.json({ ...post, remaining_days: remaining, confirmed, pending, my_status: myInterest ? myInterest.status : null });
+  });
+
+  // DELETE /api/courses/:id/square-posts/:postId — 删除帖子 [Auth, 仅创建者]
+  router.delete('/:id/square-posts/:postId', authMiddleware, (req, res) => {
+    const courseId = Number(req.params.id);
+    const postId = Number(req.params.postId);
+    const userId = req.user.userId;
+
+    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [postId, courseId]);
+    if (!post) return res.status(404).json({ error: '帖子不存在' });
+    if (post.creator_id !== userId) return res.status(403).json({ error: '只能删除自己发布的帖子' });
+
+    db.run('DELETE FROM square_posts WHERE id = ?', [postId]);
+    db.save();
+    res.json({ message: '已删除' });
+  });
+
+  // POST /api/courses/:id/square-posts/:postId/interest — 表示感兴趣 [Auth + 选课]
+  router.post('/:id/square-posts/:postId/interest', authMiddleware, (req, res) => {
+    const courseId = Number(req.params.id);
+    const postId = Number(req.params.postId);
+    const userId = req.user.userId;
+    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+
+    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [postId, courseId]);
+    if (!post) return res.status(404).json({ error: '帖子不存在' });
+    if (post.creator_id === userId) return res.status(400).json({ error: '不能对自己的帖子感兴趣' });
+    if (post.status !== 'open') return res.status(400).json({ error: '该帖子已不再接受申请' });
+    if (new Date(post.expires_at) <= new Date()) return res.status(400).json({ error: '该帖子已过期' });
+
+    const existing = db.get('SELECT * FROM square_interests WHERE post_id = ? AND user_id = ?', [postId, userId]);
+    if (existing) return res.status(400).json({ error: '你已经申请过了' });
+
+    db.run("INSERT INTO square_interests (post_id, user_id, status) VALUES (?, ?, 'pending')", [postId, userId]);
+    db.save();
+
+    const applicant = db.get('SELECT nickname FROM users WHERE id = ?', [userId]);
+    createNotification(db, {
+      userId: post.creator_id, type: 'course_square_interest', title: '有人对你的搭子帖感兴趣',
+      message: `${applicant?.nickname || '匿名'} 对「${post.title}」感兴趣`,
+      relatedType: 'course_square_post', relatedId: postId
+    });
+    db.save();
+
+    res.json({ message: '已申请，等待对方确认' });
+  });
+
+  // PUT /api/courses/:id/square-interests/:interestId — 接受/拒绝 [Auth]
+  router.put('/:id/square-interests/:interestId', authMiddleware, (req, res) => {
+    const courseId = Number(req.params.id);
+    const interestId = Number(req.params.interestId);
+    const userId = req.user.userId;
+    const { action } = req.body;
+
+    const interest = db.get('SELECT * FROM square_interests WHERE id = ?', [interestId]);
+    if (!interest) return res.status(404).json({ error: '记录不存在' });
+
+    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [interest.post_id, courseId]);
+    if (!post || post.creator_id !== userId) return res.status(403).json({ error: '无权操作' });
+    if (interest.status !== 'pending') return res.status(400).json({ error: '该申请已处理' });
+
+    if (action === 'reject') {
+      db.run("UPDATE square_interests SET status = 'rejected' WHERE id = ?", [interestId]);
+      db.save();
+      return res.json({ message: '已拒绝' });
+    }
+
+    const actualCount = db.get(
+      "SELECT COUNT(*) AS cnt FROM square_interests WHERE post_id = ? AND status = 'accepted'",
+      [post.id]
+    );
+    if (actualCount.cnt >= post.max_people) return res.status(400).json({ error: '人数已满' });
+
+    db.run("UPDATE square_interests SET status = 'accepted' WHERE id = ?", [interestId]);
+    const newCount = actualCount.cnt + 1;
+    db.run('UPDATE square_posts SET current_count = ? WHERE id = ?', [newCount, post.id]);
+    if (newCount >= post.max_people) db.run("UPDATE square_posts SET status = 'full' WHERE id = ?", [post.id]);
+    db.save();
+
+    createNotification(db, {
+      userId: interest.user_id, type: 'course_square_accepted', title: '搭子申请已通过',
+      message: `你对「${post.title}」的申请已被接受`,
+      relatedType: 'course_square_post', relatedId: post.id
+    });
+    db.save();
+
+    res.json({ message: '已接受' });
+  });
+
+  // GET /api/courses/:id/square-posts/:postId/comments — 评论列表
+  router.get('/:id/square-posts/:postId/comments', (req, res) => {
+    const postId = Number(req.params.postId);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+    const offset = (page - 1) * pageSize;
+
+    const total = (db.get('SELECT COUNT(*) AS cnt FROM square_comments WHERE post_id = ?', [postId]) || {}).cnt || 0;
+
+    const comments = db.all(`
+      SELECT sc.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
+      FROM square_comments sc
+      JOIN users u ON sc.author_id = u.id
+      WHERE sc.post_id = ?
+      ORDER BY sc.created_at ASC
+      LIMIT ? OFFSET ?
+    `, [postId, pageSize, offset]);
+
+    res.json({ comments, total, page, pageSize });
+  });
+
+  // POST /api/courses/:id/square-posts/:postId/comments — 发评论 [Auth + 选课]
+  router.post('/:id/square-posts/:postId/comments', authMiddleware, parseCourseSquareCommentImage, (req, res) => {
+    const courseId = Number(req.params.id);
+    const postId = Number(req.params.postId);
+    const userId = req.user.userId;
+    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+
+    const { content, parent_id } = req.body;
+    const imageFile = req.file;
+
+    if ((!content || !content.trim()) && !imageFile) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: '请输入内容或上传图片' });
+    }
+    if (content && content.length > 500) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: '回复内容不能超过 500 字' });
+    }
+
+    const post = db.get('SELECT id, creator_id, title FROM square_posts WHERE id = ? AND course_id = ?', [postId, courseId]);
+    if (!post) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(404).json({ error: '帖子不存在' });
+    }
+
+    let parentId = null;
+    if (parent_id) {
+      parentId = Number(parent_id);
+      const parentComment = db.get('SELECT id, post_id FROM square_comments WHERE id = ?', [parentId]);
+      if (!parentComment || parentComment.post_id !== postId) {
+        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+        return res.status(400).json({ error: '被回复的评论不存在' });
+      }
+    }
+
+    const imageUrl = imageFile ? `/uploads/comment-images/${imageFile.filename}` : '';
+
+    const result = db.run(
+      'INSERT INTO square_comments (post_id, author_id, content, parent_id, image_url) VALUES (?, ?, ?, ?, ?)',
+      [postId, userId, (content || '').trim(), parentId, imageUrl]
+    );
+    db.save();
+
+    const commenter = db.get('SELECT nickname FROM users WHERE id = ?', [userId]);
+
+    if (parentId) {
+      const parentComment = db.get('SELECT author_id FROM square_comments WHERE id = ?', [parentId]);
+      if (parentComment && parentComment.author_id !== userId) {
+        createNotification(db, {
+          userId: parentComment.author_id, type: 'new_comment', title: '新回复',
+          message: `${commenter?.nickname || '匿名'} 回复了你的评论`,
+          relatedType: 'course_square_post', relatedId: postId
+        });
+        db.save();
+      }
+    } else {
+      if (post.creator_id !== userId) {
+        createNotification(db, {
+          userId: post.creator_id, type: 'new_comment', title: '新评论',
+          message: `${commenter?.nickname || '匿名'} 评论了你的搭子帖「${post.title}」`,
+          relatedType: 'course_square_post', relatedId: postId
+        });
+        db.save();
+      }
+    }
+
+    res.status(201).json({ id: result.lastInsertRowid, post_id: postId, author_id: userId, content: (content || '').trim(), parent_id: parentId, image_url: imageUrl });
+  });
+
+  // DELETE /api/courses/:id/square-posts/:postId/comments/:commentId — 删除评论
+  router.delete('/:id/square-posts/:postId/comments/:commentId', authMiddleware, (req, res) => {
+    const commentId = Number(req.params.commentId);
+    const postId = Number(req.params.postId);
+    const userId = req.user.userId;
+
+    const comment = db.get('SELECT * FROM square_comments WHERE id = ? AND post_id = ?', [commentId, postId]);
+    if (!comment) return res.status(404).json({ error: '评论不存在' });
+    if (comment.author_id !== userId) return res.status(403).json({ error: '只能删除自己的回复' });
+
+    if (comment.image_url) {
+      const imgPath = path.join(__dirname, '..', comment.image_url);
+      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+    }
+
+    db.run("UPDATE square_comments SET content = '[已删除]', image_url = '' WHERE id = ?", [commentId]);
+    db.save();
+    res.json({ message: '已删除' });
+  });
+
+  // GET /api/courses/:id/square-posts/:postId/comments/:commentId/replies — 嵌套回复
+  router.get('/:id/square-posts/:postId/comments/:commentId/replies', (req, res) => {
+    const commentId = Number(req.params.commentId);
+    const replies = db.all(`
+      SELECT sc.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
+      FROM square_comments sc
+      JOIN users u ON sc.author_id = u.id
+      WHERE sc.parent_id = ?
+      ORDER BY sc.created_at ASC
+    `, [commentId]);
+    res.json(replies);
+  });
+
   return router;
 };

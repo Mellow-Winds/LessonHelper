@@ -4,7 +4,8 @@
  *
  * 通过 courseId 动态评估当前用户的在修状态：
  *   - 已选修 → 三段药丸（论坛/资料/交友）+ 发布按钮激活
- *   - 未选修 → 两段药丸（论坛/资料）+ 发布按钮置灰 + 交友物理隐藏
+ *   - 未选修 → 两段药丸（论坛/资料）+ 发布按钮置灰 + 交友 Tab 隐藏
+ *   交友 Tab = 课程搭子帖（course_square.js）
  */
 
 import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
@@ -14,6 +15,7 @@ import { renderAuth } from '../auth.js';
 import { getFavoriteCourseIds, getFavoritePostIds, renderCourseFavoriteButton, renderPostFavoriteButton } from '../favorites.js';
 import { renderPostAttachments } from './post_attachments.js';
 import { cleanBigCourseName } from './all_courses.js';
+import { renderCourseSquareTab, bindCourseSquareInterestBtn } from './course_square.js';
 
 /* =============================================
    全局状态
@@ -74,8 +76,8 @@ registerPage('course-detail', async (container, courseId) => {
          </button>`;
 
     // 构建药丸 Tabs：已选修多一个"交友"
-    const memberTab = enrolled
-      ? `<button class="md-pill-btn" data-tab="members" onclick="switchDetailTab('members', ${courseId})">
+    const squareTab = enrolled
+      ? `<button class="md-pill-btn" data-tab="square" onclick="switchDetailTab('square', ${courseId})">
            <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 交友
          </button>`
       : '';
@@ -99,7 +101,7 @@ registerPage('course-detail', async (container, courseId) => {
         <button class="md-pill-btn" data-tab="materials" onclick="switchDetailTab('materials', ${courseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料
         </button>
-        ${memberTab}
+        ${squareTab}
       </div>
       <div id="detail-tab-content" style="min-height:200px"></div>
     `;
@@ -142,8 +144,8 @@ export async function switchDetailTab(tab, courseId) {
     case 'materials':
       await renderMaterialsTab(contentEl, courseId, enrolled);
       break;
-    case 'members':
-      if (enrolled) await renderMembersTab(contentEl, courseId);
+    case 'square':
+      if (enrolled) await renderCourseSquareTab(contentEl, courseId, 'dc');
       break;
   }
 }
@@ -556,79 +558,6 @@ export async function handleUploadMaterial(e, courseId) {
     if (errEl) { errEl.textContent = '上传失败'; errEl.style.display = 'block'; }
     btn.disabled = false;
     btn.textContent = '上传';
-  }
-}
-
-/* =============================================
-   交友标签页（已选修专属 · 全宽网格）
-   ============================================= */
-
-async function renderMembersTab(contentEl, courseId) {
-  contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
-  const members = await apiGet(`/api/courses/${courseId}/members`);
-  const stats = await apiGet(`/api/courses/${courseId}/members/stats`);
-
-  contentEl.innerHTML = `
-    <div class="card">
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-        <span style="font-weight:600;color:var(--md-on-surface-variant)"><span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 课程成员 (<span id="detail-member-count-full">${members.length}</span>)</span>
-        <div style="flex:1"></div>
-        ${createMdSelect({
-          id: 'detail-filter-major-full',
-          options: [{ text: '全部专业', value: '' }, ...(stats?.majors || []).map(m => ({ text: m, value: m }))],
-          style: 'width:auto;min-width:120px;margin-bottom:0',
-          onchange: `filterMembersTab(${courseId})`
-        })}
-        ${createMdSelect({
-          id: 'detail-filter-grade-full',
-          options: [{ text: '全部年级', value: '' }, ...(stats?.grades || []).map(g => ({ text: g, value: g }))],
-          style: 'width:auto;min-width:120px;margin-bottom:0',
-          onchange: `filterMembersTab(${courseId})`
-        })}
-      </div>
-      <div id="detail-members-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
-        ${renderMemberCards(members)}
-      </div>
-    </div>
-  `;
-
-  const cards = contentEl.querySelectorAll('.member-card-grid');
-  if (cards.length) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });
-}
-
-function renderMemberCards(members) {
-  if (members.length === 0) {
-    return '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">暂无匹配成员</p>';
-  }
-  return members.map(m => `
-    <div class="member-card-grid member-profile-link" onclick="navigateTo('profile-user', ${m.user_id})">
-      <div class="avatar-small">${(m.nickname || '?')[0]}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:500">${escHtml(m.nickname)}</div>
-        ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
-        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="event.stopPropagation();navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">qq</span> ${escHtml(m.qq)}</div>` : ''}
-      </div>
-    </div>
-  `).join('');
-}
-
-export async function filterMembersTab(courseId) {
-  const major = document.getElementById('detail-filter-major-full')?.value || '';
-  const grade = document.getElementById('detail-filter-grade-full')?.value || '';
-  const params = new URLSearchParams();
-  if (major) params.set('major', major);
-  if (grade) params.set('grade', grade);
-
-  const gridEl = document.getElementById('detail-members-grid');
-  const countEl = document.getElementById('detail-member-count-full');
-  if (gridEl) gridEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">加载中...</p>';
-
-  try {
-    const members = await apiGet(`/api/courses/${courseId}/members?${params.toString()}`);
-    if (gridEl) gridEl.innerHTML = renderMemberCards(members);
-    if (countEl) countEl.textContent = members.length;
-  } catch {
-    if (gridEl) gridEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">加载失败</p>';
   }
 }
 
