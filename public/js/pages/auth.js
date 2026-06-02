@@ -399,16 +399,8 @@ export function switchSearchTab(type) {
 }
 
 export async function navigateToCourseResult(courseId, postId) {
-  if (isLoggedIn()) {
-    const myCourses = await apiGet('/api/courses');
-    if (Array.isArray(myCourses) && myCourses.some(course => course.id === Number(courseId))) {
-      window._myCourseTargetPostId = postId || null;
-      navigateTo('mycourse-detail', Number(courseId));
-      return;
-    }
-  }
-  const { navigateToPlazaCourseById } = await import('./courses/plaza.js');
-  await navigateToPlazaCourseById(courseId, postId);
+  window._courseDetailTargetPostId = postId || null;
+  navigateTo('course-detail', Number(courseId));
 }
 
 function renderSearchResults(data, q) {

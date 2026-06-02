@@ -1,6 +1,6 @@
 export function resolveNotificationTarget(relatedType, relatedId, courseId) {
   if ((relatedType === 'post' || relatedType === 'material') && courseId) {
-    return { page: 'mycourse-detail', data: courseId };
+    return { page: 'course-detail', data: courseId };
   }
 
   if (relatedType === 'invite') {

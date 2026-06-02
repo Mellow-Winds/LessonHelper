@@ -74,9 +74,11 @@ Lessonhelper/
 │           │   ├── square.js    #   交友广场
 │           │   └── posts.js     #   统一发布页
 │           └── courses/
-│               ├── my_courses.js #   我的课程（导入/列表/详情）
-│               ├── plaza.js     #   课程广场（大课聚合）
-│               └── publish.js   #   发布（富文本+附件）
+│               ├── my_courses.js #   我的课程（选修课表列表）
+│               ├── all_courses.js#   课程广场（全校大库检索）
+│               ├── detail.js    #   统一大课空间详情页（论坛/资料/交友）
+│               ├── publish.js   #   发布（富文本+附件）
+│               └── post_attachments.js # 帖子附件渲染工具
 └── uploads/                     # 上传文件存储
     └── materials/               #   学习资料文件
 ```
@@ -143,4 +145,4 @@ npm run dev          # 启动服务器 http://localhost:3000
 
 ---
 
-> 创建于 2026-05-30 | 最后更新：2026-06-01
+> 创建于 2026-05-30 | 最后更新：2026-06-02
