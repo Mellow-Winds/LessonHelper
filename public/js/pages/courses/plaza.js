@@ -6,9 +6,11 @@
  * 物理只读：绝不加载成员。
  */
 
-import { apiGet, apiPost, isLoggedIn } from '../../core/api.js';
+import { apiGet } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../../core/router.js';
-import { showToast, escHtml, formatTime, formatFileSize } from '../../components/ui.js';
+import { escHtml, formatTime, formatFileSize } from '../../components/ui.js';
+import { getFavoriteCourseIds, getFavoritePostIds, renderCourseFavoriteButton, renderPostFavoriteButton } from '../favorites.js';
+import { renderPostAttachments } from './post_attachments.js';
 
 /* =============================================
    大课名称清洗
@@ -66,6 +68,16 @@ async function loadPlazaDataOnce() {
   }).sort((a, b) => b.totalCount - a.totalCount);
 
   _plazaLoaded = true;
+}
+
+export async function navigateToPlazaCourseById(courseId, postId) {
+  await loadPlazaDataOnce();
+  const idx = _bigCoursesList.findIndex(item => item.courseIds.includes(Number(courseId)));
+  if (idx < 0) return false;
+  window._plazaTargetPostId = postId || null;
+  window._plazaCourseId = Number(courseId);
+  navigateTo('plaza-course', idx);
+  return true;
 }
 
 /* =============================================
@@ -172,17 +184,8 @@ registerPage('plaza-course', async (container, dataIdx) => {
     bigCourse,
     activeTab: null,
   };
-
-  // 检查发布权限：用户是否加入了该大课旗下任意小班
-  let _canPublish = false;
-  if (isLoggedIn() && window._currentUser) {
-    try {
-      const myCourses = await apiGet('/api/courses');
-      const myIds = new Set(myCourses.map(c => c.id));
-      _canPublish = bigCourse.courseIds.some(id => myIds.has(id));
-    } catch {}
-  }
-  window._plazaSpace._canPublish = _canPublish;
+  const favoriteCourseId = window._plazaCourseId || bigCourse.courseIds[0];
+  const favoriteCourseIds = await getFavoriteCourseIds();
 
   container.innerHTML = `
     <div class="page-header">
@@ -192,9 +195,7 @@ registerPage('plaza-course', async (container, dataIdx) => {
           ${bigCourse.courseCount} 个班级 · ${bigCourse.totalCount} 人 · 课程广场（只读）
         </p>
       </div>
-      <button class="btn ${_canPublish ? 'btn-primary' : 'btn-disabled'} btn-compact" id="plaza-publish-btn" onclick="handlePlazaPublish()">
-        <span class="mi">edit</span> 发布
-      </button>
+      ${renderCourseFavoriteButton(favoriteCourseId, favoriteCourseIds.has(favoriteCourseId))}
     </div>
     <div class="md-pills" id="plaza-pills">
       <button class="md-pill-btn active" data-tab="forum" onclick="switchPlazaTab('forum')">
@@ -213,23 +214,6 @@ registerPage('plaza-course', async (container, dataIdx) => {
 
   await switchPlazaTab('forum');
 });
-
-/* ---- 发布权限熔断 ---- */
-
-export function handlePlazaPublish() {
-  if (!isLoggedIn()) {
-    showToast('请先登录');
-    navigateTo('profile');
-    return;
-  }
-  if (!window._plazaSpace._canPublish) {
-    showToast('课程广场为只读档案馆。你未修读本门课程的任何班级，暂无发布权限。');
-    return;
-  }
-  // 跳转到第一个小课的发布页
-  const firstId = window._plazaSpace.bigCourse.courseIds[0];
-  navigateTo('publish', firstId);
-}
 
 /* ---- Tab切换 ---- */
 
@@ -302,6 +286,7 @@ async function fetchMaterialsFromCourses(courseIds) {
 async function renderPlazaForumTab(contentEl, courseIds) {
   contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
   const posts = await fetchPostsFromCourses(courseIds);
+  const favoritePostIds = await getFavoritePostIds();
 
   if (posts.length === 0) {
     contentEl.innerHTML = `
@@ -319,12 +304,14 @@ async function renderPlazaForumTab(contentEl, courseIds) {
       ? `<span class="plaza-origin-tag">来自 ${escHtml(p._sourceTitle)}</span>`
       : '';
     return `
-      <div class="card mb-4 plaza-post-card">
+      <div class="card mb-4 plaza-post-card" id="post-${p.id}">
         ${originTag ? `<div style="margin-bottom:8px">${originTag}</div>` : ''}
         <h3 class="card-title">${escHtml(p.title)}</h3>
         <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
+        ${renderPostAttachments(p.attachments)}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
           <span>${escHtml(p.author_name)} · ${formatTime(p.created_at)}</span>
+          ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
           <span>
             <span class="mi" style="font-size:16px;vertical-align:-3px">chat_bubble_outline</span> ${p.comment_count || 0} 回复
           </span>
@@ -335,6 +322,10 @@ async function renderPlazaForumTab(contentEl, courseIds) {
 
   const cards = contentEl.querySelectorAll('.plaza-post-card');
   if (cards.length) animStagger(Array.from(cards), { y: 20, dur: 400, gap: 50 });
+  if (window._plazaTargetPostId) {
+    document.getElementById(`post-${window._plazaTargetPostId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window._plazaTargetPostId = null;
+  }
 }
 
 /* ---- 资料标签页 ---- */

@@ -89,6 +89,7 @@ const ROUTES = [
   { page: 'my_post-course',pattern: '/my_post/course',     nav: 'my_post' },
   { page: 'my_post-explore',pattern: '/my_post/explore',   nav: 'my_post' },
   { page: 'notifications',pattern: '/notifications',       nav: 'notifications' },
+  { page: 'favorites',    pattern: '/favorites',           nav: 'favorites' },
   { page: 'search',       pattern: '/search',              nav: 'search' },
 ];
 

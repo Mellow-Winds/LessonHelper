@@ -87,7 +87,7 @@ import { showToast } from './components/ui.js';
 import {
   switchAuthTab, handleLogin, handleRegister, handleVerify, resendCode,
   refreshNotifBadge,
-  handleSearchPageKey, executeSearch, switchSearchTab,
+  handleSearchPageKey, executeSearch, switchSearchTab, navigateToCourseResult,
 } from './pages/auth.js';
 
 import {
@@ -98,6 +98,9 @@ import {
 
 import './pages/my_posts.js';
 import './pages/notifications.js';
+import {
+  toggleCourseFavorite, togglePostFavorite,
+} from './pages/favorites.js';
 
 import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
@@ -110,7 +113,7 @@ import {
 } from './pages/courses/my_courses.js';
 
 import {
-  switchPlazaTab, filterPlazaCourses, handlePlazaPublish,
+  switchPlazaTab, filterPlazaCourses,
 } from './pages/courses/plaza.js';
 
 import {
@@ -198,6 +201,9 @@ Object.assign(window, {
   handleSearchPageKey,
   executeSearch,
   switchSearchTab,
+  navigateToCourseResult,
+  toggleCourseFavorite,
+  togglePostFavorite,
   // profile
   openEditProfileModal,
   handleEditProfile,
@@ -225,7 +231,6 @@ Object.assign(window, {
   // plaza
   switchPlazaTab,
   filterPlazaCourses,
-  handlePlazaPublish,
   // publish
   onPublishFileSelected,
   // explore
