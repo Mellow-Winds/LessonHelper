@@ -127,7 +127,7 @@ import {
 } from './pages/explore/invites.js';
 import {
   refreshSquarePosts,
-  submitSquareInterest, handleSquareInterest, submitSquareComment,
+  submitSquareInterest, handleSquareInterest,
   switchSquareMyTab,
 } from './pages/explore/square.js';
 
@@ -244,7 +244,6 @@ Object.assign(window, {
   refreshSquarePosts,
   submitSquareInterest,
   handleSquareInterest,
-  submitSquareComment,
   switchSquareMyTab,
 });
 

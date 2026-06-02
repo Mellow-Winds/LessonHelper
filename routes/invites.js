@@ -47,9 +47,9 @@ module.exports = function (db) {
       params.push(Number(course_id));
     }
     if (date === 'today') {
-      where += " AND si.study_date = date('now')";
+      where += " AND si.study_date = date('now', '+8 hours')";
     } else if (date === 'week') {
-      where += " AND si.study_date BETWEEN date('now') AND date('now', '+7 days')";
+      where += " AND si.study_date BETWEEN date('now', '+8 hours') AND date('now', '+8 hours', '+7 days')";
     } else if (date && date !== 'all') {
       where += ' AND si.study_date = ?';
       params.push(date);

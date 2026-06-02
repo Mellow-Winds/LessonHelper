@@ -1176,7 +1176,6 @@ function bindCommentEvents(section, postId) {
         closeModal();
         loadedComments[postId] = null;
         toggleComments(postId);
-        setTimeout(() => toggleComments(postId), 50);
         showToast('已删除');
       });
     });
@@ -1342,14 +1341,11 @@ async function submitComment(postId, section) {
 
     loadedComments[postId] = null;
     toggleComments(postId);
+    // 滚动到最新回复
     setTimeout(() => {
-      toggleComments(postId);
-      // 滚动到最新回复
-      setTimeout(() => {
-        const list = document.getElementById(`comment-list-${postId}`);
-        if (list) list.scrollTop = list.scrollHeight;
-      }, 100);
-    }, 50);
+      const list = document.getElementById(`comment-list-${postId}`);
+      if (list) list.scrollTop = list.scrollHeight;
+    }, 300);
     showToast('回复成功');
   } catch {
     showToast('发送失败，请重试');

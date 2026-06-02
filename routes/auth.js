@@ -59,12 +59,16 @@ module.exports = function (db) {
       );
       db.save();
 
-      sendVerificationCode(email, code).then(result => {
+      try {
+        const result = await sendVerificationCode(email, code);
         if (!result.success) {
           return res.status(500).json({ error: '验证码发送失败: ' + result.error });
         }
-        res.json({ message: '验证码已重新发送至 ' + email, debug_code: code });
-      });
+        res.json({ message: '验证码已重新发送至 ' + email });
+      } catch (e) {
+        console.error('验证码发送异常:', e);
+        res.status(500).json({ error: '验证码发送失败，请稍后重试' });
+      }
       return;
     }
 
@@ -88,8 +92,7 @@ module.exports = function (db) {
 
       console.log(`[Auth] 注册: ${email}, 验证码: ${code}`);
       res.status(201).json({
-        message: '验证码已发送至 ' + email + '，请查收邮件完成验证',
-        debug_code: code  // 开发环境返回验证码，生产环境删除此行
+        message: '验证码已发送至 ' + email + '，请查收邮件完成验证'
       });
     } catch (e) {
       console.error('注册失败:', e);
@@ -201,7 +204,10 @@ module.exports = function (db) {
       if (!result.success) {
         return res.status(500).json({ error: '验证码发送失败: ' + result.error });
       }
-      res.json({ message: '验证码已重新发送至 ' + email, debug_code: code });
+      res.json({ message: '验证码已重新发送至 ' + email });
+    }).catch(e => {
+      console.error('验证码发送异常:', e);
+      res.status(500).json({ error: '验证码发送失败，请稍后重试' });
     });
   });
 
