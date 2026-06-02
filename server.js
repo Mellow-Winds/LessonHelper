@@ -285,6 +285,37 @@ async function start() {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS favorite_courses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    course_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    UNIQUE(user_id, course_id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS favorite_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    post_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    UNIQUE(user_id, post_id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS post_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    file_path TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_size INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+  )`);
+
   db.save();
 
   // --- Middleware ---
@@ -302,6 +333,7 @@ async function start() {
   const searchRouter = require('./routes/search')(db);
   const squareRouter = require('./routes/square')(db);
   const myPostsRouter = require('./routes/my_posts')(db);
+  const favoritesRouter = require('./routes/favorites')(db);
 
   app.use('/api/courses', coursesRouter);
   app.use('/api/materials', materialsRouter);
@@ -313,6 +345,7 @@ async function start() {
   app.use('/api/schedule', scheduleRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/my-posts', myPostsRouter);
+  app.use('/api/favorites', favoritesRouter);
 
   // --- SPA Fallback ---
   app.get('*', (req, res) => {

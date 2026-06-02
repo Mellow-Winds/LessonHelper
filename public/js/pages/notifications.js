@@ -6,6 +6,7 @@
 import { apiGet, apiPut } from '../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../core/router.js';
 import { showToast, escHtml, formatTime } from '../components/ui.js';
+import { resolveNotificationTarget } from './notification_routes.mjs';
 
 /* =============================================
    页面注册
@@ -113,13 +114,8 @@ async function handleNotifItemClick(notifId, relatedType, relatedId, courseId, i
     if (window.refreshNotifBadge) window.refreshNotifBadge();
   }
 
-  if (relatedType === 'post' && courseId) {
-    navigateTo('mycourse-detail', courseId);
-  } else if (relatedType === 'invite') {
-    navigateTo('explore');
-  } else if (relatedType === 'material' && courseId) {
-    navigateTo('mycourse-detail', courseId);
-  }
+  const target = resolveNotificationTarget(relatedType, relatedId, courseId);
+  if (target) navigateTo(target.page, target.data);
 }
 
 /* =============================================

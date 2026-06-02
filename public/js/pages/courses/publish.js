@@ -23,6 +23,7 @@ const POST_CATEGORIES = [
 ];
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_FILE_COUNT = 9;
 
 /* =============================================
    Page: 统一发布表单
@@ -105,7 +106,7 @@ registerPage('publish', async (container, courseId) => {
         <div id="publish-drop-zone" class="upload-drop-zone">
           <span class="mi" style="font-size:36px;color:var(--md-outline-variant)">cloud_upload</span>
           <p style="margin-top:8px;color:var(--md-on-surface-variant);font-size:14px">点击选择文件或拖拽到此处</p>
-          <input type="file" id="publish-file-input" style="display:none" onchange="onPublishFileSelected(this)">
+          <input type="file" id="publish-file-input" style="display:none" multiple onchange="onPublishFileSelected(this)">
           <p id="publish-file-name" style="display:none;font-size:14px;font-weight:500;color:var(--md-primary);margin-top:8px"></p>
         </div>
       </div>
@@ -182,8 +183,12 @@ registerPage('publish', async (container, courseId) => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
     if (e.dataTransfer.files.length) {
-      const file = e.dataTransfer.files[0];
-      if (file.size > MAX_FILE_SIZE) {
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > MAX_FILE_COUNT) {
+        showToast('每个帖子最多上传 9 个附件');
+        return;
+      }
+      if (files.some(file => file.size > MAX_FILE_SIZE)) {
         showToast('文件大小超过 20MB 限制');
         return;
       }
@@ -263,7 +268,7 @@ registerPage('publish', async (container, courseId) => {
         formData.append('content', content);
         formData.append('category', category);
         formData.append('sync_to_plaza', syncToPlaza ? '1' : '0');
-        formData.append('file', fileInput.files[0]);
+        for (const file of fileInput.files) formData.append('files', file);
 
         const token = getToken();
         const headers = {};
@@ -318,14 +323,20 @@ registerPage('publish', async (container, courseId) => {
 export function onPublishFileSelected(input) {
   const nameEl = document.getElementById('publish-file-name');
   if (input.files.length && nameEl) {
-    const file = input.files[0];
-    if (file.size > MAX_FILE_SIZE) {
+    const files = Array.from(input.files);
+    if (files.length > MAX_FILE_COUNT) {
+      showToast('每个帖子最多上传 9 个附件');
+      input.value = '';
+      nameEl.style.display = 'none';
+      return;
+    }
+    if (files.some(file => file.size > MAX_FILE_SIZE)) {
       showToast('文件大小超过 20MB 限制');
       input.value = '';
       nameEl.style.display = 'none';
       return;
     }
-    nameEl.textContent = '📎 ' + file.name;
+    nameEl.textContent = `📎 已选择 ${files.length} 个附件：${files.map(file => file.name).join('、')}`;
     nameEl.style.display = 'block';
   }
 

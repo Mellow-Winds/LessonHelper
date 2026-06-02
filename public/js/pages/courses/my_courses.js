@@ -6,6 +6,8 @@
 import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../../core/router.js';
 import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, formatTime, formatFileSize } from '../../components/ui.js';
+import { getFavoriteCourseIds, getFavoritePostIds, renderCourseFavoriteButton, renderPostFavoriteButton } from '../favorites.js';
+import { renderPostAttachments } from './post_attachments.js';
 
 /* =============================================
    学期工具函数
@@ -394,6 +396,7 @@ registerPage('mycourse-detail', async (container, courseId) => {
 
     window._myCourseSpace = { courseId, course, activeTab: null };
     const portalName = cleanPortalName(course.title);
+    const favoriteCourseIds = await getFavoriteCourseIds();
 
     container.innerHTML = `
       <div class="page-header">
@@ -403,7 +406,8 @@ registerPage('mycourse-detail', async (container, courseId) => {
             ${course.teacher ? escHtml(course.teacher) + ' · ' : ''}
             ${course.enrollment_count || 0} 人选课
           </p>
-        </div>
+      </div>
+        ${renderCourseFavoriteButton(courseId, favoriteCourseIds.has(Number(courseId)))}
         <button class="btn btn-secondary btn-compact" onclick="handlePortalToPlaza('${escHtml(portalName)}')" title="穿梭到课程广场·大课主页">
           <span class="mi">open_in_new</span> 穿梭到广场
         </button>
@@ -466,6 +470,7 @@ export async function switchMyCourseTab(tab, courseId) {
 async function renderMyForumTab(contentEl, courseId) {
   contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
   const posts = await apiGet(`/api/courses/${courseId}/posts`);
+  const favoritePostIds = await getFavoritePostIds();
 
   contentEl.innerHTML = `
     <div style="display:flex;gap:24px">
@@ -476,11 +481,13 @@ async function renderMyForumTab(contentEl, courseId) {
             <p class="text-secondary" style="margin-top:12px">暂无帖子，来发第一个吧</p>
           </div>
         ` : posts.map(p => `
-          <div class="card mb-4 post-card clickable">
+          <div class="card mb-4 post-card clickable" id="post-${p.id}">
             <h3 class="card-title" style="cursor:pointer" onclick="toggleComments(${p.id})">${escHtml(p.title)}</h3>
             <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
+            ${renderPostAttachments(p.attachments)}
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
               <span>${escHtml(p.author_name)} · ${formatTime(p.created_at)}</span>
+              ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
               <span style="cursor:pointer;color:var(--md-primary);font-weight:500" onclick="toggleComments(${p.id})">
                 <span class="mi" style="font-size:16px;vertical-align:-3px">chat_bubble_outline</span> ${p.comment_count || 0} 回复
               </span>
@@ -495,6 +502,10 @@ async function renderMyForumTab(contentEl, courseId) {
 
   const cards = contentEl.querySelectorAll('.post-card');
   if (cards.length) animStagger(Array.from(cards), { y: 20, dur: 400, gap: 50 });
+  if (window._myCourseTargetPostId) {
+    document.getElementById(`post-${window._myCourseTargetPostId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window._myCourseTargetPostId = null;
+  }
 }
 
 /* ---- 成员侧栏 ---- */
