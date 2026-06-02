@@ -10,6 +10,7 @@ import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../../core/router.js';
 import { showToast, openModal, closeModal, createMdInput, createMdTextarea, createMdSelect, escHtml, formatTime, formatFileSize, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
 import { renderAuth } from '../auth.js';
+import { renderCourseSquareTab } from './course_square.js';
 
 /* =============================================
    学期工具函数
@@ -424,8 +425,8 @@ registerPage('mycourse-detail', async (container, courseId) => {
         <button class="md-pill-btn" data-tab="materials" onclick="switchMyCourseTab('materials', ${courseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料
         </button>
-        <button class="md-pill-btn" data-tab="members" onclick="switchMyCourseTab('members', ${courseId})">
-          <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 成员
+        <button class="md-pill-btn" data-tab="square" onclick="switchMyCourseTab('square', ${courseId})">
+          <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 交友
         </button>
       </div>
       <div id="my-course-tab-content" style="min-height:200px"></div>
@@ -461,8 +462,8 @@ export async function switchMyCourseTab(tab, courseId) {
     case 'materials':
       await renderMyMaterialsTab(contentEl, courseId);
       break;
-    case 'members':
-      await renderMyMembersTab(contentEl, courseId);
+    case 'square':
+      await renderCourseSquareTab(contentEl, courseId, 'mc');
       break;
   }
 }
@@ -846,77 +847,6 @@ export async function handleUploadMaterial(e, courseId) {
     if (errEl) { errEl.textContent = '上传失败'; errEl.style.display = 'block'; }
     btn.disabled = false;
     btn.textContent = '上传';
-  }
-}
-
-/* ---- 成员标签页（全宽）---- */
-
-async function renderMyMembersTab(contentEl, courseId) {
-  contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
-  const members = await apiGet(`/api/courses/${courseId}/members`);
-  const stats = await apiGet(`/api/courses/${courseId}/members/stats`);
-
-  contentEl.innerHTML = `
-    <div class="card">
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-        <span style="font-weight:600;color:var(--md-on-surface-variant)"><span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 课程成员 (<span id="my-member-count-full">${members.length}</span>)</span>
-        <div style="flex:1"></div>
-        ${createMdSelect({
-          id: 'my-filter-major-full',
-          options: [{ text: '全部专业', value: '' }, ...(stats?.majors || []).map(m => ({ text: m, value: m }))],
-          style: 'width:auto;min-width:120px;margin-bottom:0',
-          onchange: `filterMyMembersTab(${courseId})`
-        })}
-        ${createMdSelect({
-          id: 'my-filter-grade-full',
-          options: [{ text: '全部年级', value: '' }, ...(stats?.grades || []).map(g => ({ text: g, value: g }))],
-          style: 'width:auto;min-width:120px;margin-bottom:0',
-          onchange: `filterMyMembersTab(${courseId})`
-        })}
-      </div>
-      <div id="my-members-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
-        ${renderMyMemberCards(members)}
-      </div>
-    </div>
-  `;
-
-  const cards = contentEl.querySelectorAll('.member-card-grid');
-  if (cards.length) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });
-}
-
-function renderMyMemberCards(members) {
-  if (members.length === 0) {
-    return '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">暂无匹配成员</p>';
-  }
-  return members.map(m => `
-    <div class="member-card-grid member-profile-link" onclick="navigateTo('profile-user', ${m.user_id})">
-      <div class="avatar-small">${(m.nickname || '?')[0]}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:500">${escHtml(m.nickname)}</div>
-        ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
-        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="event.stopPropagation();navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">qq</span> ${escHtml(m.qq)}</div>` : ''}
-      </div>
-    </div>
-  `).join('');
-}
-
-export async function filterMyMembersTab(courseId) {
-  const major = document.getElementById('my-filter-major-full')?.value || '';
-  const grade = document.getElementById('my-filter-grade-full')?.value || '';
-  const params = new URLSearchParams();
-  if (major) params.set('major', major);
-  if (grade) params.set('grade', grade);
-
-  const gridEl = document.getElementById('my-members-grid');
-  const countEl = document.getElementById('my-member-count-full');
-  if (gridEl) gridEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">加载中...</p>';
-
-  try {
-    const members = await apiGet(`/api/courses/${courseId}/members?${params.toString()}`);
-    if (gridEl) gridEl.innerHTML = renderMyMemberCards(members);
-    if (countEl) countEl.textContent = members.length;
-  } catch {
-    if (gridEl) gridEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:32px;grid-column:1/-1">加载失败</p>';
   }
 }
 
@@ -1353,4 +1283,5 @@ async function submitComment(postId, section) {
     textarea.disabled = false;
     sendBtn.disabled = false;
     sendBtn.innerHTML = '<span class="mi" style="font-size:18px">send</span>';
+  }
 }
