@@ -88,6 +88,6 @@ function handleFeedClick(event) {
   } else if (item.dataset.type === 'invite') {
     navigateTo('explore');
   } else if (item.dataset.type === 'material' && courseId) {
-    navigateTo('mycourse-detail', courseId);
+    navigateTo('course-detail', courseId);
   }
 }

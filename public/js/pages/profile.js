@@ -843,7 +843,7 @@ function renderCommonCourses(courses = []) {
       <div class="profile-common-title"><span class="mi">school</span>共同课程 ${courses.length} 门</div>
       <div class="profile-common-list">
         ${courses.map(course => `
-          <button class="profile-common-course" onclick="navigateTo('mycourse-detail', ${course.id})">
+          <button class="profile-common-course" onclick="navigateTo('course-detail', ${course.id})">
             ${escHtml(course.title)}${course.teacher ? `<span>${escHtml(course.teacher)}</span>` : ''}
           </button>
         `).join('')}

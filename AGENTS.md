@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-**课搭子**（LessonHelper）是一个面向大学生的同课程学习互助平台。当前处于 MVP 第一阶段，聚焦三个核心功能：用户系统、课程界面、课程空间论坛。
+**课搭子**（LessonHelper）是一个面向大学生的同课程学习互助平台。核心功能包括：用户系统、课程管理、学习资料共享、自习邀约、交友广场、消息通知、全局搜索。
 
 ## 技术栈
 
@@ -10,41 +10,48 @@
 |------|------|
 | 后端 | Express 4.x + SQLite (sql.js WASM) |
 | 认证 | JWT (jsonwebtoken) + bcryptjs |
-| 前端 | 原生 JavaScript SPA + Material Design 3 |
-| 样式 | 自定义 CSS（遵循 themerules 设计规范） |
+| 前端 | 原生 JavaScript SPA + ES6 Modules |
+| 设计系统 | Material Design 3（自定义 CSS） |
 
 ## 项目结构
 
 ```
 Lessonhelper/
-├── server.js              # Express 入口，数据库初始化，路由挂载
-├── package.json           # 依赖配置
-├── themerules             # 前端设计规范（颜色/排版/间距/组件）
-├── AGENTS.md              # 本文件 — 项目指南
-├── docs/                  # 📚 项目文档
-│   ├── requirements.md    #   开发需求文档
-│   ├── tech-spec.md       #   技术规范（数据库/API/安全）
-│   ├── design-spec.md     #   设计规范（页面布局/组件风格）
-│   ├── development-steps.md # 分步开发计划（当前进度 + 待办）
-│   └── api-spec.md        #   API 接口规范
-├── devlog/                # 📝 开发日志（每天一个文件）
-│   └── YYYY-MM-DD.md
-├── db/                    # SQLite 数据库文件
-├── routes/                # 后端路由
-│   ├── courses.js         #   课程/帖子/评论 API
-│   ├── user.js            #   用户 API
-│   ├── schedule.js        #   课表导入 API
-│   ├── middleware/         #   中间件（auth.js）
-│   └── auth.js            #   认证 API
-├── public/                # 前端静态文件
-│   ├── index.html         #   SPA 入口
-│   ├── css/style.css      #   样式
-│   └── js/                #   客户端逻辑（ES6 Modules）
-│       ├── main.js        #     全局入口
-│       ├── core/          #     api.js + router.js
-│       ├── components/    #     ui.js
-│       └── pages/         #     auth.js / profile.js / courses.js / square.js
-└── uploads/               # 上传文件存储（未来使用）
+├── server.js                    # Express 入口，数据库初始化，路由挂载
+├── package.json                 # 依赖配置
+├── themerules                   # 前端设计规范
+├── CLAUDE.md / AGENTS.md        # 项目指南
+├── docs/                        # 📚 项目文档
+├── devlog/                      # 📝 开发日志
+├── db/                          # SQLite 数据库文件
+├── routes/                      # 后端路由（10 个文件）
+├── public/                      # 前端静态文件
+│   ├── index.html               #   SPA 入口
+│   ├── css/style.css            #   样式
+│   └── js/
+│       ├── main.js              #   全局入口
+│       ├── core/
+│       │   ├── api.js           #   Fetch 请求层 + Token 管理
+│       │   └── router.js        #   路由系统 + 动效引擎
+│       ├── components/
+│       │   └── ui.js            #   MD3 组件工厂 + Toast + Modal
+│       └── pages/
+│           ├── auth.js          #   登录/注册 + 搜索页
+│           ├── profile.js       #   个人中心
+│           ├── notifications.js #   通知中心
+│           ├── my_posts.js      #   我的创作
+│           ├── explore.js       #   探索页入口
+│           ├── explore/
+│           │   ├── invites.js   #   自习邀约
+│           │   ├── square.js    #   交友广场
+│           │   └── posts.js     #   统一发布页
+│           └── courses/
+│               ├── my_courses.js #   我的课程（选修课表列表）
+│               ├── all_courses.js#   课程广场（全校大库检索）
+│               ├── detail.js    #   统一大课空间详情页
+│               ├── publish.js   #   发布（富文本+附件）
+│               └── post_attachments.js # 帖子附件渲染工具
+└── uploads/                     # 上传文件存储
 ```
 
 ## 文档索引
@@ -73,6 +80,7 @@ Lessonhelper/
 - 密码用 bcryptjs 哈希（cost=10）
 - 前端样式遵循 themerules（无渐变、无玻璃态、色值用设计Token）
 - 新页面用 `registerPage(name, renderFn)` 注册
+- 输入框必须用 `createMdInput()` / `createMdSelect()` 工厂，禁止原生 `<select>`
 
 ### 启动命令
 ```bash
@@ -96,4 +104,4 @@ curl -X POST http://localhost:3000/api/auth/register \
 
 ---
 
-> 创建于 2026-05-30
+> 创建于 2026-05-30 | 最后更新：2026-06-02

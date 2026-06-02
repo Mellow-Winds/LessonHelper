@@ -2,9 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const plazaSource = await readFile(new URL('../public/js/pages/courses/plaza.js', import.meta.url), 'utf8');
+const detailSource = await readFile(new URL('../public/js/pages/courses/detail.js', import.meta.url), 'utf8');
 
-test('course plaza never renders a publish button', () => {
-  assert.doesNotMatch(plazaSource, /id="plaza-publish-btn"/);
-  assert.doesNotMatch(plazaSource, /onclick="handlePlazaPublish\(\)"/);
+test('course detail enforces read-only mode for non-enrolled users', () => {
+  // The detail page checks enrollment and conditionally renders
+  assert.match(detailSource, /showPublishBlockedToast/);
+  // Publish button is disabled for non-enrolled users
+  assert.match(detailSource, /btn-disabled/);
+  // Members/交友 tab is only shown for enrolled users
+  assert.match(detailSource, /if \(enrolled\).*renderMembersTab/s);
+});
+
+test('course detail never renders a publish button for non-enrolled users in the plaza', () => {
+  // The publish button is conditionally rendered based on enrollment
+  assert.match(detailSource, /const publishBtn = enrolled/);
+  assert.match(detailSource, /btn-disabled btn-compact/);
 });

@@ -5,8 +5,7 @@ import { readFile } from 'node:fs/promises';
 const indexSource = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const routerSource = await readFile(new URL('../public/js/core/router.js', import.meta.url), 'utf8');
 const favoritesSource = await readFile(new URL('../public/js/pages/favorites.js', import.meta.url), 'utf8').catch(() => '');
-const myCoursesSource = await readFile(new URL('../public/js/pages/courses/my_courses.js', import.meta.url), 'utf8');
-const plazaSource = await readFile(new URL('../public/js/pages/courses/plaza.js', import.meta.url), 'utf8');
+const detailSource = await readFile(new URL('../public/js/pages/courses/detail.js', import.meta.url), 'utf8');
 
 test('favorites page is reachable from the sidebar', () => {
   assert.match(indexSource, /data-page="favorites"/);
@@ -23,9 +22,7 @@ test('favorites page loads courses and posts and exposes optimistic toggles', ()
   assert.match(favoritesSource, /帖子 \$\{posts\.length\}/);
 });
 
-test('course detail pages and course post cards render favorite controls', () => {
-  assert.match(myCoursesSource, /renderCourseFavoriteButton/);
-  assert.match(myCoursesSource, /renderPostFavoriteButton/);
-  assert.match(plazaSource, /renderCourseFavoriteButton/);
-  assert.match(plazaSource, /renderPostFavoriteButton/);
+test('course detail page renders favorite controls', () => {
+  assert.match(detailSource, /renderCourseFavoriteButton/);
+  assert.match(detailSource, /renderPostFavoriteButton/);
 });

@@ -1,8 +1,9 @@
 /**
- * pages/courses/publish.js — 合并通用发布表单
+ * pages/courses/publish.js — 统一发布表单
  * registerPage: publish
  *
  * 挂载路由 /course/:id/posts
+ * 返回按钮统一回到 course-detail
  * 强制固定分类下拉 · 文件上传20MB限制
  * 资料分享或有附件时 → 同步开关强制开启且置灰
  */
@@ -51,16 +52,17 @@ registerPage('publish', async (container, courseId) => {
     return;
   }
 
-  const backPage = window._myCourseSpace?.courseId === courseId ? 'mycourse-detail' : 'plaza-course';
+  // 清洗课程名用于面包屑显示
+  const cleanTitle = course.title.replace(/\d{1,3}\s*班\s*$/, '').replace(/[\s ]*\d{1,3}\s*$/, '').replace(/\d{1,3}$/, '').trim();
 
   container.innerHTML = `
     <div class="create-post-page">
       <div class="create-post-header">
-        <button class="btn btn-icon" onclick="navigateTo('${backPage}', ${courseId})" title="返回">
+        <button class="btn btn-icon" onclick="navigateTo('course-detail', ${courseId})" title="返回">
           <span class="mi">arrow_back</span>
         </button>
         <div class="create-post-breadcrumb">
-          <span class="text-secondary">${escHtml(course.title)}</span>
+          <span class="text-secondary">${escHtml(cleanTitle)}</span>
           <span class="mi" style="font-size:18px;color:var(--md-outline)">chevron_right</span>
           <span style="font-weight:600">发帖</span>
         </div>
@@ -299,12 +301,7 @@ registerPage('publish', async (container, courseId) => {
       }
 
       showToast('发帖成功');
-      // 返回来源页面
-      if (window._myCourseSpace?.courseId === courseId) {
-        navigateTo('mycourse-detail', courseId);
-      } else {
-        navigateTo('plaza-course', courseId);
-      }
+      navigateTo('course-detail', courseId);
     } catch (err) {
       errEl.textContent = '发布失败，请检查网络';
       errEl.style.display = 'block';

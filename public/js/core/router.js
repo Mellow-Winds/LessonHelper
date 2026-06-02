@@ -71,9 +71,8 @@ export function renderMarkdown(text) {
 
 const ROUTES = [
   { page: 'mycourse',       pattern: '/mycourse',              nav: 'mycourse' },
-  { page: 'mycourse-detail',pattern: '/mycourse/:id',          nav: 'mycourse' },
+  { page: 'course-detail',  pattern: '/course/:id',            nav: null },
   { page: 'allcourse',      pattern: '/allcourse',             nav: 'allcourse' },
-  { page: 'plaza-course',   pattern: '/allcourse/:id',         nav: 'allcourse' },
   { page: 'publish',        pattern: '/course/:id/posts',      nav: null },
   { page: 'profile',        pattern: '/profile',               nav: 'profile' },
   { page: 'profile-edit', pattern: '/profile/edit',        nav: 'profile' },

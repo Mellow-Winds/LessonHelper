@@ -5,7 +5,7 @@ import { resolveNotificationTarget } from '../public/js/pages/notification_route
 
 test('course post notifications navigate to the course detail page', () => {
   assert.deepEqual(resolveNotificationTarget('post', 31, 7), {
-    page: 'mycourse-detail',
+    page: 'course-detail',
     data: 7,
   });
 });
@@ -18,7 +18,7 @@ test('invite notifications navigate to explore', () => {
 
 test('material notifications navigate to the course detail page', () => {
   assert.deepEqual(resolveNotificationTarget('material', 31, 7), {
-    page: 'mycourse-detail',
+    page: 'course-detail',
     data: 7,
   });
 });

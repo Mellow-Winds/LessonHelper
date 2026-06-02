@@ -311,3 +311,25 @@
 - [x] `tests/following.test.mjs`、`tests/following_frontend.test.mjs`、`tests/notification_routes.test.mjs`：增加隐私绕过、共同课程、关注通知、动态聚合、侧栏入口和通知跳转回归测试。
 
 **验证**：`npm test` 执行 35 个测试全部通过；`node --check` 检查受影响模块全部通过；本地服务启动后访问首页返回 `HTTP 200`。
+
+---
+
+## 第18轮：课程系统扁平化重构 ✅
+
+**目标**：消灭"小课空间"，全站统一为唯一的"大课空间详情页"
+
+- [x] `public/js/core/router.js`：`mycourse-detail` 和 `plaza-course` 路由替换为 `course-detail`（`/course/:id`）
+- [x] `public/js/pages/courses/my_courses.js`：精简为仅选修课表列表页，详情页逻辑全部迁出
+- [x] `public/js/pages/courses/all_courses.js`（新建）：课程广场搜索页，聚合逻辑从 plaza.js 迁移
+- [x] `public/js/pages/courses/detail.js`（新建）：全站唯一大课空间详情页，通过 courseId 动态评估选修状态
+  - 已选修 → 三段药丸（论坛/资料/交友）+ 发布按钮激活
+  - 未选修 → 两段药丸（论坛/资料）+ 发布按钮置灰 + 交友物理隐藏
+- [x] `public/js/pages/courses/publish.js`：移除对 `_myCourseSpace` 依赖，返回统一导航到 `course-detail`
+- [x] `public/js/pages/courses/plaza.js`：删除（功能迁移到 all_courses.js + detail.js）
+- [x] `public/js/main.js`：更新 import 和 window 注册
+- [x] `public/js/pages/auth.js`：`navigateToCourseResult` 简化为统一导航
+- [x] 更新所有引用旧页面名的文件：`following_feed.js`、`profile.js`、`notification_routes.mjs`、`my_posts.js`
+- [x] `public/css/style.css`：更新 `.btn-disabled` 样式支持 onclick Toast
+- [x] 更新 6 个测试文件以匹配新页面名和文件结构
+
+**验证**：`npm test` 执行 37 个测试全部通过；`node --check` 检查所有修改文件通过；本地服务返回 `HTTP 200`。

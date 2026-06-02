@@ -105,16 +105,18 @@ import {
 import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
   openImportModal, handleAgreeAndImport, handleScheduleImport,
-  switchMyCourseTab, toggleComments, handleAddComment,
-  refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
-  openUploadMaterialModal, onFileSelected, handleUploadMaterial,
-  filterMyMembers, filterMyMembersTab,
-  handlePortalToPlaza,
 } from './pages/courses/my_courses.js';
 
 import {
-  switchPlazaTab, filterPlazaCourses,
-} from './pages/courses/plaza.js';
+  filterPlazaCourses, navigateToPlazaCourseById,
+} from './pages/courses/all_courses.js';
+
+import {
+  showPublishBlockedToast, switchDetailTab, toggleComments, handleAddComment,
+  refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
+  openUploadMaterialModal, onFileSelected, handleUploadMaterial,
+  filterMembers, filterMembersTab,
+} from './pages/courses/detail.js';
 
 import {
   onPublishFileSelected,
@@ -209,7 +211,7 @@ Object.assign(window, {
   openEditProfileModal,
   handleEditProfile,
   handlePrivacyChange,
-  // my courses
+  // my courses (list only)
   handleLeaveCourse,
   openCourseSearchModal,
   doCourseSearch,
@@ -217,7 +219,12 @@ Object.assign(window, {
   openImportModal,
   handleAgreeAndImport,
   handleScheduleImport,
-  switchMyCourseTab,
+  // all courses (plaza search)
+  filterPlazaCourses,
+  navigateToPlazaCourseById,
+  // course detail (unified)
+  showPublishBlockedToast,
+  switchDetailTab,
   toggleComments,
   handleAddComment,
   refreshMyMaterials,
@@ -226,12 +233,8 @@ Object.assign(window, {
   openUploadMaterialModal,
   onFileSelected,
   handleUploadMaterial,
-  filterMyMembers,
-  filterMyMembersTab,
-  handlePortalToPlaza,
-  // plaza
-  switchPlazaTab,
-  filterPlazaCourses,
+  filterMembers,
+  filterMembersTab,
   // publish
   onPublishFileSelected,
   // explore
