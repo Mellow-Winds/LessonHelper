@@ -76,7 +76,7 @@ export async function navigateToPlazaCourseById(courseId, postId) {
   if (idx < 0) return false;
   window._plazaTargetPostId = postId || null;
   window._plazaCourseId = Number(courseId);
-  navigateTo('plaza-course', idx);
+  navigateTo('plaza-course', Number(courseId));
   return true;
 }
 
@@ -166,12 +166,10 @@ window._plazaSpace = {};
 registerPage('plaza-course', async (container, courseIdOrIdx) => {
   await loadPlazaDataOnce();
 
-  // 兼容：支持 courseId 或索引（旧版）
-  let bigCourse;
-  if (typeof courseIdOrIdx === 'number' && courseIdOrIdx < _bigCoursesList.length && _bigCoursesList[courseIdOrIdx]?.courseIds) {
+  // 优先按 courseId 匹配，回退到索引（旧版兼容）
+  let bigCourse = _bigCoursesList.find(item => item.courseIds.includes(Number(courseIdOrIdx)));
+  if (!bigCourse && typeof courseIdOrIdx === 'number' && courseIdOrIdx < _bigCoursesList.length) {
     bigCourse = _bigCoursesList[courseIdOrIdx];
-  } else {
-    bigCourse = _bigCoursesList.find(item => item.courseIds.includes(Number(courseIdOrIdx)));
   }
   if (!bigCourse) {
     container.innerHTML = `

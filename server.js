@@ -136,6 +136,8 @@ async function start() {
   migrateTable('courses', 'teacher', "TEXT DEFAULT ''");
   migrateTable('comments', 'parent_id', 'INTEGER');
   migrateTable('comments', 'image_url', "TEXT DEFAULT ''");
+  migrateTable('square_comments', 'parent_id', 'INTEGER');
+  migrateTable('square_comments', 'image_url', "TEXT DEFAULT ''");
 
   // New table: user_courses (many-to-many enrollment)
   db.run(`CREATE TABLE IF NOT EXISTS user_courses (

@@ -269,7 +269,7 @@ export async function resendCode(e) {
 }
 
 // 导出 renderAuth 供 profile.js 使用
-export { renderAuth, authTab as _authTab_getter };
+export { renderAuth };
 
 /* =============================================
    Page: Profile (含登录/注册入口)

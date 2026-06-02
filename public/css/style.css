@@ -1276,6 +1276,22 @@ select::-ms-expand {
   color: var(--md-primary, #1976d2);
 }
 
+.square-status-msg {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.square-status-accepted {
+  background: var(--md-primary-container, #e8f5e9);
+  color: var(--md-primary, #2e7d32);
+}
+.square-status-rejected {
+  background: var(--md-error-container, #fce4ec);
+  color: var(--md-error, #c62828);
+}
+
 /* ========================================
    Create Post Page
    ======================================== */
