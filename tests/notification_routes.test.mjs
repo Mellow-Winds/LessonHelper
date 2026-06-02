@@ -29,3 +29,10 @@ test('square post notifications navigate to the square post detail page', () => 
     data: 31,
   });
 });
+
+test('new follower notifications navigate to the follower profile', () => {
+  assert.deepEqual(resolveNotificationTarget('user', 7, 0), {
+    page: 'profile-user',
+    data: 7,
+  });
+});

@@ -131,7 +131,7 @@ function renderInvitesList(invites) {
               <span><span class="mi" style="font-size:16px;vertical-align:-3px">people</span> ${inv.participant_count}/${inv.max_participants}人</span>
             </div>
             ${inv.description ? `<p style="margin-top:8px;font-size:14px;color:var(--md-on-surface-variant)">${escHtml(inv.description)}</p>` : ''}
-            <div style="margin-top:8px;font-size:12px;color:var(--md-outline)">发起人: ${escHtml(inv.creator_name)}</div>
+            <div style="margin-top:8px;font-size:12px;color:var(--md-outline)">发起人: <button class="user-profile-link" onclick="navigateTo('profile-user', ${inv.creator_id})">${escHtml(inv.creator_name)}</button></div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
             ${!isCreator && !isJoined && inv.status === 'open' && !isFull ? `<button class="btn btn-primary" style="font-size:12px;padding:6px 16px" data-action="join" data-id="${inv.id}">加入</button>` : ''}

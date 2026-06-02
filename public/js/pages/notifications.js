@@ -7,6 +7,9 @@ import { apiGet, apiPut } from '../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../core/router.js';
 import { showToast, escHtml, formatTime } from '../components/ui.js';
 import { resolveNotificationTarget } from './notification_routes.mjs';
+import { renderFollowingFeed } from './following_feed.js';
+
+let activeTab = 'messages';
 
 /* =============================================
    页面注册
@@ -26,7 +29,11 @@ registerPage('notifications', async (container) => {
         <span class="mi">done_all</span> 全部已读
       </button>
     </div>
-    <div id="notif-list-container"></div>
+    <div class="md-tabs" id="notification-tabs">
+      <button class="md-tab-btn${activeTab === 'messages' ? ' active' : ''}" data-notification-tab="messages">消息通知</button>
+      <button class="md-tab-btn${activeTab === 'following' ? ' active' : ''}" data-notification-tab="following">关注动态</button>
+    </div>
+    <div id="notification-tab-content"></div>
   `;
 
   bindRipples(container);
@@ -34,19 +41,47 @@ registerPage('notifications', async (container) => {
 
   document.getElementById('notif-mark-all-btn')?.addEventListener('click', handleMarkAllRead);
 
-  // 事件委托：点击通知项
-  const listContainer = document.getElementById('notif-list-container');
-  if (listContainer) {
-    listContainer.addEventListener('click', (e) => {
+  container.querySelectorAll('[data-notification-tab]').forEach(btn => {
+    btn.addEventListener('click', () => switchNotificationTab(btn.dataset.notificationTab));
+  });
+
+  await renderActiveTab();
+});
+
+/* =============================================
+   页签切换
+   ============================================= */
+
+async function switchNotificationTab(tab) {
+  if (tab === activeTab) return;
+  activeTab = tab;
+  document.querySelectorAll('[data-notification-tab]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.notificationTab === tab);
+  });
+  await renderActiveTab();
+}
+
+async function renderActiveTab() {
+  const content = document.getElementById('notification-tab-content');
+  if (!content) return;
+
+  const markAllBtn = document.getElementById('notif-mark-all-btn');
+  if (markAllBtn) markAllBtn.style.display = 'none';
+
+  if (activeTab === 'following') {
+    await renderFollowingFeed(content);
+  } else {
+    content.innerHTML = '<div id="notif-list-container"></div>';
+    const listContainer = document.getElementById('notif-list-container');
+    listContainer?.addEventListener('click', (e) => {
       const item = e.target.closest('.notif-page-item');
       if (!item) return;
       const { notifId, relatedType, relatedId, courseId, isRead } = item.dataset;
       handleNotifItemClick(Number(notifId), relatedType, Number(relatedId), Number(courseId), isRead === 'true');
     });
+    await loadNotifications();
   }
-
-  await loadNotifications();
-});
+}
 
 /* =============================================
    加载通知列表
@@ -140,6 +175,7 @@ function getNotifIcon(type) {
     new_material: 'folder',
     invite_join: 'person_add',
     invite_cancel: 'event_busy',
+    new_follower: 'person_add',
   };
   return `<span class="mi" style="font-size:22px">${icons[type] || 'notifications'}</span>`;
 }

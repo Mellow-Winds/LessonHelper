@@ -98,7 +98,7 @@ function renderSquarePosts(posts) {
           <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;font-size:12px;color:var(--md-on-surface-variant)">
             <span><span class="mi" style="font-size:14px;vertical-align:-2px">people</span> ${p.confirmed_count || 0}/${p.max_people}人</span>
             <span><span class="mi" style="font-size:14px;vertical-align:-2px">schedule</span> 剩余 ${p.remaining_days} 天</span>
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> ${escHtml(p.creator_name)}</span>
+            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> <button class="user-profile-link" onclick="event.stopPropagation();navigateTo('profile-user', ${p.creator_id})">${escHtml(p.creator_name)}</button></span>
           </div>
           ${p.my_status ? `<div style="margin-top:6px;font-size:12px;color:var(--md-primary);font-weight:500">你: ${p.my_status === 'pending' ? '已申请，等待确认' : p.my_status === 'accepted' ? '已通过' : '已拒绝'}</div>` : ''}
         </div>
@@ -137,7 +137,7 @@ export async function renderSquarePost(container, postId) {
         <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;font-size:14px;color:var(--md-on-surface-variant)">
           <span><span class="mi" style="font-size:16px;vertical-align:-3px">people</span> ${data.confirmed?.length || 0}/${data.max_people}人</span>
           <span><span class="mi" style="font-size:16px;vertical-align:-3px">schedule</span> 剩余 ${data.remaining_days} 天</span>
-          <span><span class="mi" style="font-size:16px;vertical-align:-3px">person</span> ${escHtml(data.creator_name)}${data.creator_major ? ' · ' + escHtml(data.creator_major) : ''}${data.creator_grade ? ' · ' + escHtml(data.creator_grade) : ''}</span>
+          <span><span class="mi" style="font-size:16px;vertical-align:-3px">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${data.creator_id})">${escHtml(data.creator_name)}</button>${data.creator_major ? ' · ' + escHtml(data.creator_major) : ''}${data.creator_grade ? ' · ' + escHtml(data.creator_grade) : ''}</span>
         </div>
         ${!isCreator ? renderSquareAction(data) : ''}
       </div>
@@ -151,7 +151,7 @@ export async function renderSquarePost(container, postId) {
             <div style="display:flex;align-items:center;gap:10px;padding:8px 0;${data.confirmed.indexOf(m) > 0 ? 'border-top:1px solid var(--md-outline-variant)' : ''}">
               <div class="avatar-small">${(m.nickname || '?')[0]}</div>
               <div style="flex:1">
-                <div style="font-weight:500">${escHtml(m.nickname)}</div>
+                <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.user_id})">${escHtml(m.nickname)}</button>
                 ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
               </div>
               ${m.qq ? `<div style="font-size:13px;color:var(--md-primary);cursor:pointer" onclick="navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:14px;vertical-align:-2px" data-icon="qq">qq</span> QQ: ${escHtml(m.qq)}</div>` : ''}
@@ -218,7 +218,7 @@ function renderSquareCreatorPanel(data) {
         <div style="display:flex;align-items:center;gap:10px;padding:8px 0;${data.pending.indexOf(p) > 0 ? 'border-top:1px solid var(--md-outline-variant)' : ''}">
           <div class="avatar-small">${(p.nickname || '?')[0]}</div>
           <div style="flex:1">
-            <div style="font-weight:500">${escHtml(p.nickname)}</div>
+            <button class="user-profile-link" onclick="navigateTo('profile-user', ${p.user_id})">${escHtml(p.nickname)}</button>
             ${(p.major || p.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([p.major, p.grade].filter(Boolean).join(' · '))}</div>` : ''}
           </div>
           <div style="display:flex;gap:6px">
@@ -257,7 +257,7 @@ async function loadSquareComments(postId) {
     } else {
       el.innerHTML = comments.map(c => `
         <div style="padding:8px 0;${comments.indexOf(c) > 0 ? 'border-top:1px solid var(--md-outline-variant)' : ''}">
-          <div style="font-size:13px"><strong>${escHtml(c.author_name)}</strong> · ${formatTime(c.created_at)}</div>
+          <div style="font-size:13px"><button class="user-profile-link" onclick="navigateTo('profile-user', ${c.author_id})">${escHtml(c.author_name)}</button> · ${formatTime(c.created_at)}</div>
           <div style="font-size:14px;margin-top:4px;white-space:pre-wrap">${escHtml(c.content)}</div>
         </div>
       `).join('');

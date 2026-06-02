@@ -30,4 +30,20 @@ function authMiddleware(req, res, next) {
   }
 }
 
-module.exports = { authMiddleware, generateToken, JWT_SECRET };
+// 公开接口可以识别已登录用户，但不会强制要求登录。
+function optionalAuthMiddleware(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return next();
+  }
+
+  try {
+    const token = header.split(' ')[1];
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch (e) {
+    // 无效 token 按未登录处理，公开内容仍可访问。
+  }
+  next();
+}
+
+module.exports = { authMiddleware, optionalAuthMiddleware, generateToken, JWT_SECRET };
