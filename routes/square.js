@@ -90,6 +90,11 @@ module.exports = function (db) {
 
     if (!post) return res.status(404).json({ error: '帖子不存在' });
 
+    // 检查过期状态
+    if (new Date(post.expires_at) <= new Date()) {
+      post.status = 'expired';
+    }
+
     // 已确认成员（显示 QQ）
     const confirmed = db.all(`
       SELECT u.id AS user_id, u.nickname, u.major, u.grade, u.avatar_url, u.qq
