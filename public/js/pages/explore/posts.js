@@ -269,7 +269,7 @@ async function renderInviteForm(formEl) {
     if (Array.isArray(courses)) {
       courseOptions = [
         { text: '不关联课程', value: '' },
-        ...courses.map(c => ({ text: c.name || c.course_name || `课程${c.id}`, value: String(c.id) })),
+        ...courses.map(c => ({ text: c.title || `课程${c.id}`, value: String(c.id) })),
       ];
     }
   } catch { /* fallback to empty */ }

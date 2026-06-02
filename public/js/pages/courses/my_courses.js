@@ -999,6 +999,7 @@ function renderComments(section, postId, comments) {
     ${isLoggedIn() ? `
       <form onsubmit="handleAddComment(event, ${postId})" style="display:flex;gap:8px;margin-top:12px;align-items:flex-start">
         ${createMdInput({
+          name: 'content',
           label: '写回复',
           required: true,
           style: 'flex:1;margin-bottom:0',
