@@ -32,7 +32,7 @@ $env:RESEND_API_KEY="re_xxxxxx"
 - 个人资料：昵称、专业、年级、QQ、微信、抖音、MBTI、肖像描述
 - 每日签到（连续打卡 + 双重宽限期保护）
 - 完整度进度条（7 项因子）
-- 关注/粉丝系统
+- 关注/粉丝系统 + 关注动态
 - 隐私设置（公开资料 / 允许被匹配）
 - 个人名片公开主页
 - 预览「他人看我」模式
@@ -42,9 +42,10 @@ $env:RESEND_API_KEY="re_xxxxxx"
 ### 课程系统
 - 课表 Excel 导入（南京大学教务系统 XLSX 解析）
 - 课程列表（学期筛选、选课/退课、50 门上限）
-- 课程空间：论坛（发帖/评论）+ 资料（上传/下载/评分）+ 成员（筛选/统计）
+- 课程空间：论坛（发帖/评论/附件）+ 资料（上传/下载/评分）+ 成员（筛选/统计）
 - 课程广场：全校课程聚合浏览（大课归并、跨班内容共享）
-- 统一发布页：富文本编辑器 + 文件附件 + 分类选择
+- 统一发布页：富文本编辑器 + 多文件附件（最多 9 个）+ 分类选择
+- 课程成员访问控制（仅选课用户可查看成员）
 
 ### 学习资料
 - 上传：PDF / PPT / Word / 图片，单文件 20MB
@@ -71,6 +72,10 @@ $env:RESEND_API_KEY="re_xxxxxx"
 - 搜索课程 / 资料 / 帖子
 - 分 Tab 展示、关键词高亮、搜索历史
 
+### 收藏系统
+- 收藏课程 / 帖子
+- 我的收藏页面
+
 ## 技术栈
 
 | 层级 | 技术 |
@@ -83,44 +88,28 @@ $env:RESEND_API_KEY="re_xxxxxx"
 | 前端 | 原生 JavaScript SPA + ES6 Modules |
 | 设计系统 | Material Design 3 |
 | Markdown | markdown-it |
+| 测试 | node:test |
 
 ## 项目结构
 
-```
-├── server.js                  # Express 入口
-├── routes/                    # 后端 API（10 个路由文件）
-│   ├── auth.js                #   注册/登录/签到
-│   ├── courses.js             #   课程/帖子/评论/成员
-│   ├── user.js                #   名片/关注/反馈
-│   ├── schedule.js            #   课表导入
-│   ├── materials.js           #   学习资料
-│   ├── invites.js             #   自习邀约
-│   ├── notifications.js       #   消息通知
-│   ├── search.js              #   全局搜索
-│   ├── square.js              #   交友广场
-│   └── my_posts.js            #   我的创作
-├── public/
-│   ├── index.html
-│   ├── css/style.css
-│   └── js/
-│       ├── main.js            #   全局入口
-│       ├── core/              #   API 层 + 路由系统
-│       ├── components/        #   MD3 组件工厂
-│       └── pages/             #   页面模块（11 个文件）
-├── docs/                      # 项目文档
-├── devlog/                    # 开发日志
-├── todolist/                  # 待规划功能
-└── uploads/                   # 文件存储
-```
+详见 [CLAUDE.md](CLAUDE.md)。简要概览：
+
+- `routes/` — 11 个后端 API 路由文件
+- `public/js/pages/` — 14 个前端页面模块
+- `tests/` — 13 个自动化测试文件
+- `docs/` — 项目文档（需求/技术/设计/API/开发步骤）
+- `todolist/` — 待规划功能清单
+- `devlog/` — 开发日志
 
 ## 项目文档
 
 | 文档 | 路径 |
 |------|------|
+| 项目指南 | [CLAUDE.md](CLAUDE.md) |
 | 开发需求 | [docs/requirements.md](docs/requirements.md) |
 | 技术规范 | [docs/tech-spec.md](docs/tech-spec.md) |
 | 设计规范 | [docs/design-spec.md](docs/design-spec.md) |
 | 开发步骤 | [docs/development-steps.md](docs/development-steps.md) |
 | API 文档 | [docs/api-spec.md](docs/api-spec.md) |
-| 项目指南 | [CLAUDE.md](CLAUDE.md) |
 | 开发日志 | [devlog/](devlog/) |
+| 待办事项 | [todolist/](todolist/) |
