@@ -190,12 +190,12 @@ module.exports = function (db) {
     if (existing) return res.status(400).json({ error: '你已参与该邀约' });
     if (invite.creator_id === userId) return res.status(400).json({ error: '你是邀约发起人，无需重复加入' });
 
-    // 检查人数上限
+    // 检查人数上限（max_participants 包含创建者，需预留 1 个名额）
     const count = db.get(
       "SELECT COUNT(*) AS cnt FROM study_invite_responses WHERE invite_id = ? AND status = 'accepted'",
       [inviteId]
     );
-    if (count.cnt >= invite.max_participants) {
+    if (count.cnt >= invite.max_participants - 1) {
       return res.status(400).json({ error: '人数已满' });
     }
 
@@ -205,7 +205,7 @@ module.exports = function (db) {
     );
 
     // 满员时自动更新状态
-    if (count.cnt + 1 >= invite.max_participants) {
+    if (count.cnt + 1 >= invite.max_participants - 1) {
       db.run("UPDATE study_invites SET status = 'full' WHERE id = ?", [inviteId]);
     }
     db.save();
