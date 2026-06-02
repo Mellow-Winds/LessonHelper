@@ -5,7 +5,8 @@
 
 import { apiGet, apiPut } from '../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../core/router.js';
-import { showToast, escHtml, formatTime } from '../components/ui.js';
+import { showToast, escHtml, formatTime, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
+import { renderAuth } from './auth.js';
 import { resolveNotificationTarget } from './notification_routes.mjs';
 import { renderFollowingFeed } from './following_feed.js';
 
@@ -18,7 +19,8 @@ let activeTab = 'messages';
 registerPage('notifications', async (container) => {
   if (!window._currentUser) { await window.loadCurrentUser(); }
   if (!window._currentUser) {
-    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录</p></div>';
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 

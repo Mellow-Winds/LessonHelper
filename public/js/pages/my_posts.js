@@ -5,7 +5,8 @@
 
 import { apiGet } from '../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../core/router.js';
-import { showToast, escHtml, formatTime } from '../components/ui.js';
+import { showToast, escHtml, formatTime, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
+import { renderAuth } from './auth.js';
 
 /* =============================================
    Tab 配置
@@ -23,7 +24,8 @@ const MY_POST_TABS = [
 registerPage('my_post', async (container) => {
   if (!window._currentUser) { await window.loadCurrentUser(); }
   if (!window._currentUser) {
-    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录</p></div>';
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 
@@ -56,7 +58,8 @@ registerPage('my_post', async (container) => {
 registerPage('my_post-course', async (container) => {
   if (!window._currentUser) { await window.loadCurrentUser(); }
   if (!window._currentUser) {
-    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录</p></div>';
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
   await renderMyPostPage(container, 'course');
@@ -65,7 +68,8 @@ registerPage('my_post-course', async (container) => {
 registerPage('my_post-explore', async (container) => {
   if (!window._currentUser) { await window.loadCurrentUser(); }
   if (!window._currentUser) {
-    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录</p></div>';
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
   await renderMyPostPage(container, 'explore');

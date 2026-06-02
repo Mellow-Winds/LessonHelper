@@ -250,3 +250,41 @@ export function closeModal() {
 
 // 挂载到 window 供 openModal 模板中的 onclick="closeModal()" 使用
 window.closeModal = closeModal;
+
+/* =============================================
+   登录提示组件（统一风格）
+   ============================================= */
+
+/**
+ * 渲染登录提示卡片
+ * @returns {string} HTML 字符串
+ */
+export function renderLoginPrompt() {
+  return `
+    <div class="profile-page">
+      <div class="profile-empty-card">
+        <span class="mi profile-empty-icon">person_off</span>
+        <h2 class="profile-empty-title">尚未登录</h2>
+        <p class="profile-empty-desc">登录后即可使用完整功能</p>
+        <button class="btn btn-primary" id="login-prompt-btn">
+          <span class="mi">login</span>
+          前往登录
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * 绑定登录提示按钮事件（点击后在当前页面内渲染登录表单）
+ * @param {HTMLElement} container - 页面容器
+ * @param {Function} renderAuthFn - renderAuth 函数，接收 container 参数
+ */
+export function bindLoginPrompt(container, renderAuthFn) {
+  const btn = container.querySelector('#login-prompt-btn');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      if (renderAuthFn) renderAuthFn(container);
+    });
+  }
+}

@@ -9,7 +9,8 @@
 
 import { apiGet, apiPost, getToken, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, bindRipples } from '../../core/router.js';
-import { showToast, createMdSelect, escHtml } from '../../components/ui.js';
+import { showToast, createMdSelect, escHtml, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
+import { renderAuth } from '../auth.js';
 
 /* =============================================
    分类配置
@@ -31,8 +32,8 @@ const MAX_FILE_COUNT = 9;
 
 registerPage('publish', async (container, courseId) => {
   if (!isLoggedIn()) {
-    showToast('请先登录');
-    navigateTo('profile');
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 

@@ -6,7 +6,8 @@
 
 import { apiGet, apiPost, apiPut } from '../../core/api.js';
 import { navigateTo, animIn, animStagger, bindRipples } from '../../core/router.js';
-import { showToast, createMdInput, createMdSelect, escHtml, formatTime } from '../../components/ui.js';
+import { showToast, createMdInput, createMdSelect, escHtml, formatTime, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
+import { renderAuth } from '../auth.js';
 
 /* =============================================
    Constants
@@ -21,7 +22,8 @@ const SQUARE_CATEGORIES = ['考研搭子', '考公搭子', '考证搭子', '项�
 export async function renderSquare(container) {
   if (!window._currentUser) { await window.loadCurrentUser(); }
   if (!window._currentUser) {
-    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录后浏览交友广场</p></div>';
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 
@@ -282,7 +284,8 @@ export async function submitSquareComment(postId) {
 
 export async function renderSquareMy(container) {
   if (!window._currentUser) {
-    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录</p></div>';
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 

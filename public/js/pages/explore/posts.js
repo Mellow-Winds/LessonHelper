@@ -6,7 +6,8 @@
 
 import { apiGet, apiPost } from '../../core/api.js';
 import { navigateTo, animIn, bindRipples } from '../../core/router.js';
-import { showToast, createMdInput, createMdTextarea, createMdSelect, escHtml } from '../../components/ui.js';
+import { showToast, createMdInput, createMdTextarea, createMdSelect, escHtml, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
+import { renderAuth } from '../auth.js';
 
 /* =============================================
    Constants
@@ -27,7 +28,8 @@ const TIME_SLOTS = [
 export async function renderPosts(container) {
   if (!window._currentUser) { await window.loadCurrentUser(); }
   if (!window._currentUser) {
-    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录后发布内容</p></div>';
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 

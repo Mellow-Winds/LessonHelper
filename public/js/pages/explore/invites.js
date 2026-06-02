@@ -6,7 +6,8 @@
 
 import { apiGet, apiPost, apiDelete } from '../../core/api.js';
 import { navigateTo, animStagger } from '../../core/router.js';
-import { showToast, createMdSelect, escHtml } from '../../components/ui.js';
+import { showToast, createMdSelect, escHtml, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
+import { renderAuth } from '../auth.js';
 
 /* =============================================
    Render — 渲染邀约列表面板
@@ -17,7 +18,8 @@ export async function renderInvites(container) {
     await window.loadCurrentUser();
   }
   if (!window._currentUser) {
-    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录后查看自习邀约</p></div>';
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 
@@ -165,7 +167,8 @@ export async function cancelInvite(inviteId) {
 
 export async function renderMyInvites(container) {
   if (!window._currentUser) {
-    container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">请先登录</p></div>';
+    container.innerHTML = renderLoginPrompt();
+    bindLoginPrompt(container, renderAuth);
     return;
   }
 
