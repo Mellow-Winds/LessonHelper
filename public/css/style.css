@@ -1098,12 +1098,60 @@ select::-ms-expand {
 
 /* ---- Course Tabs (uses .md-tabs / .md-tab-btn) ---- */
 
+/* ---- Material Filter Bar ---- */
+.material-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  margin-bottom: 16px;
+}
+.material-filter-bar .md-select-container,
+.material-filter-bar .md-input-group {
+  margin-bottom: 0;
+}
+.material-filter-bar .mat-filter-category,
+.material-filter-bar .mat-filter-sort {
+  flex: 0 0 140px;
+  width: 140px;
+}
+.material-filter-bar .mat-filter-category .md-select-trigger,
+.material-filter-bar .mat-filter-sort .md-select-trigger,
+.material-filter-bar .mat-filter-search .md-input,
+.material-filter-bar .mat-filter-search .md-border {
+  border-radius: 12px;
+  height: 44px;
+}
+.material-filter-bar .mat-filter-category .md-select-trigger,
+.material-filter-bar .mat-filter-sort .md-select-trigger {
+  padding: 10px 36px 10px 14px;
+}
+.material-filter-bar .mat-filter-search {
+  flex: 1;
+  min-width: 0;
+}
+.material-filter-bar .mat-filter-search .md-label {
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+}
+
 /* ---- Material Card ---- */
 .material-card {
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.25s var(--ease-standard), border-color 0.25s var(--ease-standard);
+  padding: 16px;
+}
+.material-card:hover {
+  box-shadow: var(--shadow-2);
+  border-color: var(--md-outline);
 }
 .material-card + .material-card {
   margin-top: 12px;
+}
+.material-card-inner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
 }
 .material-icon {
   display: flex;
@@ -1113,11 +1161,83 @@ select::-ms-expand {
   min-width: 48px;
   padding: 8px;
   background: var(--md-surface-variant, #f5f5f5);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: 12px;
   text-align: center;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
+  flex-shrink: 0;
+}
+.material-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.material-card-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.3;
+}
+.material-card-desc {
+  font-size: 12px;
+  color: var(--md-on-surface-variant);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.material-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #6b7280;
+}
+.material-meta-row + .material-meta-row {
+  margin-top: 4px;
+}
+.material-meta-row .mi {
+  font-size: 20px;
+  vertical-align: middle;
+  line-height: 1;
+}
+.material-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.material-stars-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.material-stars-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+.material-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  align-self: center;
+}
+.material-card-actions .btn {
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(74, 144, 217, 0.2);
+  transition: background-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.material-card-actions .btn-primary:hover {
+  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.3);
+}
+.material-card-actions .btn .mi {
+  font-size: 20px;
 }
 
 /* ---- Stars ---- */
@@ -1985,32 +2105,55 @@ input {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-6);
-  background: var(--md-on-surface);
-  color: var(--md-surface);
-  border-radius: var(--radius-pill);
+  gap: var(--space-4);
+  padding: 14px var(--space-8);
+  background: rgba(26, 27, 33, 0.95);
+  color: #ffffff;
+  border-radius: 999px;
   font-size: var(--text-sm);
   font-weight: 500;
-  box-shadow: var(--shadow-3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24), 0 2px 8px rgba(0, 0, 0, 0.12);
   z-index: 100;
   animation: slideUpIn 0.3s var(--ease-decelerate);
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .profile-preview-banner .mi {
+  font-size: 20px;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.profile-preview-banner-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: #ffffff;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.profile-preview-banner-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.profile-preview-banner-btn:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.profile-preview-banner-btn .mi {
   font-size: 18px;
-}
-
-.profile-preview-banner .btn-secondary {
-  border-color: rgba(255,255,255,0.3);
-  color: var(--md-surface);
-  font-size: var(--text-xs);
-  padding: 6px 16px;
-}
-
-.profile-preview-banner .btn-secondary:hover {
-  background: rgba(255,255,255,0.1);
-  border-color: rgba(255,255,255,0.5);
 }
 
 @keyframes slideUpIn {
@@ -4099,8 +4242,9 @@ input, textarea, select, button,
 
   .page-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: var(--space-3);
+    width: 100%;
   }
 
   .explore-header-actions {
@@ -4125,9 +4269,8 @@ input, textarea, select, button,
     font-size: var(--text-base);
   }
 
-  /* ---- 按钮 ---- */
+  /* ---- 按钮（搜索栏内的按钮除外） ---- */
   .btn-primary {
-    width: 100%;
     justify-content: center;
     height: 48px;
     border-radius: var(--radius-md);
@@ -4158,7 +4301,9 @@ input, textarea, select, button,
     padding-right: var(--space-4);
   }
 
-  .md-input-group textarea.md-input {
+  .md-input-group textarea.md-input,
+  textarea.forum-editor-textarea,
+  textarea.forum-compose-textarea {
     height: auto;
     min-height: 80px;
   }
@@ -4179,7 +4324,9 @@ input, textarea, select, button,
 
   .md-pill-btn {
     white-space: nowrap;
-    flex-shrink: 0;
+    flex: 1 1 0%;
+    min-width: 0;
+    justify-content: center;
     padding: 8px 16px;
     min-height: 44px;
   }
@@ -4253,6 +4400,45 @@ input, textarea, select, button,
   .md-select-option {
     min-height: 48px;
     padding: 14px var(--space-4);
+  }
+
+  /* ---- 并列下拉选择器 → 标准向下展开式 ---- */
+  .inline-selects .md-select-container.open .md-select-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    bottom: auto;
+    left: 0;
+    right: auto;
+    width: 100%;
+    max-height: 240px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    background: var(--md-surface-container-lowest);
+    padding-bottom: 0;
+    z-index: 1100;
+  }
+
+  .inline-selects .md-select-container {
+    overflow: visible !important;
+  }
+
+  .inline-selects .md-select-option {
+    min-height: 44px;
+    padding: 12px 16px;
+    text-align: center;
+    border-bottom: 1px solid var(--md-outline-variant);
+    color: var(--md-on-surface);
+    background: var(--md-surface-container-lowest);
+  }
+
+  .inline-selects .md-select-option:last-child {
+    border-bottom: none;
+  }
+
+  .inline-selects .md-select-option.selected {
+    color: var(--md-primary);
+    font-weight: 600;
+    background: var(--md-primary-container);
   }
 
   /* ---- 课表表格 → 垂直卡片布局 ---- */
@@ -4386,27 +4572,107 @@ input, textarea, select, button,
   }
 
   /* ---- 表单按钮组 ---- */
-  .page-header .btn,
-  .page-header > div:last-child {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
     width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
   }
 
+  /* 我的课程页按钮容器：垂直单列，撑满整行 */
   .page-header > div:last-child {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: 12px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
 
+  /* 按钮基础：全宽，52px 高，16px 圆角，内容居中不截断 */
   .page-header > div:last-child .btn {
     width: 100%;
+    height: 52px;
+    border-radius: 16px;
+    font-size: 15px;
+    font-weight: 500;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
     justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: visible;
+    padding: 0 20px;
+    line-height: 1;
+  }
+
+  /* Secondary 按钮：白底蓝字蓝边框 */
+  .page-header > div:last-child .btn.btn-secondary {
+    background: #ffffff;
+    color: var(--md-primary);
+    border: 1.5px solid var(--md-primary);
+  }
+
+  /* Primary 按钮：蓝底白字 */
+  .page-header > div:last-child .btn.btn-primary {
+    background: var(--md-primary);
+    color: #ffffff;
+    border: 1.5px solid var(--md-primary);
+  }
+
+  /* 图标：固定尺寸，不压缩 */
+  .page-header > div:last-child .btn .mi {
+    font-size: 20px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  /* Primary 按钮图标白色 */
+  .page-header > div:last-child .btn.btn-primary .mi {
+    color: #ffffff;
+  }
+
+  /* ---- 资料筛选栏 ---- */
+  .material-filter-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .material-filter-bar .mat-filter-category,
+  .material-filter-bar .mat-filter-sort {
+    flex: 0 0 calc(50% - 4px);
+    width: calc(50% - 4px);
+  }
+  .material-filter-bar .mat-filter-search {
+    flex-basis: 100%;
+    order: 3;
   }
 
   /* ---- 资料卡片操作按钮 ---- */
-  .material-card .btn {
+  .material-card .btn,
+  .material-card-actions .btn {
     min-width: 44px;
     min-height: 44px;
     padding: 8px 12px;
+  }
+
+  /* ---- 预览横幅适配 ---- */
+  .profile-preview-banner {
+    bottom: 72px;
+    padding: 12px var(--space-4);
+    gap: var(--space-2);
+    max-width: calc(100vw - 32px);
+  }
+  .profile-preview-banner span:not(.mi) {
+    font-size: 12px;
+  }
+  .profile-preview-banner-btn {
+    padding: 6px 12px;
+    font-size: 12px;
   }
 
   /* ---- 邀约/广场卡片 ---- */
@@ -4421,10 +4687,45 @@ input, textarea, select, button,
     padding: var(--space-3) var(--space-4);
   }
 
-  /* ---- 横向 flex 行自适应 ---- */
-  [style*="display:flex"][style*="gap:12px"],
-  [style*="display:flex"][style*="gap:8px"] {
-    flex-wrap: wrap;
+  /* ---- 搜索栏 flex 行（输入框 + 按钮） ---- */
+  .search-bar-row {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px !important;
+  }
+
+  /* 输入框容器：flex:1 占满剩余空间 */
+  .search-bar-row > [style*="flex:1"] {
+    flex: 1 1 0%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* 输入框本体：52px 高，12px 圆角 */
+  .search-bar-row .md-input,
+  .search-bar-row input {
+    height: 52px !important;
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 0 16px !important;
+    font-size: 16px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 搜索按钮：固定 96px 宽，52px 高，12px 圆角 */
+  .search-bar-row > .btn,
+  .search-bar-row > button {
+    flex-shrink: 0;
+    width: 96px !important;
+    min-width: 96px;
+    max-width: 96px;
+    height: 52px !important;
+    border-radius: 12px !important;
+    font-size: 16px !important;
+    font-weight: 500;
+    padding: 0;
+    justify-content: center;
   }
 
   /* ---- 确保所有可点击元素 ≥44px ---- */
