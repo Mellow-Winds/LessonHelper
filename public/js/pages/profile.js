@@ -172,7 +172,7 @@ function renderPreviewBanner() {
     <div class="profile-preview-banner">
       <span class="mi">visibility</span>
       <span>正在预览他人看到的你的主页</span>
-      <button class="btn btn-secondary btn-compact" onclick="window._exitProfilePreview()">
+      <button class="profile-preview-banner-btn" onclick="window._exitProfilePreview()">
         <span class="mi">edit</span>
         退出预览
       </button>

@@ -80,12 +80,14 @@ registerPage('course-detail', async (container, courseId) => {
       <div class="page-header">
         <div style="flex:1;min-width:0">
           <h1 class="page-title" style="margin-bottom:4px">${escHtml(cleanName)}</h1>
-          <p class="text-secondary">
-            ${course.enrollment_count || 0} 人选课
-            ${enrolled ? '' : ' · <span style="color:var(--md-outline)">只读模式</span>'}
-          </p>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <p class="text-secondary" style="margin:0">
+              ${course.enrollment_count || 0} 人选课
+              ${enrolled ? '' : ' · <span style="color:var(--md-outline)">只读模式</span>'}
+            </p>
+            ${renderCourseFavoriteButton(courseId, favoriteCourseIds.has(Number(courseId)))}
+          </div>
         </div>
-        ${renderCourseFavoriteButton(courseId, favoriteCourseIds.has(Number(courseId)))}
       </div>
       <div class="md-pills" id="detail-pills">
         <button class="md-pill-btn active" data-tab="forum" onclick="switchDetailTab('forum', ${courseId})">
@@ -1049,32 +1051,30 @@ async function loadMaterials(contentEl, courseId, enrolled, opts = {}) {
     : '';
 
   contentEl.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        ${createMdSelect({
-          id: 'detail-mat-category',
-          options: categories.map(c => ({ text: c, value: c === '全部' ? 'all' : c })),
-          style: 'width:auto;min-width:100px;margin-bottom:0',
-          onchange: `refreshMyMaterials(${courseId})`
-        })}
-        ${createMdInput({
-          id: 'detail-mat-chapter',
-          label: '按章节搜索',
-          style: 'width:auto;min-width:120px;margin-bottom:0',
-          onchange: `refreshMyMaterials(${courseId})`,
-          placeholder: ' '
-        })}
-        ${createMdSelect({
-          id: 'detail-mat-sort',
-          options: [
-            { text: '最新上传', value: 'newest' },
-            { text: '评分最高', value: 'rating' },
-            { text: '下载最多', value: 'downloads' }
-          ],
-          style: 'width:auto;min-width:100px;margin-bottom:0',
-          onchange: `refreshMyMaterials(${courseId})`
-        })}
-      </div>
+    <div class="material-filter-bar inline-selects">
+      ${createMdSelect({
+        id: 'detail-mat-category',
+        options: categories.map(c => ({ text: c, value: c === '全部' ? 'all' : c })),
+        style: 'margin-bottom:0',
+        onchange: `refreshMyMaterials(${courseId})`
+      }).replace('class="md-select-container"', 'class="md-select-container mat-filter-category"')}
+      ${createMdInput({
+        id: 'detail-mat-chapter',
+        label: '按章节搜索',
+        style: 'margin-bottom:0',
+        onchange: `refreshMyMaterials(${courseId})`,
+        placeholder: ' '
+      }).replace('class="md-input-group"', 'class="md-input-group mat-filter-search"')}
+      ${createMdSelect({
+        id: 'detail-mat-sort',
+        options: [
+          { text: '最新上传', value: 'newest' },
+          { text: '评分最高', value: 'rating' },
+          { text: '下载最多', value: 'downloads' }
+        ],
+        style: 'margin-bottom:0',
+        onchange: `refreshMyMaterials(${courseId})`
+      }).replace('class="md-select-container"', 'class="md-select-container mat-filter-sort"')}
       ${uploadBtn}
     </div>
     <div id="detail-materials-list">
@@ -1101,33 +1101,37 @@ function renderMaterialsList(materials, courseId, enrolled) {
 
   return materials.map(m => `
     <div class="card material-card">
-      <div style="display:flex;gap:12px;align-items:flex-start">
+      <div class="material-card-inner">
         <div class="material-icon" style="color:${typeColors[m.file_type] || typeColors.other}">
           <span class="mi" style="font-size:28px">${typeIcons[m.file_type] || typeIcons.other}</span>
           <span style="font-size:10px;text-transform:uppercase">${m.file_type}</span>
         </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:var(--text-base)">${escHtml(m.title)}</div>
-          ${m.description ? `<div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">${escHtml(m.description)}</div>` : ''}
-          <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;font-size:12px;color:var(--md-on-surface-variant)">
-            ${m.chapter ? `<span><span class="mi" style="font-size:14px;vertical-align:-2px">bookmark</span> ${escHtml(m.chapter)}</span>` : ''}
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">category</span> ${escHtml(m.category)}</span>
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.uploader_id})">${escHtml(m.uploader_name)}</button></span>
-            <span>${formatFileSize(m.file_size)}</span>
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">download</span> ${m.download_count}</span>
+        <div class="material-card-body">
+          <div class="material-card-title">${escHtml(m.title)}</div>
+          ${m.description ? `<div class="material-card-desc">${escHtml(m.description)}</div>` : ''}
+          <div style="margin-top:8px">
+            <div class="material-meta-row">
+              ${m.chapter ? `<span class="material-meta-item"><span class="mi">bookmark</span> ${escHtml(m.chapter)}</span>` : ''}
+              <span class="material-meta-item"><span class="mi">category</span> ${escHtml(m.category)}</span>
+              <span class="material-meta-item"><span class="mi">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.uploader_id})">${escHtml(m.uploader_name)}</button></span>
+            </div>
+            <div class="material-meta-row">
+              <span class="material-meta-item"><span class="mi">straighten</span> ${formatFileSize(m.file_size)}</span>
+              <span class="material-meta-item"><span class="mi">download</span> ${m.download_count}</span>
+            </div>
           </div>
           ${enrolled ? `
-            <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <div class="material-stars-row">
               ${renderStars(m.avg_rating, m.id)}
-              <span style="font-size:12px;color:var(--md-on-surface-variant)">${m.rating_count > 0 ? m.avg_rating.toFixed(1) + ' 分' : '暂无评分'}</span>
+              <span class="material-stars-label">${m.rating_count > 0 ? m.avg_rating.toFixed(1) + ' 分' : '暂无评分'}</span>
             </div>
           ` : ''}
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
-          <a href="/api/materials/${m.id}/download" class="btn btn-primary" style="font-size:12px;padding:6px 12px">
-            <span class="mi" style="font-size:16px">download</span> 下载
+        <div class="material-card-actions">
+          <a href="/api/materials/${m.id}/download" class="btn btn-primary">
+            <span class="mi">download</span> 下载
           </a>
-          ${enrolled && m.uploader_id === window._currentUser?.id ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 12px" onclick="deleteMyMaterial(${m.id}, ${courseId})"><span class="mi" style="font-size:16px">delete</span> 删除</button>` : ''}
+          ${enrolled && m.uploader_id === window._currentUser?.id ? `<button class="btn btn-secondary" onclick="deleteMyMaterial(${m.id}, ${courseId})"><span class="mi">delete</span> 删除</button>` : ''}
         </div>
       </div>
     </div>
