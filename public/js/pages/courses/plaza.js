@@ -92,7 +92,7 @@ registerPage('allcourse', async (container) => {
         <p class="text-secondary" style="margin-top:4px;font-size:var(--text-sm)">全校课程档案馆 · 只读浏览</p>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:var(--space-6)">
+    <div class="search-bar-row" style="display:flex;gap:8px;margin-bottom:var(--space-6)">
       ${createMdInput({ id: 'plaza-search', label: '搜索课程', placeholder: ' ', style: 'flex:1;margin-bottom:0', attrs: 'oninput="filterPlazaCourses(this.value)"' })}
       <button class="btn btn-primary" style="height:56px" onclick="filterPlazaCourses(document.getElementById('plaza-search').value)">搜索</button>
     </div>
@@ -195,11 +195,13 @@ registerPage('plaza-course', async (container, courseIdOrIdx) => {
     <div class="page-header">
       <div style="flex:1;min-width:0">
         <h1 class="page-title" style="margin-bottom:4px">${escHtml(bigCourse.name)}</h1>
-        <p class="text-secondary">
-          ${bigCourse.courseCount} 个班级 · ${bigCourse.totalCount} 人 · 课程广场（只读）
-        </p>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <p class="text-secondary" style="margin:0">
+            ${bigCourse.courseCount} 个班级 · ${bigCourse.totalCount} 人 · 课程广场（只读）
+          </p>
+          ${renderCourseFavoriteButton(favoriteCourseId, favoriteCourseIds.has(favoriteCourseId))}
+        </div>
       </div>
-      ${renderCourseFavoriteButton(favoriteCourseId, favoriteCourseIds.has(favoriteCourseId))}
     </div>
     <div class="md-pills" id="plaza-pills">
       <button class="md-pill-btn active" data-tab="forum" onclick="switchPlazaTab('forum')">
@@ -352,25 +354,29 @@ async function renderPlazaMaterialsTab(contentEl, courseIds) {
   const typeColors = { pdf: '#e53935', ppt: '#FB8C00', doc: '#1E88E5', image: '#43A047', other: '#757575' };
 
   contentEl.innerHTML = materials.map(m => `
-    <div class="card material-card mb-4">
-      <div style="display:flex;gap:12px;align-items:flex-start">
+    <div class="card material-card">
+      <div class="material-card-inner">
         <div class="material-icon" style="color:${typeColors[m.file_type] || typeColors.other}">
           <span class="mi" style="font-size:28px">${typeIcons[m.file_type] || typeIcons.other}</span>
           <span style="font-size:10px;text-transform:uppercase">${m.file_type}</span>
         </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:var(--text-base)">${escHtml(m.title)}</div>
-          ${m.description ? `<div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">${escHtml(m.description)}</div>` : ''}
-          <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;font-size:12px;color:var(--md-on-surface-variant)">
-            ${m._sourceTitle ? `<span class="plaza-origin-tag">来自 ${escHtml(m._sourceTitle)}</span>` : ''}
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.uploader_id})">${escHtml(m.uploader_name)}</button></span>
-            <span>${formatFileSize(m.file_size)}</span>
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">download</span> ${m.download_count}</span>
+        <div class="material-card-body">
+          <div class="material-card-title">${escHtml(m.title)}</div>
+          ${m.description ? `<div class="material-card-desc">${escHtml(m.description)}</div>` : ''}
+          <div style="margin-top:8px">
+            <div class="material-meta-row">
+              ${m._sourceTitle ? `<span class="material-meta-item"><span class="mi">school</span> ${escHtml(m._sourceTitle)}</span>` : ''}
+              <span class="material-meta-item"><span class="mi">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.uploader_id})">${escHtml(m.uploader_name)}</button></span>
+            </div>
+            <div class="material-meta-row">
+              <span class="material-meta-item"><span class="mi">straighten</span> ${formatFileSize(m.file_size)}</span>
+              <span class="material-meta-item"><span class="mi">download</span> ${m.download_count}</span>
+            </div>
           </div>
         </div>
-        <div style="flex-shrink:0">
-          <a href="/api/materials/${m.id}/download" class="btn btn-primary" style="font-size:12px;padding:6px 12px">
-            <span class="mi" style="font-size:16px">download</span> 下载
+        <div class="material-card-actions">
+          <a href="/api/materials/${m.id}/download" class="btn btn-primary">
+            <span class="mi">download</span> 下载
           </a>
         </div>
       </div>
