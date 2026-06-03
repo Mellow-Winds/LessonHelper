@@ -35,7 +35,7 @@ export async function renderCourseSquareTab(container, courseId, prefix) {
   const st = getState(prefix);
 
   container.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <div class="form-row" style="justify-content:space-between;margin-bottom:16px;flex-wrap:wrap">
       ${createMdSelect({
         id: `${prefix}-sq-filter-category`,
         options: [{ text: '全部类型', value: 'all' }, ...COURSE_SQUARE_CATEGORIES.map(c => ({ text: c, value: c }))],

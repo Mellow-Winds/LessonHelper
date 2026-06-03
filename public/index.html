@@ -5,27 +5,53 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>课搭子 - 同课程学习互助平台</title>
 
-  <!-- Material Icons (Rounded) -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-  <!-- Remix Icon (品牌图标库，用于QQ/微信等社交图标) -->
-  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
-  <!-- Material Web Components (MD3) -->
-  <link href="https://unpkg.com/@material/web@2.3.0/dist/md.theme.css" rel="stylesheet">
+  <!-- 预连接 CDN，减少 DNS + TLS 握手时间 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
+  <!-- 关键路径内联 CSS：确保首屏立即有正确布局和背景色 -->
+  <style>
+    :root{--md-primary:#4A90D9;--md-on-primary:#fff;--md-primary-container:#D3E4FD;--md-on-primary-container:#001C3B;--md-primary-hover:#3A7CC4;--md-surface:#F9F9FF;--md-on-surface:#1A1B21;--md-surface-variant:#E0E2EC;--md-on-surface-variant:#44474F;--md-outline:#74777F;--md-outline-variant:#C4C6D0;--md-surface-container-lowest:#fff;--md-surface-container-low:#F3F3FA;--md-surface-container:#EDEDF4;--md-surface-container-high:#E8E8EF;--md-surface-container-highest:#E2E2E9;--text-xs:11px;--text-sm:14px;--text-base:16px;--text-lg:20px;--text-xl:24px;--text-2xl:32px;--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-6:24px;--space-8:32px;--radius-sm:12px;--radius-md:16px;--radius-lg:20px;--radius-xl:24px;--radius-2xl:28px;--radius-pill:999px;--shadow-1:0 1px 2px rgba(0,0,0,.05),0 1px 3px rgba(0,0,0,.06);--shadow-2:0 2px 4px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.06);--shadow-3:0 4px 8px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.08);--ease-standard:cubic-bezier(.2,0,0,1);--ease-decelerate:cubic-bezier(0,0,0,1);--ease-accelerate:cubic-bezier(.3,0,1,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);--dur-fast:120ms;--dur-normal:250ms;--dur-smooth:350ms;--dur-slow:500ms;--dur-xslow:650ms}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;overflow:hidden}
+    body{--md-field-bg:var(--md-surface);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background-color:var(--md-surface);color:var(--md-on-surface);font-size:var(--text-base);font-weight:400;line-height:1.5;display:flex}
+    :not(:defined){opacity:0;transition:opacity .2s ease-in-out}
+    .sidebar{width:240px;flex-shrink:0;background:linear-gradient(180deg,var(--md-surface-container-low) 0%,var(--md-surface) 100%);border-right:1px solid var(--md-outline-variant);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-6)}
+    .main-content{flex:1;padding:var(--space-8);overflow-y:auto;overflow-x:hidden;position:relative}
+    .brand{display:flex;align-items:center;gap:var(--space-3);color:var(--md-primary);font-size:var(--text-lg);font-weight:700;padding:var(--space-4) var(--space-4);letter-spacing:-.01em}
+    .nav-menu{display:flex;flex-direction:column;gap:4px;flex:1}
+    .nav-item{display:flex;align-items:center;gap:var(--space-3);padding:12px 16px;border-radius:var(--radius-pill);color:var(--md-on-surface-variant);font-size:var(--text-sm);font-weight:500;text-decoration:none;cursor:pointer;transition:background-color var(--dur-normal) var(--ease-standard),color var(--dur-normal) var(--ease-standard)}
+    .nav-item.active{background-color:var(--md-primary-container);color:var(--md-on-primary-container);font-weight:600;box-shadow:var(--shadow-1)}
+    .bottom-tab-bar{display:none}
+  </style>
+
+  <!-- 外部 CSS 异步加载（不阻塞渲染） -->
+  <link rel="preload" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round&display=block" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round&display=block" rel="stylesheet"></noscript>
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet"></noscript>
+  <link rel="preload" href="https://unpkg.com/@material/web@2.3.0/dist/md.theme.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link href="https://unpkg.com/@material/web@2.3.0/dist/md.theme.css" rel="stylesheet"></noscript>
+
+  <!-- Material Web Components (MD3) — type=module 默认 defer -->
   <script type="module" src="https://unpkg.com/@material/web@2.3.0/button/filled-button.js?module"></script>
   <script type="module" src="https://unpkg.com/@material/web@2.3.0/button/outlined-button.js?module"></script>
   <script type="module" src="https://unpkg.com/@material/web@2.3.0/icon/icon.js?module"></script>
   <!-- Motion (Framer Motion family, vanilla JS) -->
-  <script src="https://unpkg.com/motion@11.18.2/dist/motion.js"></script>
+  <script src="https://unpkg.com/motion@11.18.2/dist/motion.js" defer></script>
   <!-- markdown-it (markdown rendering) -->
-  <script src="/js/markdown-it.min.js"></script>
+  <script src="/js/markdown-it.min.js" defer></script>
 
+  <!-- 本地样式表（在异步外部 CSS 之后，解析不被阻塞） -->
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
   <aside class="sidebar">
     <div class="brand">
-      <span class="mi">dashboard</span>
+      <svg class="mi-svg" viewBox="0 0 24 24"><path d="M4 13h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm10 0h6c.55 0 1-.45 1-1v-8c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zM13 4v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1z"/></svg>
       <span>课搭子</span>
     </div>
 
@@ -33,19 +59,19 @@
       <section class="nav-section">
         <span class="nav-section-label">功能</span>
         <a class="nav-item" data-page="search">
-          <span class="mi">search</span>
+          <svg class="mi-svg" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 0 0 1.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 0 0-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 0 0 5.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0c.41-.41.41-1.08 0-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5S14 7.01 14 9.5S11.99 14 9.5 14z"/></svg>
           <span>搜索</span>
         </a>
         <a class="nav-item" data-page="explore">
-          <span class="mi">explore</span>
+          <svg class="mi-svg" viewBox="0 0 24 24"><path d="M12 10.9c-.61 0-1.1.49-1.1 1.1s.49 1.1 1.1 1.1c.61 0 1.1-.49 1.1-1.1s-.49-1.1-1.1-1.1zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm2.19 12.19L6 18l3.81-8.19L18 6l-3.81 8.19z"/></svg>
           <span>发现</span>
         </a>
         <a class="nav-item active" data-page="mycourse">
-          <span class="mi">school</span>
+          <svg class="mi-svg" viewBox="0 0 24 24"><path d="M5 13.18v2.81c0 .73.4 1.41 1.04 1.76l5 2.73c.6.33 1.32.33 1.92 0l5-2.73c.64-.35 1.04-1.03 1.04-1.76v-2.81l-6.04 3.3c-.6.33-1.32.33-1.92 0L5 13.18zm6.04-9.66l-8.43 4.6c-.69.38-.69 1.38 0 1.76l8.43 4.6c.6.33 1.32.33 1.92 0L21 10.09V16c0 .55.45 1 1 1s1-.45 1-1V9.59c0-.37-.2-.7-.52-.88l-9.52-5.19a2.04 2.04 0 0 0-1.92 0z"/></svg>
           <span>我的课程</span>
         </a>
         <a class="nav-item" data-page="allcourse">
-          <span class="mi">public</span>
+          <svg class="mi-svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93c0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41c0 2.08-.8 3.97-2.1 5.39z"/></svg>
           <span>课程广场</span>
         </a>
       </section>
@@ -53,20 +79,20 @@
       <section class="nav-section">
         <span class="nav-section-label">个人</span>
         <a class="nav-item" data-page="profile">
-          <span class="mi sidebar-avatar-icon" id="sidebar-avatar">person</span>
+          <svg class="mi-svg sidebar-avatar-icon" id="sidebar-avatar" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4s-4 1.79-4 4s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v1c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-1c0-2.66-5.33-4-8-4z"/></svg>
           <span>个人中心</span>
         </a>
         <a class="nav-item" data-page="my_post">
-          <span class="mi">edit_note</span>
+          <svg class="mi-svg" viewBox="0 0 24 24"><path d="M14 11c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1s.45-1 1-1h9c.55 0 1 .45 1 1zM3 7c0 .55.45 1 1 1h9c.55 0 1-.45 1-1s-.45-1-1-1H4c-.55 0-1 .45-1 1zm7 8c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1s.45 1 1 1h5c.55 0 1-.45 1-1zm8.01-2.13l.71-.71a.996.996 0 0 1 1.41 0l.71.71c.39.39.39 1.02 0 1.41l-.71.71l-2.12-2.12zm-.71.71l-5.16 5.16c-.09.09-.14.21-.14.35v1.41c0 .28.22.5.5.5h1.41c.13 0 .26-.05.35-.15l5.16-5.16l-2.12-2.11z"/></svg>
           <span>我的发布</span>
         </a>
         <a class="nav-item" data-page="notifications" id="notification-bell">
-          <span class="mi">notifications</span>
+          <svg class="mi-svg" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-1.29 1.29c-.63.63-.19 1.71.7 1.71h13.17c.89 0 1.34-1.08.71-1.71L18 16z"/></svg>
           <span>通知中心</span>
           <span class="notif-badge" id="notif-badge" style="display:none">0</span>
         </a>
         <a class="nav-item" data-page="favorites">
-          <span class="mi">bookmark</span>
+          <svg class="mi-svg" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3l7 3V5c0-1.1-.9-2-2-2z"/></svg>
           <span>我的收藏</span>
         </a>
       </section>
@@ -80,24 +106,24 @@
   <!-- 手机端底部 Tab 栏（仅 ≤767px 可见） -->
   <nav class="bottom-tab-bar">
     <a class="nav-item" data-page="mycourse">
-      <span class="mi">school</span>
+      <svg class="mi-svg" viewBox="0 0 24 24"><path d="M5 13.18v2.81c0 .73.4 1.41 1.04 1.76l5 2.73c.6.33 1.32.33 1.92 0l5-2.73c.64-.35 1.04-1.03 1.04-1.76v-2.81l-6.04 3.3c-.6.33-1.32.33-1.92 0L5 13.18zm6.04-9.66l-8.43 4.6c-.69.38-.69 1.38 0 1.76l8.43 4.6c.6.33 1.32.33 1.92 0L21 10.09V16c0 .55.45 1 1 1s1-.45 1-1V9.59c0-.37-.2-.7-.52-.88l-9.52-5.19a2.04 2.04 0 0 0-1.92 0z"/></svg>
       <span>课表</span>
     </a>
     <a class="nav-item" data-page="allcourse">
-      <span class="mi">public</span>
+      <svg class="mi-svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93c0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41c0 2.08-.8 3.97-2.1 5.39z"/></svg>
       <span>广场</span>
     </a>
     <a class="nav-item" data-page="explore">
-      <span class="mi">explore</span>
+      <svg class="mi-svg" viewBox="0 0 24 24"><path d="M12 10.9c-.61 0-1.1.49-1.1 1.1s.49 1.1 1.1 1.1c.61 0 1.1-.49 1.1-1.1s-.49-1.1-1.1-1.1zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm2.19 12.19L6 18l3.81-8.19L18 6l-3.81 8.19z"/></svg>
       <span>发现</span>
     </a>
     <a class="nav-item" data-page="notifications">
-      <span class="mi">notifications</span>
+      <svg class="mi-svg" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-1.29 1.29c-.63.63-.19 1.71.7 1.71h13.17c.89 0 1.34-1.08.71-1.71L18 16z"/></svg>
       <span>通知</span>
       <span class="notif-badge" id="bottom-notif-badge" style="display:none">0</span>
     </a>
     <a class="nav-item" data-page="profile">
-      <span class="mi">person</span>
+      <svg class="mi-svg" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4s-4 1.79-4 4s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v1c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-1c0-2.66-5.33-4-8-4z"/></svg>
       <span>我的</span>
     </a>
   </nav>

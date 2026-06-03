@@ -170,7 +170,7 @@ document.addEventListener('click', (e) => {
         li.classList.toggle('selected', li === option);
       });
       container.classList.remove('open');
-      container.dispatchEvent(new CustomEvent('md-select-change', { detail: { value, text } }));
+      container.dispatchEvent(new CustomEvent('md-select-change', { detail: { value, text }, bubbles: true }));
       const onchangeStr = container.getAttribute('data-onchange');
       if (onchangeStr) {
         try { eval(onchangeStr); } catch (err) { console.error('md-select onchange error:', err); }

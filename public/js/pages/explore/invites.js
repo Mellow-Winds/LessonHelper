@@ -24,7 +24,7 @@ export async function renderInvites(container) {
   }
 
   container.innerHTML = `
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <div class="form-row" style="margin-bottom:16px;flex-wrap:wrap">
       ${createMdSelect({
         id: 'invite-filter-date',
         options: [

@@ -1045,26 +1045,17 @@ async function loadMaterials(contentEl, courseId, enrolled, opts = {}) {
   const categories = ['全部', '课件', '笔记', '作业', '真题', '其他'];
 
   const uploadBtn = enrolled
-    ? `<button class="btn btn-primary" onclick="openUploadMaterialModal(${courseId})">
-         <span class="mi">upload</span> 上传资料
-       </button>`
+    ? `<button class="btn btn-primary" onclick="openUploadMaterialModal(${courseId})"><span class="mi">upload</span> 上传资料</button>`
     : '';
 
   contentEl.innerHTML = `
-    <div class="material-filter-bar inline-selects">
+    <div class="material-filter-bar">
       ${createMdSelect({
         id: 'detail-mat-category',
         options: categories.map(c => ({ text: c, value: c === '全部' ? 'all' : c })),
-        style: 'margin-bottom:0',
+        style: 'width:120px;margin-bottom:0',
         onchange: `refreshMyMaterials(${courseId})`
-      }).replace('class="md-select-container"', 'class="md-select-container mat-filter-category"')}
-      ${createMdInput({
-        id: 'detail-mat-chapter',
-        label: '按章节搜索',
-        style: 'margin-bottom:0',
-        onchange: `refreshMyMaterials(${courseId})`,
-        placeholder: ' '
-      }).replace('class="md-input-group"', 'class="md-input-group mat-filter-search"')}
+      })}
       ${createMdSelect({
         id: 'detail-mat-sort',
         options: [
@@ -1072,9 +1063,17 @@ async function loadMaterials(contentEl, courseId, enrolled, opts = {}) {
           { text: '评分最高', value: 'rating' },
           { text: '下载最多', value: 'downloads' }
         ],
-        style: 'margin-bottom:0',
+        style: 'width:130px;margin-bottom:0',
         onchange: `refreshMyMaterials(${courseId})`
-      }).replace('class="md-select-container"', 'class="md-select-container mat-filter-sort"')}
+      })}
+      ${createMdInput({
+        id: 'detail-mat-chapter',
+        label: '按章节搜索',
+        style: 'flex:1;margin-bottom:0',
+        placeholder: ' ',
+        attrs: `onkeydown="if(event.key==='Enter'){event.preventDefault();refreshMyMaterials(${courseId})}"`
+      })}
+      <button class="btn btn-primary" onclick="refreshMyMaterials(${courseId})"><span class="mi">search</span></button>
       ${uploadBtn}
     </div>
     <div id="detail-materials-list">
