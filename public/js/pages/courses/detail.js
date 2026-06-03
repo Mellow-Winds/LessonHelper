@@ -199,12 +199,70 @@ async function renderForumTab(contentEl, courseId, enrolled) {
       : `<div class="forum-stream">${posts.map(p => renderForumPostRow(p, enrolled, favoritePostIds)).join('')}</div>`
   );
 
+  // ---- 事件绑定（绕过 window 注册问题） ----
+  bindForumEvents(contentEl, courseId, enrolled);
+
   // 定位目标帖子
   const targetId = window._courseDetailTargetPostId;
   if (targetId) {
     document.getElementById(`forum-post-${targetId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     window._courseDetailTargetPostId = null;
   }
+}
+
+/* ---- 事件绑定（渲染后 addEventListener，不依赖 window） ---- */
+
+function bindForumEvents(root, courseId, enrolled) {
+  // compose bar
+  const composeBar = root.querySelector('#forum-compose-bar');
+  if (composeBar) {
+    composeBar.addEventListener('click', () => openForumCompose());
+  }
+
+  // 用事件委托处理所有 forum 内部点击
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const postId = Number(btn.dataset.postId);
+    const commentId = Number(btn.dataset.commentId);
+    const likeKey = btn.dataset.likeKey;
+
+    switch (action) {
+      case 'reply-post':
+        openForumInlineEditor(postId, null, `post-${postId}`);
+        break;
+      case 'reply-comment':
+        openForumInlineEditor(postId, commentId, `comment-${commentId}`);
+        break;
+      case 'reply-nested':
+        openForumInlineEditor(postId, commentId, `nested-${commentId}`);
+        break;
+      case 'toggle-comments':
+        toggleForumComments(postId);
+        break;
+      case 'toggle-replies':
+        toggleForumReplies(commentId, postId);
+        break;
+      case 'like': {
+        const state = _forumLikeState[likeKey] || { liked: false, count: 0 };
+        state.liked = !state.liked;
+        state.count += state.liked ? 1 : -1;
+        if (state.count < 0) state.count = 0;
+        _forumLikeState[likeKey] = state;
+        btn.classList.toggle('liked', state.liked);
+        const icon = btn.querySelector('.mi');
+        if (icon) icon.textContent = state.liked ? 'favorite' : 'favorite_border';
+        const wrapper = btn.closest('.forum-like-col, .forum-reply-like');
+        const countEl = wrapper?.querySelector('.forum-like-count');
+        if (countEl) countEl.textContent = state.count;
+        break;
+      }
+      case 'navigate-profile':
+        navigateTo('profile-user', Number(btn.dataset.userId));
+        break;
+    }
+  });
 }
 
 function renderForumPostRow(p, enrolled, favoritePostIds) {
@@ -218,18 +276,18 @@ function renderForumPostRow(p, enrolled, favoritePostIds) {
     <div class="forum-post-row" id="forum-post-${p.id}">
       <div class="forum-avatar-col">
         ${p.author_avatar_url
-          ? `<img class="forum-avatar" src="${p.author_avatar_url}" alt="" onclick="navigateTo('profile-user', ${p.author_id})" style="cursor:pointer">`
-          : `<div class="forum-avatar-letter" onclick="navigateTo('profile-user', ${p.author_id})" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
+          ? `<img class="forum-avatar" src="${p.author_avatar_url}" alt="" data-action="navigate-profile" data-user-id="${p.author_id}" style="cursor:pointer">`
+          : `<div class="forum-avatar-letter" data-action="navigate-profile" data-user-id="${p.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
         }
       </div>
       <div class="forum-content-col">
         <div class="forum-post-header">
           <div class="forum-post-meta">
-            <button class="forum-post-name" onclick="navigateTo('profile-user', ${p.author_id})">${escHtml(p.author_name)}</button>
+            <button class="forum-post-name" data-action="navigate-profile" data-user-id="${p.author_id}">${escHtml(p.author_name)}</button>
             <span class="forum-post-time">${formatTime(p.created_at)}</span>
           </div>
           <div class="forum-like-col">
-            <button class="forum-like-btn${like.liked ? ' liked' : ''}" data-like-key="${likeKey}" onclick="toggleForumLike(${p.id}, 'post', this)">
+            <button class="forum-like-btn${like.liked ? ' liked' : ''}" data-action="like" data-like-key="${likeKey}">
               <span class="mi" style="font-size:18px;pointer-events:none">${like.liked ? 'favorite' : 'favorite_border'}</span>
             </button>
             <span class="forum-like-count">${like.count}</span>
@@ -259,10 +317,10 @@ function renderForumPostRow(p, enrolled, favoritePostIds) {
         ` : ''}
         ${enrolled ? `
           <div class="forum-actions">
-            <button class="forum-action-btn" onclick="openForumInlineEditor(${p.id}, null, 'post-${p.id}')">
+            <button class="forum-action-btn" data-action="reply-post" data-post-id="${p.id}">
               <span class="mi" style="font-size:16px">chat_bubble_outline</span> 回复
             </button>
-            <button class="forum-action-btn" onclick="toggleForumComments(${p.id})" id="forum-toggle-${p.id}">
+            <button class="forum-action-btn" data-action="toggle-comments" data-post-id="${p.id}">
               <span class="mi" style="font-size:16px">forum</span> ${p.comment_count || 0} 回复
             </button>
             ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
@@ -363,18 +421,18 @@ function renderForumComment(c, postId, childMap) {
     <div class="forum-reply-row" id="forum-comment-${c.id}">
       <div>
         ${c.author_avatar_url
-          ? `<img class="forum-reply-avatar" src="${c.author_avatar_url}" alt="" onclick="navigateTo('profile-user', ${c.author_id})" style="cursor:pointer">`
-          : `<div class="forum-reply-avatar-letter" onclick="navigateTo('profile-user', ${c.author_id})" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
+          ? `<img class="forum-reply-avatar" src="${c.author_avatar_url}" alt="" data-action="navigate-profile" data-user-id="${c.author_id}" style="cursor:pointer">`
+          : `<div class="forum-reply-avatar-letter" data-action="navigate-profile" data-user-id="${c.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
         }
       </div>
       <div class="forum-reply-content">
         <div class="forum-reply-header">
           <div class="forum-reply-meta">
-            <button class="forum-reply-name" onclick="navigateTo('profile-user', ${c.author_id})">${escHtml(c.author_name)}</button>
+            <button class="forum-reply-name" data-action="navigate-profile" data-user-id="${c.author_id}">${escHtml(c.author_name)}</button>
             <span class="forum-reply-time">${formatTime(c.created_at)}</span>
           </div>
           <div class="forum-reply-like">
-            <button class="forum-like-btn${like.liked ? ' liked' : ''}" data-like-key="${likeKey}" onclick="toggleForumLike(${c.id}, 'comment', this)" style="padding:2px">
+            <button class="forum-like-btn${like.liked ? ' liked' : ''}" data-action="like" data-like-key="${likeKey}" style="padding:2px">
               <span class="mi" style="font-size:14px;pointer-events:none">${like.liked ? 'favorite' : 'favorite_border'}</span>
             </button>
             <span class="forum-like-count" style="font-size:11px">${like.count}</span>
@@ -385,7 +443,7 @@ function renderForumComment(c, postId, childMap) {
         `}
         ${renderCommentImages(c.image_url)}
         <div class="forum-reply-actions">
-          <button class="forum-action-btn" onclick="openForumInlineEditor(${postId}, ${c.id}, 'comment-${c.id}')">
+          <button class="forum-action-btn" data-action="reply-comment" data-post-id="${postId}" data-comment-id="${c.id}">
             <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
           </button>
         </div>
@@ -395,7 +453,7 @@ function renderForumComment(c, postId, childMap) {
             <div class="forum-nested-replies">
               ${children.map(child => renderNestedReply(child, c.author_name, c.author_id, postId)).join('')}
             </div>
-            <button class="forum-view-replies" onclick="toggleForumReplies(${c.id}, ${postId})">
+            <button class="forum-view-replies" data-action="toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">
               ── 收起回复 🔼
             </button>
           ` : `
@@ -405,7 +463,7 @@ function renderForumComment(c, postId, childMap) {
               </div>
             ` : ''}
             ${hiddenCount > 0 ? `
-              <button class="forum-view-replies" onclick="toggleForumReplies(${c.id}, ${postId})">
+              <button class="forum-view-replies" data-action="toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">
                 ── 查看更多 ${hiddenCount} 条回复 🔽
               </button>
             ` : ''}
@@ -425,21 +483,21 @@ function renderNestedReply(child, parentAuthorName, parentAuthorId, postId) {
     <div class="forum-nested-reply">
       <div>
         ${child.author_avatar_url
-          ? `<img class="forum-reply-avatar" src="${child.author_avatar_url}" alt="" onclick="navigateTo('profile-user', ${child.author_id})" style="cursor:pointer">`
-          : `<div class="forum-reply-avatar-letter" onclick="navigateTo('profile-user', ${child.author_id})" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
+          ? `<img class="forum-reply-avatar" src="${child.author_avatar_url}" alt="" data-action="navigate-profile" data-user-id="${child.author_id}" style="cursor:pointer">`
+          : `<div class="forum-reply-avatar-letter" data-action="navigate-profile" data-user-id="${child.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
         }
       </div>
       <div class="forum-reply-content">
         <div class="forum-reply-header">
           <div class="forum-reply-meta">
-            <button class="forum-reply-name" onclick="navigateTo('profile-user', ${child.author_id})">${escHtml(child.author_name)}</button>
+            <button class="forum-reply-name" data-action="navigate-profile" data-user-id="${child.author_id}">${escHtml(child.author_name)}</button>
             <span class="forum-reply-to">
-              回复 <button class="forum-reply-link" onclick="navigateTo('profile-user', ${parentAuthorId})">${escHtml(parentAuthorName || '')}</button>
+              回复 <button class="forum-reply-link" data-action="navigate-profile" data-user-id="${parentAuthorId}">${escHtml(parentAuthorName || '')}</button>
             </span>
             <span class="forum-reply-time">${formatTime(child.created_at)}</span>
           </div>
           <div class="forum-reply-like">
-            <button class="forum-like-btn${like.liked ? ' liked' : ''}" data-like-key="${likeKey}" onclick="toggleForumLike(${child.id}, 'comment', this)" style="padding:2px">
+            <button class="forum-like-btn${like.liked ? ' liked' : ''}" data-action="like" data-like-key="${likeKey}" style="padding:2px">
               <span class="mi" style="font-size:14px;pointer-events:none">${like.liked ? 'favorite' : 'favorite_border'}</span>
             </button>
             <span class="forum-like-count" style="font-size:11px">${like.count}</span>
@@ -450,7 +508,7 @@ function renderNestedReply(child, parentAuthorName, parentAuthorId, postId) {
         `}
         ${renderCommentImages(child.image_url)}
         <div class="forum-reply-actions">
-          <button class="forum-action-btn" onclick="openForumInlineEditor(${postId}, ${child.id || child.parent_id}, 'nested-${child.id}')">
+          <button class="forum-action-btn" data-action="reply-nested" data-post-id="${postId}" data-comment-id="${child.id || child.parent_id}">
             <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
           </button>
         </div>
@@ -555,25 +613,27 @@ export function openForumInlineEditor(postId, parentCommentId, ctxKey) {
   setTimeout(() => {
     const textarea = document.getElementById(`forum-textarea-${ctxKey}`);
     if (textarea) textarea.focus();
-  }, 100);
+  }, 150);
 
-  // 失焦自动收回（延迟检测，避免点击按钮时误触）
-  const textarea = document.getElementById(`forum-textarea-${ctxKey}`);
-  if (textarea) {
-    textarea.addEventListener('blur', () => {
+  // 失焦自动收回：仅当焦点彻底离开编辑器区域且内容为空时才收回
+  setTimeout(() => {
+    const editorDiv = container.querySelector('.forum-inline-editor');
+    if (!editorDiv) return;
+    editorDiv.addEventListener('focusout', (e) => {
       setTimeout(() => {
-        const ta = document.getElementById(`forum-textarea-${ctxKey}`);
-        const sendBtn = document.getElementById(`forum-send-${ctxKey}`);
-        // 如果焦点不在编辑器区域内且内容为空，收回
-        if (ta && !ta.value.trim() && (!sendBtn || document.activeElement !== sendBtn)) {
-          const imgs = _forumReplyImages[ctxKey];
-          if (!imgs || imgs.files.length === 0) {
-            closeForumInlineEditor(ctxKey);
-          }
-        }
-      }, 200);
+        // 焦点还在编辑器内部 → 不收回
+        if (editorDiv.contains(document.activeElement)) return;
+        // 有文字内容 → 不收回
+        const ta = editorDiv.querySelector('textarea');
+        if (ta && ta.value.trim()) return;
+        // 有图片 → 不收回
+        const imgs = _forumReplyImages[ctxKey];
+        if (imgs && imgs.files.length > 0) return;
+        // 彻底离开且为空 → 收回
+        closeForumInlineEditor(ctxKey);
+      }, 300);
     });
-  }
+  }, 200);
 }
 
 function closeForumInlineEditor(ctxKey) {
