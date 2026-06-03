@@ -171,7 +171,7 @@ export async function renderSquarePost(container, postId) {
     bindRipples(container);
     animIn(container.querySelector('.card'), { y: 16, dur: 380 });
 
-    toggleSquareComments(postId);
+    toggleSqComments(postId);
   } catch (e) {
     container.innerHTML = `<div class="card"><p class="text-secondary">加载失败: ${e.message}</p></div>`;
   }
@@ -233,376 +233,420 @@ export async function handleSquareInterest(interestId, action) {
 }
 
 /* =============================================
-   广场评论系统（完整版：楼中楼 + 图片 + 软删除）
+   广场评论系统（课程论坛风格：内联编辑器 + 事件委托）
    ============================================= */
 
-let sqLoadedComments = {};
-let sqCommentImageMap = {};
-let sqReplyingTo = {};
+const _sqExpandedComments = {};
+const _sqExpandedReplies = {};
+const _sqReplyImages = {};
 
-function formatRelativeTime(ts) {
-  if (!ts) return '';
-  const now = Date.now();
-  const diff = now - new Date(ts).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return '刚刚';
-  if (min < 60) return `${min} 分钟前`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} 小时前`;
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+function renderSqCommentImages(imageUrlStr) {
+  if (!imageUrlStr) return '';
+  const urls = imageUrlStr.split(';').filter(Boolean);
+  if (urls.length === 0) return '';
+  if (urls.length === 1) {
+    return `<a href="${urls[0]}" target="_blank" rel="noopener"><img class="forum-reply-image" src="${urls[0]}" alt="回复图片" loading="lazy"></a>`;
+  }
+  return `
+    <div class="forum-image-grid count-${Math.min(urls.length, 9)}" style="max-width:240px">
+      ${urls.map(url => `<a href="${url}" target="_blank" rel="noopener" class="forum-image-link"><img src="${url}" alt="回复图片" loading="lazy"></a>`).join('')}
+    </div>
+  `;
 }
 
-async function toggleSquareComments(postId) {
+async function toggleSqComments(postId) {
   const section = document.getElementById(`sq-comments-${postId}`);
   if (!section) return;
 
-  if (!sqLoadedComments[postId]) {
-    section.innerHTML = renderSqCommentSkeleton();
-    try {
-      const data = await apiGet(`/api/square/posts/${postId}/comments?page=1&pageSize=20`);
-      sqLoadedComments[postId] = {
-        comments: data.comments || [],
-        total: data.total || 0,
-        page: 1,
-        hasMore: (data.comments || []).length < (data.total || 0)
-      };
-      renderSqComments(section, postId);
-    } catch {
-      section.innerHTML = '<div class="comment-error">加载失败，点击重试</div>';
-      section.querySelector('.comment-error')?.addEventListener('click', () => {
-        sqLoadedComments[postId] = null;
-        toggleSquareComments(postId);
-      });
+  if (section.style.display === 'block') {
+    section.style.display = 'none';
+    _sqExpandedComments[postId] = false;
+    return;
+  }
+
+  section.style.display = 'block';
+  _sqExpandedComments[postId] = true;
+
+  section.innerHTML = '<p style="font-size:12px;color:var(--md-on-surface-variant);padding:8px 0">加载中...</p>';
+
+  try {
+    const data = await apiGet(`/api/square/posts/${postId}/comments`);
+    const comments = Array.isArray(data) ? data : (data.comments || []);
+
+    const topComments = comments.filter(c => !c.parent_id);
+    const childMap = {};
+    comments.forEach(c => {
+      if (c.parent_id) {
+        if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
+        childMap[c.parent_id].push(c);
+      }
+    });
+
+    if (topComments.length === 0) {
+      section.innerHTML = `
+        <div class="forum-reply-section">
+          <p style="font-size:12px;color:var(--md-on-surface-variant);padding:8px 0">暂无回复</p>
+          <div id="sq-inline-post-${postId}"></div>
+          ${isLoggedIn() ? `<button class="forum-action-btn" data-action="sq-reply-post" data-post-id="${postId}" style="margin-top:4px"><span class="mi" style="font-size:14px">chat_bubble_outline</span> 写回复</button>` : '<p class="text-secondary" style="font-size:12px"><a href="#" onclick="navigateTo(\'profile\')" style="color:var(--md-primary)">登录</a> 后参与讨论</p>'}
+        </div>
+      `;
+    } else {
+      section.innerHTML = `
+        <div class="forum-reply-section">
+          ${topComments.map(c => renderSqForumComment(c, postId, childMap)).join('')}
+          <div id="sq-inline-post-${postId}"></div>
+          ${isLoggedIn() ? `<button class="forum-action-btn" data-action="sq-reply-post" data-post-id="${postId}" style="margin-top:4px"><span class="mi" style="font-size:14px">chat_bubble_outline</span> 写回复</button>` : ''}
+        </div>
+      `;
     }
-  } else {
-    renderSqComments(section, postId);
+
+    bindSqForumEvents(section, postId);
+  } catch {
+    section.innerHTML = '<p style="font-size:12px;color:var(--md-error);padding:8px 0">加载失败，点击重试</p>';
+    section.style.cursor = 'pointer';
+    section.onclick = () => { section.onclick = null; toggleSqComments(postId); };
   }
 }
 
-function renderSqCommentSkeleton() {
-  return Array(3).fill('').map(() => `
-    <div class="comment-skeleton">
-      <div class="comment-skeleton-avatar"></div>
-      <div class="comment-skeleton-lines">
-        <div class="comment-skeleton-line short"></div>
-        <div class="comment-skeleton-line"></div>
+function renderSqForumComment(c, postId, childMap) {
+  const avatarLetter = (c.author_name || '?')[0].toUpperCase();
+  const children = childMap[c.id] || [];
+  const previewChildren = children.slice(-2);
+  const hiddenCount = children.length - previewChildren.length;
+  const isExpanded = _sqExpandedReplies[c.id];
+
+  return `
+    <div class="forum-reply-row" id="sq-comment-${c.id}">
+      <div>
+        ${c.author_avatar_url
+          ? `<img class="forum-reply-avatar" src="${c.author_avatar_url}" alt="" data-action="sq-navigate-profile" data-user-id="${c.author_id}" style="cursor:pointer">`
+          : `<div class="forum-reply-avatar-letter" data-action="sq-navigate-profile" data-user-id="${c.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
+        }
       </div>
+      <div class="forum-reply-content">
+        <div class="forum-reply-header">
+          <div class="forum-reply-meta">
+            <button class="forum-reply-name" data-action="sq-navigate-profile" data-user-id="${c.author_id}">${escHtml(c.author_name)}</button>
+            <span class="forum-reply-time">${formatTime(c.created_at)}</span>
+          </div>
+        </div>
+        ${c.content === '[已删除]' ? `<p class="forum-reply-text" style="color:var(--md-on-surface-variant);font-style:italic">已删除</p>` : `
+          <p class="forum-reply-text">${escHtml(c.content || '')}</p>
+        `}
+        ${renderSqCommentImages(c.image_url)}
+        ${c.content !== '[已删除]' ? `
+          <div class="forum-reply-actions">
+            <button class="forum-action-btn" data-action="sq-reply-comment" data-post-id="${postId}" data-comment-id="${c.id}">
+              <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
+            </button>
+            ${window._currentUser && c.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="sq-delete" data-post-id="${postId}" data-comment-id="${c.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
+          </div>
+        ` : ''}
+        <div id="sq-inline-comment-${c.id}"></div>
+        ${children.length > 0 ? `
+          ${isExpanded ? `
+            <div class="forum-nested-replies">
+              ${children.map(child => renderSqNestedReply(child, c.author_name, c.author_id, postId, childMap, 1)).join('')}
+            </div>
+            <button class="forum-view-replies" data-action="sq-toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">
+              ── 收起回复 🔼
+            </button>
+          ` : `
+            ${previewChildren.length > 0 ? `
+              <div class="forum-nested-replies">
+                ${previewChildren.map(child => renderSqNestedReply(child, c.author_name, c.author_id, postId, childMap, 1)).join('')}
+              </div>
+            ` : ''}
+            ${hiddenCount > 0 ? `
+              <button class="forum-view-replies" data-action="sq-toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">
+                ── 查看更多 ${hiddenCount} 条回复 🔽
+              </button>
+            ` : ''}
+          `}
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderSqNestedReply(child, parentAuthorName, parentAuthorId, postId, childMap, depth) {
+  const avatarLetter = (child.author_name || '?')[0].toUpperCase();
+  const children = (childMap || {})[child.id] || [];
+  const curDepth = depth || 0;
+  const maxPreview = curDepth >= 3 ? 0 : 2;
+  const previewChildren = children.slice(-maxPreview);
+  const hiddenCount = children.length - previewChildren.length;
+  const isExpanded = _sqExpandedReplies[child.id];
+
+  return `
+    <div class="forum-nested-reply">
+      <div>
+        ${child.author_avatar_url
+          ? `<img class="forum-reply-avatar" src="${child.author_avatar_url}" alt="" data-action="sq-navigate-profile" data-user-id="${child.author_id}" style="cursor:pointer">`
+          : `<div class="forum-reply-avatar-letter" data-action="sq-navigate-profile" data-user-id="${child.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
+        }
+      </div>
+      <div class="forum-reply-content">
+        <div class="forum-reply-header">
+          <div class="forum-reply-meta">
+            <button class="forum-reply-name" data-action="sq-navigate-profile" data-user-id="${child.author_id}">${escHtml(child.author_name)}</button>
+            <span class="forum-reply-to">
+              回复 <button class="forum-reply-link" data-action="sq-navigate-profile" data-user-id="${parentAuthorId}">${escHtml(parentAuthorName || '')}</button>
+            </span>
+            <span class="forum-reply-time">${formatTime(child.created_at)}</span>
+          </div>
+        </div>
+        ${child.content === '[已删除]' ? `<p class="forum-reply-text" style="color:var(--md-on-surface-variant);font-style:italic">已删除</p>` : `
+          <p class="forum-reply-text">${escHtml(child.content || '')}</p>
+        `}
+        ${renderSqCommentImages(child.image_url)}
+        ${child.content !== '[已删除]' ? `
+          <div class="forum-reply-actions">
+            <button class="forum-action-btn" data-action="sq-reply-nested" data-post-id="${postId}" data-comment-id="${child.id}">
+              <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
+            </button>
+            ${window._currentUser && child.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="sq-delete" data-post-id="${postId}" data-comment-id="${child.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
+          </div>
+        ` : ''}
+        <div id="sq-inline-comment-${child.id}"></div>
+        ${children.length > 0 ? `
+          ${isExpanded ? `
+            <div class="forum-nested-replies">
+              ${children.map(c => renderSqNestedReply(c, child.author_name, child.author_id, postId, childMap, curDepth + 1)).join('')}
+            </div>
+            <button class="forum-view-replies" data-action="sq-toggle-replies" data-comment-id="${child.id}" data-post-id="${postId}">
+              ── 收起回复 🔼
+            </button>
+          ` : `
+            ${previewChildren.length > 0 ? `
+              <div class="forum-nested-replies">
+                ${previewChildren.map(c => renderSqNestedReply(c, child.author_name, child.author_id, postId, childMap, curDepth + 1)).join('')}
+              </div>
+            ` : ''}
+            ${hiddenCount > 0 ? `
+              <button class="forum-view-replies" data-action="sq-toggle-replies" data-comment-id="${child.id}" data-post-id="${postId}">
+                ── 查看更多 ${hiddenCount} 条回复 🔽
+              </button>
+            ` : ''}
+          `}
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function bindSqForumEvents(root, postId) {
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const pId = Number(btn.dataset.postId) || postId;
+    const commentId = Number(btn.dataset.commentId);
+
+    switch (action) {
+      case 'sq-reply-post':
+        openSqInlineEditor(postId, null, `post-${postId}`);
+        break;
+      case 'sq-reply-comment':
+        openSqInlineEditor(postId, commentId, `comment-${commentId}`);
+        break;
+      case 'sq-reply-nested':
+        openSqInlineEditor(postId, commentId, `nested-${commentId}`);
+        break;
+      case 'sq-toggle-replies':
+        _sqExpandedReplies[commentId] = !_sqExpandedReplies[commentId];
+        if (_sqExpandedComments[postId]) {
+          toggleSqComments(postId);
+          setTimeout(() => toggleSqComments(postId), 30);
+        }
+        break;
+      case 'sq-delete':
+        openModal('确认删除', `
+          <p style="margin-bottom:24px">确定要删除这条回复吗？删除后无法恢复</p>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" id="confirm-sq-delete" style="background:var(--md-error,#e53935)">删除</button>
+          </div>
+        `);
+        document.getElementById('confirm-sq-delete')?.addEventListener('click', async () => {
+          const result = await apiDelete(`/api/square/posts/${pId}/comments/${commentId}`);
+          if (result.error) { showToast(result.error); return; }
+          closeModal();
+          if (_sqExpandedComments[postId]) {
+            toggleSqComments(postId);
+            setTimeout(() => toggleSqComments(postId), 30);
+          }
+          showToast('已删除');
+        });
+        break;
+      case 'sq-navigate-profile':
+        navigateTo('profile-user', Number(btn.dataset.userId));
+        break;
+    }
+  });
+}
+
+function openSqInlineEditor(postId, parentCommentId, ctxKey) {
+  const containerId = parentCommentId
+    ? `sq-inline-comment-${parentCommentId}`
+    : `sq-inline-post-${postId}`;
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (container.innerHTML.trim() !== '') {
+    closeSqInlineEditor(ctxKey);
+    return;
+  }
+
+  document.querySelectorAll('[id^="sq-inline-"]').forEach(el => {
+    if (el.id !== containerId && el.innerHTML.trim() !== '') {
+      el.innerHTML = '';
+    }
+  });
+
+  _sqReplyImages[ctxKey] = { files: [], urls: [] };
+
+  container.innerHTML = `
+    <div class="forum-inline-editor">
+      <div class="forum-editor-row">
+        <textarea class="forum-editor-textarea" id="sq-textarea-${ctxKey}"
+          placeholder=" " rows="1"
+          oninput="autoResizeForumTextarea(this)"></textarea>
+        <div class="forum-editor-actions">
+          <input type="file" id="sq-file-${ctxKey}" accept="image/jpeg,image/png,image/gif,image/webp"
+            multiple style="display:none" onchange="handleSqReplyImageChange('${ctxKey}', ${postId})">
+          <button class="forum-editor-btn forum-editor-camera" onclick="document.getElementById('sq-file-${ctxKey}').click()" title="添加图片">
+            <span class="mi">photo_camera</span>
+          </button>
+          <button class="forum-editor-btn forum-editor-send" id="sq-send-${ctxKey}"
+            onclick="submitSqForumReply(${postId}, ${parentCommentId || 'null'}, '${ctxKey}')">
+            <span class="mi">send</span>
+          </button>
+        </div>
+      </div>
+      <div class="forum-editor-previews" id="sq-previews-${ctxKey}"></div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    const textarea = document.getElementById(`sq-textarea-${ctxKey}`);
+    if (textarea) textarea.focus();
+  }, 150);
+
+  setTimeout(() => {
+    const editorDiv = container.querySelector('.forum-inline-editor');
+    if (!editorDiv) return;
+    editorDiv.addEventListener('focusout', () => {
+      setTimeout(() => {
+        if (editorDiv.contains(document.activeElement)) return;
+        const ta = editorDiv.querySelector('textarea');
+        if (ta && ta.value.trim()) return;
+        const imgs = _sqReplyImages[ctxKey];
+        if (imgs && imgs.files.length > 0) return;
+        closeSqInlineEditor(ctxKey);
+      }, 300);
+    });
+  }, 200);
+}
+
+function closeSqInlineEditor(ctxKey) {
+  const textarea = document.getElementById(`sq-textarea-${ctxKey}`);
+  if (!textarea) return;
+  const container = textarea.closest('.forum-inline-editor')?.parentElement;
+  if (container) container.innerHTML = '';
+  delete _sqReplyImages[ctxKey];
+}
+
+window.openSqInlineEditor = openSqInlineEditor;
+window.submitSqForumReply = submitSqForumReply;
+window.handleSqReplyImageChange = handleSqReplyImageChange;
+
+function handleSqReplyImageChange(ctxKey, postId) {
+  const input = document.getElementById(`sq-file-${ctxKey}`);
+  if (!input) return;
+  const files = Array.from(input.files);
+  if (files.length === 0) return;
+  if (files.length > 9) { showToast('最多上传 9 张图片'); input.value = ''; return; }
+  if (files.some(f => !f.type.startsWith('image/'))) { showToast('仅支持图片文件'); input.value = ''; return; }
+  if (files.some(f => f.size > 20 * 1024 * 1024)) { showToast('图片不能超过 20MB'); input.value = ''; return; }
+
+  _sqReplyImages[ctxKey] = { files, urls: files.map(f => URL.createObjectURL(f)) };
+  renderSqImagePreviews(ctxKey);
+}
+
+function renderSqImagePreviews(ctxKey) {
+  const container = document.getElementById(`sq-previews-${ctxKey}`);
+  if (!container) return;
+  const imgs = _sqReplyImages[ctxKey];
+  if (!imgs || imgs.files.length === 0) { container.innerHTML = ''; return; }
+
+  container.innerHTML = imgs.urls.map((url, i) => `
+    <div class="forum-preview-thumb">
+      <img src="${url}" alt="">
+      <button class="forum-preview-remove" onclick="removeSqPreviewImage('${ctxKey}', ${i})"><span class="mi" style="font-size:14px">close</span></button>
     </div>
   `).join('');
 }
 
-function renderSqComments(section, postId) {
-  const data = sqLoadedComments[postId] || { comments: [], total: 0, page: 1, hasMore: false };
-  const { comments, total, hasMore } = data;
+window.removeSqPreviewImage = function(ctxKey, index) {
+  const imgs = _sqReplyImages[ctxKey];
+  if (!imgs) return;
+  imgs.files.splice(index, 1);
+  imgs.urls.splice(index, 1);
+  renderSqImagePreviews(ctxKey);
+};
 
-  const rootComments = comments.filter(c => !c.parent_id);
-  const childMap = {};
-  comments.forEach(c => {
-    if (c.parent_id) {
-      if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
-      childMap[c.parent_id].push(c);
-    }
-  });
-
-  section.innerHTML = `
-    <div class="comment-list" id="sq-comment-list-${postId}">
-      ${rootComments.length === 0 && !hasMore
-        ? '<p class="text-secondary" style="text-align:center;padding:16px;font-size:var(--text-sm)">暂无回复</p>'
-        : rootComments.map((c, idx) => renderSqSingleComment(c, idx + 1, postId, childMap, 0)).join('')
-      }
-      ${hasMore ? `<div class="comment-load-more" id="sq-load-more-${postId}">加载更多回复</div>` : ''}
-    </div>
-    ${isLoggedIn() ? renderSqCommentInput(postId) : '<p class="text-secondary" style="margin-top:12px;font-size:var(--text-sm)"><a href="#" onclick="navigateTo(\'profile\')" style="color:var(--md-primary)">登录</a> 后参与讨论</p>'}
-  `;
-
-  bindSqCommentEvents(section, postId);
-}
-
-function renderSqSingleComment(comment, floorNum, postId, childMap, depth) {
-  const isDeleted = comment.content === '[已删除]';
-  const isOwner = window._currentUser && comment.author_id === window._currentUser.id;
-  const children = childMap[comment.id] || [];
-  const maxDepth = 3;
-
-  return `
-    <div class="comment-item ${depth > 0 ? 'comment-nested' : ''}" data-comment-id="${comment.id}" data-depth="${depth}">
-      <div class="comment-header">
-        ${depth === 0 ? `<span class="comment-floor">${floorNum} 楼</span>` : ''}
-        ${comment.author_avatar_url
-          ? `<img class="comment-avatar" src="${escHtml(comment.author_avatar_url)}" alt="">`
-          : `<div class="comment-avatar-letter">${isDeleted ? '?' : escHtml((comment.author_name || '?')[0])}</div>`
-        }
-        <div class="comment-meta">
-          <button class="user-profile-link" ${isDeleted ? 'disabled' : `onclick="navigateTo('profile-user', ${comment.author_id})"`}>
-            ${isDeleted ? '已注销用户' : escHtml(comment.author_name)}
-          </button>
-          <span class="comment-time">${formatRelativeTime(comment.created_at)}</span>
-        </div>
-      </div>
-      ${comment.parent_id && depth > 0 ? (() => {
-        const parent = (sqLoadedComments[postId]?.comments || []).find(c => c.id === comment.parent_id);
-        return parent ? `<div class="comment-reply-ref">回复 @${escHtml(parent.author_name || '已注销用户')}</div>` : '';
-      })() : ''}
-      <div class="comment-body">
-        ${isDeleted
-          ? '<p class="comment-deleted">该回复已被删除</p>'
-          : `<p class="comment-content">${escHtml(comment.content)}</p>`
-        }
-        ${comment.image_url ? `<div class="comment-image-wrap"><img src="${escHtml(comment.image_url)}" alt="评论图片" class="comment-image" loading="lazy" onclick="window.open('${escHtml(comment.image_url)}', '_blank')"></div>` : ''}
-      </div>
-      ${!isDeleted ? `
-        <div class="comment-actions">
-          ${isLoggedIn() ? `<button class="comment-action-btn comment-reply-btn" data-comment-id="${comment.id}" data-author="${escHtml(comment.author_name)}"><span class="mi" style="font-size:14px">reply</span> 回复</button>` : ''}
-          ${isOwner ? `<button class="comment-action-btn comment-delete-btn" data-comment-id="${comment.id}" data-post-id="${postId}"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
-        </div>
-      ` : ''}
-      ${children.length > 0 && depth < maxDepth
-        ? children.map(c => renderSqSingleComment(c, 0, postId, childMap, depth + 1)).join('')
-        : ''
-      }
-      ${children.length > 0 && depth >= maxDepth
-        ? `<button class="comment-load-more-replies" data-parent-id="${comment.id}" data-post-id="${postId}">查看更多回复 (${children.length})</button>`
-        : ''
-      }
-    </div>
-  `;
-}
-
-function renderSqCommentInput(postId) {
-  const replyRef = sqReplyingTo[postId];
-  return `
-    <div class="comment-input-area" id="sq-input-area-${postId}">
-      ${replyRef ? `<div class="comment-reply-ref-bar">回复 @${escHtml(replyRef.author_name)}<button class="comment-cancel-reply" data-post-id="${postId}"><span class="mi" style="font-size:16px">close</span></button></div>` : ''}
-      <div class="comment-input-row">
-        <div class="comment-textarea-wrap">
-          <textarea class="comment-textarea" id="sq-textarea-${postId}" placeholder="写回复..." rows="2" maxlength="500"></textarea>
-          <span class="comment-char-count" id="sq-char-count-${postId}">0/500</span>
-        </div>
-        <div class="comment-input-actions">
-          <label class="comment-action-btn comment-upload-btn" title="上传图片">
-            <span class="mi" style="font-size:20px">add_photo_alternate</span>
-            <input type="file" accept=".jpg,.jpeg,.png" style="display:none" id="sq-img-input-${postId}">
-          </label>
-          <button class="btn btn-primary comment-send-btn" id="sq-send-btn-${postId}" data-post-id="${postId}" disabled>
-            <span class="mi" style="font-size:18px">send</span>
-          </button>
-        </div>
-      </div>
-      <div class="comment-image-preview" id="sq-img-preview-${postId}" style="display:none">
-        <img id="sq-preview-img-${postId}" src="" alt="">
-        <button class="comment-remove-image" data-post-id="${postId}"><span class="mi" style="font-size:16px">close</span></button>
-      </div>
-      <div class="comment-tip">请遵守社区规范，禁止发布违规内容</div>
-    </div>
-  `;
-}
-
-function bindSqCommentEvents(section, postId) {
-  // 回复按钮
-  section.querySelectorAll('.comment-reply-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      sqReplyingTo[postId] = { id: Number(btn.dataset.commentId), author_name: btn.dataset.author };
-      renderSqComments(section, postId);
-      const textarea = document.getElementById(`sq-textarea-${postId}`);
-      if (textarea) { textarea.focus(); textarea.value = `@${btn.dataset.author} `; updateSqCharCount(postId); }
-    });
-  });
-
-  // 取消回复
-  section.querySelectorAll('.comment-cancel-reply').forEach(btn => {
-    btn.addEventListener('click', () => {
-      delete sqReplyingTo[postId];
-      renderSqComments(section, postId);
-    });
-  });
-
-  // 删除按钮
-  section.querySelectorAll('.comment-delete-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      openModal('确认删除', `
-        <p style="margin-bottom:24px">确定要删除这条回复吗？删除后无法恢复</p>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-          <button class="btn btn-primary" id="confirm-delete-sq-comment" data-comment-id="${btn.dataset.commentId}" data-post-id="${btn.dataset.postId}" style="background:var(--md-error,#e53935)">删除</button>
-        </div>
-      `);
-      document.getElementById('confirm-delete-sq-comment')?.addEventListener('click', async () => {
-        const result = await apiDelete(`/api/square/posts/${btn.dataset.postId}/comments/${btn.dataset.commentId}`);
-        if (result.error) { showToast(result.error); return; }
-        closeModal();
-        sqLoadedComments[postId] = null;
-        toggleSquareComments(postId);
-        showToast('已删除');
-      });
-    });
-  });
-
-  // 加载更多
-  const loadMoreBtn = document.getElementById(`sq-load-more-${postId}`);
-  if (loadMoreBtn) {
-    loadMoreBtn.addEventListener('click', async () => {
-      loadMoreBtn.textContent = '加载中...';
-      loadMoreBtn.disabled = true;
-      const data = sqLoadedComments[postId];
-      const nextPage = data.page + 1;
-      try {
-        const result = await apiGet(`/api/square/posts/${postId}/comments?page=${nextPage}&pageSize=20`);
-        data.comments.push(...(result.comments || []));
-        data.page = nextPage;
-        data.hasMore = data.comments.length < data.total;
-        renderSqComments(section, postId);
-      } catch {
-        loadMoreBtn.textContent = '加载失败，点击重试';
-        loadMoreBtn.disabled = false;
-      }
-    });
-  }
-
-  // 查看更多回复
-  section.querySelectorAll('.comment-load-more-replies').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const parentId = Number(btn.dataset.parentId);
-      btn.textContent = '加载中...';
-      try {
-        const replies = await apiGet(`/api/square/posts/${postId}/comments/${parentId}/replies`);
-        const data = sqLoadedComments[postId];
-        replies.forEach(r => {
-          if (!data.comments.find(c => c.id === r.id)) data.comments.push(r);
-        });
-        renderSqComments(section, postId);
-      } catch {
-        btn.textContent = '加载失败';
-      }
-    });
-  });
-
-  // 文本输入
-  const textarea = document.getElementById(`sq-textarea-${postId}`);
-  if (textarea) {
-    textarea.addEventListener('input', () => updateSqCharCount(postId));
-    textarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        submitSqComment(postId, section);
-      }
-    });
-    textarea.focus();
-  }
-
-  // 发送按钮
-  const sendBtn = document.getElementById(`sq-send-btn-${postId}`);
-  if (sendBtn) {
-    sendBtn.addEventListener('click', () => submitSqComment(postId, section));
-  }
-
-  // 图片上传
-  const imgInput = document.getElementById(`sq-img-input-${postId}`);
-  if (imgInput) {
-    imgInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (file.size > 1024 * 1024) { showToast('图片不能超过 1MB'); imgInput.value = ''; return; }
-      sqCommentImageMap[postId] = file;
-      const preview = document.getElementById(`sq-img-preview-${postId}`);
-      const previewImg = document.getElementById(`sq-preview-img-${postId}`);
-      if (preview && previewImg) {
-        previewImg.src = URL.createObjectURL(file);
-        preview.style.display = 'block';
-      }
-      updateSqSendBtn(postId);
-    });
-  }
-
-  // 移除图片
-  section.querySelectorAll('.comment-remove-image').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const pid = Number(btn.dataset.postId);
-      delete sqCommentImageMap[pid];
-      const preview = document.getElementById(`sq-img-preview-${pid}`);
-      if (preview) preview.style.display = 'none';
-      const imgInput = document.getElementById(`sq-img-input-${pid}`);
-      if (imgInput) imgInput.value = '';
-      updateSqSendBtn(pid);
-    });
-  });
-}
-
-function updateSqCharCount(postId) {
-  const textarea = document.getElementById(`sq-textarea-${postId}`);
-  const counter = document.getElementById(`sq-char-count-${postId}`);
-  if (!textarea || !counter) return;
-  const len = textarea.value.length;
-  counter.textContent = `${len}/500`;
-  counter.classList.toggle('exceeded', len >= 500);
-  updateSqSendBtn(postId);
-}
-
-function updateSqSendBtn(postId) {
-  const textarea = document.getElementById(`sq-textarea-${postId}`);
-  const sendBtn = document.getElementById(`sq-send-btn-${postId}`);
-  if (!textarea || !sendBtn) return;
-  const hasContent = textarea.value.trim().length > 0;
-  const hasImage = !!sqCommentImageMap[postId];
-  const notExceeded = textarea.value.length <= 500;
-  sendBtn.disabled = !(hasContent || hasImage) || !notExceeded;
-}
-
-async function submitSqComment(postId, section) {
-  const textarea = document.getElementById(`sq-textarea-${postId}`);
-  const sendBtn = document.getElementById(`sq-send-btn-${postId}`);
-  if (!textarea || !sendBtn) return;
+async function submitSqForumReply(postId, parentCommentId, ctxKey) {
+  const textarea = document.getElementById(`sq-textarea-${ctxKey}`);
+  if (!textarea) return;
 
   const content = textarea.value.trim();
-  const imageFile = sqCommentImageMap[postId];
-  if (!content && !imageFile) return;
-  if (content.length > 500) { showToast('回复内容不能超过 500 字'); return; }
+  const imgs = _sqReplyImages[ctxKey];
+  const hasImages = imgs && imgs.files.length > 0;
 
-  textarea.disabled = true;
-  sendBtn.disabled = true;
-  sendBtn.innerHTML = '<span class="mi" style="font-size:18px">hourglass_empty</span>';
+  if (!content && !hasImages) {
+    showToast('请输入内容或上传图片');
+    return;
+  }
+
+  const sendBtn = document.getElementById(`sq-send-${ctxKey}`);
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '发送中...'; }
 
   try {
     const formData = new FormData();
     formData.append('content', content);
-    if (sqReplyingTo[postId]) formData.append('parent_id', sqReplyingTo[postId].id);
-    if (imageFile) formData.append('image', imageFile);
+    if (parentCommentId) formData.append('parent_id', String(parentCommentId));
+    if (hasImages) {
+      imgs.files.forEach(file => formData.append('image', file));
+    }
 
     const token = getToken();
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`/api/square/posts/${postId}/comments`, { method: 'POST', headers, body: formData });
+    const res = await fetch(`/api/square/posts/${postId}/comments`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
     const result = await res.json();
 
     if (result.error) {
       showToast(result.error);
-      textarea.disabled = false;
-      sendBtn.disabled = false;
-      sendBtn.innerHTML = '<span class="mi" style="font-size:18px">send</span>';
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<span class="mi">send</span>'; }
       return;
     }
 
-    textarea.value = '';
-    delete sqCommentImageMap[postId];
-    delete sqReplyingTo[postId];
-    const preview = document.getElementById(`sq-img-preview-${postId}`);
-    if (preview) preview.style.display = 'none';
-    const imgInput = document.getElementById(`sq-img-input-${postId}`);
-    if (imgInput) imgInput.value = '';
-
-    sqLoadedComments[postId] = null;
-    toggleSquareComments(postId);
-    setTimeout(() => {
-      const list = document.getElementById(`sq-comment-list-${postId}`);
-      if (list) list.scrollTop = list.scrollHeight;
-    }, 300);
+    closeSqInlineEditor(ctxKey);
     showToast('回复成功');
+
+    if (_sqExpandedComments[postId]) {
+      toggleSqComments(postId);
+      setTimeout(() => toggleSqComments(postId), 30);
+    }
   } catch {
-    showToast('发送失败，请重试');
-    textarea.disabled = false;
-    sendBtn.disabled = false;
-    sendBtn.innerHTML = '<span class="mi" style="font-size:18px">send</span>';
+    showToast('网络错误，请重试');
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<span class="mi">send</span>'; }
   }
 }
 
@@ -621,7 +665,7 @@ export async function renderSquareMy(container) {
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
-        <h1 class="page-title">我的广场</h1>
+        <h1 class="page-title"><span class="mi" style="vertical-align:-4px;margin-right:4px">people</span>我的广场</h1>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px">

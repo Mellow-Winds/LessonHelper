@@ -1,5 +1,18 @@
 const express = require('express');
 
+// 大课名称清洗（与前端 plaza.js 一致）
+function cleanBigCourseName(title) {
+  if (!title) return '';
+  const parens = title.match(/[（(].+?[)）]/g) || [];
+  let temp = title;
+  parens.forEach((p, i) => { temp = temp.replace(p, `__PH${i}__`); });
+  temp = temp.replace(/\d{1,3}\s*班\s*$/, '');
+  temp = temp.replace(/[\s ]*\d{1,3}\s*$/, '');
+  temp = temp.replace(/\d{1,3}$/, '');
+  parens.forEach((p, i) => { temp = temp.replace(`__PH${i}__`, p); });
+  return temp.trim();
+}
+
 module.exports = function (db) {
   const router = express.Router();
 
@@ -19,16 +32,19 @@ module.exports = function (db) {
     let total = 0;
 
     if (type === 'all' || type === 'courses') {
-      const countResult = db.all(`SELECT COUNT(*) AS cnt FROM courses c WHERE c.title LIKE ? OR c.description LIKE ? OR c.teacher LIKE ?`, [keyword, keyword, keyword]);
-      total += countResult[0]?.cnt || 0;
-      results.courses = db.all(`
+      // 只查大课记录，再用清洗逻辑过滤掉漏网的小课
+      const bigCourseCond = `c.big_course_id IS NULL AND (c.description = '' OR c.description IS NULL)`;
+      const allMatched = db.all(`
         SELECT c.id, c.title, c.teacher, c.semester,
-          (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id) AS enrollment_count
+          (SELECT COUNT(*) FROM user_courses uc JOIN courses c2 ON uc.course_id = c2.id WHERE c2.big_course_id = c.id) AS enrollment_count
         FROM courses c
-        WHERE c.title LIKE ? OR c.description LIKE ? OR c.teacher LIKE ?
+        WHERE (${bigCourseCond}) AND (c.title LIKE ? OR c.teacher LIKE ?)
         ORDER BY c.created_at DESC
-        LIMIT ? OFFSET ?
-      `, [keyword, keyword, keyword, limit, offset]);
+      `, [keyword, keyword]);
+      // 过滤：清洗后名称与原标题不同的，是漏网的小课，剔除
+      const filtered = allMatched.filter(c => cleanBigCourseName(c.title) === c.title);
+      total += filtered.length;
+      results.courses = filtered.slice(offset, offset + limit);
     }
 
     if (type === 'all' || type === 'materials') {

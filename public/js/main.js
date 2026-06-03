@@ -105,7 +105,6 @@ import {
 import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
   openImportModal, handleAgreeAndImport, handleScheduleImport,
-  switchMyCourseTab,
   handlePortalToPlaza,
   openMoveSemesterModal, handleMoveSemester,
 } from './pages/courses/my_courses.js';
@@ -234,7 +233,6 @@ Object.assign(window, {
   // course detail (unified)
   showPublishBlockedToast,
   switchDetailTab,
-  switchMyCourseTab,
   toggleComments,
   refreshMyMaterials,
   rateMyMaterial,
