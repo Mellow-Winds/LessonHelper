@@ -90,22 +90,27 @@ module.exports = function (db) {
     const viewerId = req.user?.userId || null;
 
     const user = db.get(
-      'SELECT id, nickname, major, grade, avatar_url, avatar_desc, mbti, qq, wechat, douyin, privacy_show_profile, created_at FROM users WHERE id = ?',
+      'SELECT id, nickname, major, grade, avatar_url, avatar_desc, mbti, gender, qq, wechat, douyin, privacy_show_profile, privacy_show_following, privacy_show_followers, created_at FROM users WHERE id = ?',
       [userId]
     );
     if (!user) return res.status(404).json({ error: '用户不存在' });
 
-    // 获取关注/粉丝数
-    const followingCount = db.get(
+    const isSelf = viewerId === userId;
+
+    // 获取关注/粉丝数（受隐私控制）
+    const showFollowing = isSelf || user.privacy_show_following !== 0;
+    const showFollowers = isSelf || user.privacy_show_followers !== 0;
+
+    const followingCount = showFollowing ? (db.get(
       'SELECT COUNT(*) as count FROM follows WHERE follower_id = ?', [userId]
-    )?.count || 0;
-    const followerCount = db.get(
+    )?.count || 0) : null;
+    const followerCount = showFollowers ? (db.get(
       'SELECT COUNT(*) as count FROM follows WHERE following_id = ?', [userId]
-    )?.count || 0;
+    )?.count || 0) : null;
 
     // 是否被当前查看者关注
     let isFollowing = false;
-    if (viewerId && viewerId !== userId) {
+    if (viewerId && !isSelf) {
       const follow = db.get(
         'SELECT id FROM follows WHERE follower_id = ? AND following_id = ?',
         [viewerId, userId]
@@ -114,7 +119,7 @@ module.exports = function (db) {
     }
 
     // 隐私过滤：如果设置了不公开且不是本人查看
-    if (!user.privacy_show_profile && viewerId !== userId) {
+    if (!user.privacy_show_profile && !isSelf) {
       return res.json({
         id: user.id,
         nickname: user.nickname,
@@ -122,11 +127,13 @@ module.exports = function (db) {
         privacyHidden: true,
         followingCount,
         followerCount,
-        isFollowing
+        isFollowing,
+        privacyShowFollowing: showFollowing,
+        privacyShowFollowers: showFollowers
       });
     }
 
-    const commonCourses = viewerId && viewerId !== userId
+    const commonCourses = viewerId && !isSelf
       ? db.all(`
           SELECT c.id, c.title, c.teacher
           FROM courses c
@@ -141,7 +148,9 @@ module.exports = function (db) {
       followingCount,
       followerCount,
       isFollowing,
-      commonCourses
+      commonCourses,
+      privacyShowFollowing: showFollowing,
+      privacyShowFollowers: showFollowers
     });
   });
 
@@ -198,10 +207,19 @@ module.exports = function (db) {
   });
 
   // GET /api/user/:id/followers — 粉丝列表
-  router.get('/:id/followers', (req, res) => {
+  router.get('/:id/followers', optionalAuthMiddleware, (req, res) => {
     const userId = Number(req.params.id);
+    const viewerId = req.user?.userId || null;
     const limit = Math.min(Number(req.query.limit) || 50, 100);
     const offset = Number(req.query.offset) || 0;
+
+    // 隐私检查：非本人需检查 privacy_show_followers
+    if (viewerId !== userId) {
+      const user = db.get('SELECT privacy_show_followers FROM users WHERE id = ?', [userId]);
+      if (user && user.privacy_show_followers === 0) {
+        return res.status(403).json({ error: '该用户未公开粉丝列表' });
+      }
+    }
 
     const list = db.all(`
       SELECT u.id, u.nickname,
@@ -219,10 +237,19 @@ module.exports = function (db) {
   });
 
   // GET /api/user/:id/following — 关注列表
-  router.get('/:id/following', (req, res) => {
+  router.get('/:id/following', optionalAuthMiddleware, (req, res) => {
     const userId = Number(req.params.id);
+    const viewerId = req.user?.userId || null;
     const limit = Math.min(Number(req.query.limit) || 50, 100);
     const offset = Number(req.query.offset) || 0;
+
+    // 隐私检查：非本人需检查 privacy_show_following
+    if (viewerId !== userId) {
+      const user = db.get('SELECT privacy_show_following FROM users WHERE id = ?', [userId]);
+      if (user && user.privacy_show_following === 0) {
+        return res.status(403).json({ error: '该用户未公开关注列表' });
+      }
+    }
 
     const list = db.all(`
       SELECT u.id, u.nickname,
@@ -237,6 +264,166 @@ module.exports = function (db) {
     `, [userId, limit, offset]);
 
     res.json(list);
+  });
+
+  // POST /api/user/:id/contact-exchange — 发送交换联系方式请求
+  router.post('/:id/contact-exchange', authMiddleware, (req, res) => {
+    const targetId = Number(req.params.id);
+    const myId = req.user.userId;
+    const { message } = req.body;
+
+    if (targetId === myId) {
+      return res.status(400).json({ error: '不能向自己发送交换请求' });
+    }
+
+    const target = db.get('SELECT id, nickname FROM users WHERE id = ?', [targetId]);
+    if (!target) return res.status(404).json({ error: '用户不存在' });
+
+    // 检查是否已有待处理的请求（双向检查）
+    const existing = db.get(
+      `SELECT id FROM contact_exchange_requests
+       WHERE status = 'pending'
+       AND ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))`,
+      [myId, targetId, targetId, myId]
+    );
+    if (existing) {
+      return res.status(409).json({ error: '已存在待处理的交换请求' });
+    }
+
+    db.run(
+      'INSERT INTO contact_exchange_requests (from_user_id, to_user_id, message) VALUES (?, ?, ?)',
+      [myId, targetId, message || '']
+    );
+
+    const sender = db.get('SELECT nickname FROM users WHERE id = ?', [myId]);
+    createNotification(db, {
+      userId: targetId,
+      type: 'contact_exchange_request',
+      title: '交换联系方式请求',
+      message: `${sender?.nickname || '一位同学'} 请求与你交换联系方式`,
+      relatedType: 'contact_exchange',
+      relatedId: myId
+    });
+    db.save();
+
+    res.json({ success: true });
+  });
+
+  // GET /api/user/contact-exchange/:id — 获取交换请求详情
+  router.get('/contact-exchange/:id', authMiddleware, (req, res) => {
+    const requestId = Number(req.params.id);
+    const userId = req.user.userId;
+
+    const request = db.get(
+      `SELECT cer.*, u.nickname, u.avatar_url, u.major, u.grade, u.qq, u.wechat, u.douyin
+       FROM contact_exchange_requests cer
+       JOIN users u ON u.id = cer.from_user_id
+       WHERE cer.id = ?`,
+      [requestId]
+    );
+
+    if (!request) return res.status(404).json({ error: '请求不存在' });
+
+    // 只有请求双方可以查看
+    if (request.from_user_id !== userId && request.to_user_id !== userId) {
+      return res.status(403).json({ error: '无权查看此请求' });
+    }
+
+    // 如果已同意，双方都能看到对方的联系方式
+    let contactInfo = null;
+    if (request.status === 'accepted') {
+      const otherUserId = request.from_user_id === userId ? request.to_user_id : request.from_user_id;
+      const other = db.get('SELECT nickname, qq, wechat, douyin FROM users WHERE id = ?', [otherUserId]);
+      contactInfo = other;
+    }
+
+    res.json({
+      id: request.id,
+      fromUserId: request.from_user_id,
+      toUserId: request.to_user_id,
+      message: request.message,
+      status: request.status,
+      createdAt: request.created_at,
+      resolvedAt: request.resolved_at,
+      fromUser: {
+        id: request.from_user_id,
+        nickname: request.nickname,
+        avatar_url: request.avatar_url,
+        major: request.major,
+        grade: request.grade
+      },
+      contactInfo
+    });
+  });
+
+  // PUT /api/user/contact-exchange/:id/accept — 同意交换
+  router.put('/contact-exchange/:id/accept', authMiddleware, (req, res) => {
+    const requestId = Number(req.params.id);
+    const userId = req.user.userId;
+
+    const request = db.get(
+      'SELECT * FROM contact_exchange_requests WHERE id = ?',
+      [requestId]
+    );
+
+    if (!request) return res.status(404).json({ error: '请求不存在' });
+    if (request.to_user_id !== userId) return res.status(403).json({ error: '无权操作此请求' });
+    if (request.status !== 'pending') return res.status(400).json({ error: '该请求已处理' });
+
+    db.run(
+      "UPDATE contact_exchange_requests SET status = 'accepted', resolved_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [requestId]
+    );
+
+    // 获取双方联系方式发给请求方
+    const accepter = db.get('SELECT nickname, qq, wechat, douyin FROM users WHERE id = ?', [userId]);
+    const requester = db.get('SELECT nickname, qq, wechat, douyin FROM users WHERE id = ?', [request.from_user_id]);
+
+    createNotification(db, {
+      userId: request.from_user_id,
+      type: 'contact_exchange_accepted',
+      title: '交换请求已通过',
+      message: `${accepter?.nickname || '对方'} 同意了你的交换联系方式请求，点击查看`,
+      relatedType: 'contact_exchange',
+      relatedId: requestId
+    });
+    db.save();
+
+    res.json({ success: true });
+  });
+
+  // PUT /api/user/contact-exchange/:id/reject — 拒绝交换
+  router.put('/contact-exchange/:id/reject', authMiddleware, (req, res) => {
+    const requestId = Number(req.params.id);
+    const userId = req.user.userId;
+
+    const request = db.get(
+      'SELECT * FROM contact_exchange_requests WHERE id = ?',
+      [requestId]
+    );
+
+    if (!request) return res.status(404).json({ error: '请求不存在' });
+    if (request.to_user_id !== userId) return res.status(403).json({ error: '无权操作此请求' });
+    if (request.status !== 'pending') return res.status(400).json({ error: '该请求已处理' });
+
+    db.run(
+      "UPDATE contact_exchange_requests SET status = 'rejected', resolved_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [requestId]
+    );
+
+    const rejecter = db.get('SELECT nickname FROM users WHERE id = ?', [userId]);
+
+    createNotification(db, {
+      userId: request.from_user_id,
+      type: 'contact_exchange_rejected',
+      title: '交换请求被拒绝',
+      message: `${rejecter?.nickname || '对方'} 拒绝了你的交换联系方式请求`,
+      relatedType: 'contact_exchange',
+      relatedId: requestId
+    });
+    db.save();
+
+    res.json({ success: true });
   });
 
   // POST /api/user/feedback — 问题反馈

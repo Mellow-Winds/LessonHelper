@@ -261,6 +261,22 @@ function bindForumEvents(root, courseId, enrolled) {
       case 'navigate-profile':
         navigateTo('profile-user', Number(btn.dataset.userId));
         break;
+      case 'delete-comment':
+        openModal('确认删除', `
+          <p style="margin-bottom:24px">确定要删除这条回复吗？删除后无法恢复</p>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" id="confirm-forum-delete" style="background:var(--md-error,#e53935)">删除</button>
+          </div>
+        `);
+        document.getElementById('confirm-forum-delete')?.addEventListener('click', async () => {
+          const result = await apiDelete(`/api/courses/posts/${postId}/comments/${commentId}`);
+          if (result.error) { showToast(result.error); return; }
+          closeModal();
+          await refreshForumComments(postId);
+          showToast('已删除');
+        });
+        break;
     }
   });
 }
@@ -345,15 +361,9 @@ export async function toggleComments(postId) {
   await toggleForumComments(postId);
 }
 
-async function toggleForumComments(postId) {
+async function refreshForumComments(postId) {
   const section = document.getElementById(`forum-comments-${postId}`);
   if (!section) return;
-
-  if (section.style.display === 'block') {
-    section.style.display = 'none';
-    _forumExpandedComments[postId] = false;
-    return;
-  }
 
   section.style.display = 'block';
   _forumExpandedComments[postId] = true;
@@ -390,8 +400,21 @@ async function toggleForumComments(postId) {
   } catch {
     section.innerHTML = '<p style="font-size:12px;color:var(--md-error);padding:8px 0">加载失败，点击重试</p>';
     section.style.cursor = 'pointer';
-    section.onclick = () => { section.onclick = null; toggleForumComments(postId); };
+    section.onclick = () => { section.onclick = null; refreshForumComments(postId); };
   }
+}
+
+async function toggleForumComments(postId) {
+  const section = document.getElementById(`forum-comments-${postId}`);
+  if (!section) return;
+
+  if (section.style.display === 'block') {
+    section.style.display = 'none';
+    _forumExpandedComments[postId] = false;
+    return;
+  }
+
+  await refreshForumComments(postId);
 }
 
 function renderCommentImages(imageUrlStr) {
@@ -446,12 +469,13 @@ function renderForumComment(c, postId, childMap) {
           <button class="forum-action-btn" data-action="reply-comment" data-post-id="${postId}" data-comment-id="${c.id}">
             <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
           </button>
+          ${window._currentUser && c.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="delete-comment" data-post-id="${postId}" data-comment-id="${c.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
         </div>
         <div id="forum-inline-comment-${c.id}"></div>
         ${children.length > 0 ? `
           ${isExpanded ? `
             <div class="forum-nested-replies">
-              ${children.map(child => renderNestedReply(child, c.author_name, c.author_id, postId)).join('')}
+              ${children.map(child => renderNestedReply(child, c.author_name, c.author_id, postId, childMap, 1)).join('')}
             </div>
             <button class="forum-view-replies" data-action="toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">
               ── 收起回复 🔼
@@ -459,7 +483,7 @@ function renderForumComment(c, postId, childMap) {
           ` : `
             ${previewChildren.length > 0 ? `
               <div class="forum-nested-replies">
-                ${previewChildren.map(child => renderNestedReply(child, c.author_name, c.author_id, postId)).join('')}
+                ${previewChildren.map(child => renderNestedReply(child, c.author_name, c.author_id, postId, childMap, 1)).join('')}
               </div>
             ` : ''}
             ${hiddenCount > 0 ? `
@@ -474,10 +498,16 @@ function renderForumComment(c, postId, childMap) {
   `;
 }
 
-function renderNestedReply(child, parentAuthorName, parentAuthorId, postId) {
+function renderNestedReply(child, parentAuthorName, parentAuthorId, postId, childMap, depth) {
   const avatarLetter = (child.author_name || '?')[0].toUpperCase();
   const likeKey = `c${child.id}`;
   const like = _forumLikeState[likeKey] || { liked: false, count: 0 };
+  const children = (childMap || {})[child.id] || [];
+  const curDepth = depth || 0;
+  const maxPreview = curDepth >= 3 ? 0 : 2;
+  const previewChildren = children.slice(-maxPreview);
+  const hiddenCount = children.length - previewChildren.length;
+  const isExpanded = _forumExpandedReplies[child.id];
 
   return `
     <div class="forum-nested-reply">
@@ -508,11 +538,33 @@ function renderNestedReply(child, parentAuthorName, parentAuthorId, postId) {
         `}
         ${renderCommentImages(child.image_url)}
         <div class="forum-reply-actions">
-          <button class="forum-action-btn" data-action="reply-nested" data-post-id="${postId}" data-comment-id="${child.id || child.parent_id}">
+          <button class="forum-action-btn" data-action="reply-nested" data-post-id="${postId}" data-comment-id="${child.id}">
             <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
           </button>
+          ${window._currentUser && child.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="delete-comment" data-post-id="${postId}" data-comment-id="${child.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
         </div>
-        <div id="forum-inline-nested-${child.id}"></div>
+        <div id="forum-inline-comment-${child.id}"></div>
+        ${children.length > 0 ? `
+          ${isExpanded ? `
+            <div class="forum-nested-replies">
+              ${children.map(c => renderNestedReply(c, child.author_name, child.author_id, postId, childMap, curDepth + 1)).join('')}
+            </div>
+            <button class="forum-view-replies" data-action="toggle-replies" data-comment-id="${child.id}" data-post-id="${postId}">
+              ── 收起回复 🔼
+            </button>
+          ` : `
+            ${previewChildren.length > 0 ? `
+              <div class="forum-nested-replies">
+                ${previewChildren.map(c => renderNestedReply(c, child.author_name, child.author_id, postId, childMap, curDepth + 1)).join('')}
+              </div>
+            ` : ''}
+            ${hiddenCount > 0 ? `
+              <button class="forum-view-replies" data-action="toggle-replies" data-comment-id="${child.id}" data-post-id="${postId}">
+                ── 查看更多 ${hiddenCount} 条回复 🔽
+              </button>
+            ` : ''}
+          `}
+        ` : ''}
       </div>
     </div>
   `;
@@ -520,12 +572,11 @@ function renderNestedReply(child, parentAuthorName, parentAuthorId, postId) {
 
 /* ---- 楼中楼展开/收起 ---- */
 
-export function toggleForumReplies(commentId, postId) {
+export async function toggleForumReplies(commentId, postId) {
   _forumExpandedReplies[commentId] = !_forumExpandedReplies[commentId];
   // 重新渲染整个评论区
   if (_forumExpandedComments[postId]) {
-    toggleForumComments(postId);
-    setTimeout(() => toggleForumComments(postId), 30);
+    await refreshForumComments(postId);
   }
 }
 
@@ -619,8 +670,10 @@ export function openForumInlineEditor(postId, parentCommentId, ctxKey) {
   setTimeout(() => {
     const editorDiv = container.querySelector('.forum-inline-editor');
     if (!editorDiv) return;
-    editorDiv.addEventListener('focusout', (e) => {
+    editorDiv.addEventListener('focusout', () => {
       setTimeout(() => {
+        // 容器已被刷新（DOM 替换）→ 不处理
+        if (!container.querySelector('.forum-inline-editor')) return;
         // 焦点还在编辑器内部 → 不收回
         if (editorDiv.contains(document.activeElement)) return;
         // 有文字内容 → 不收回
@@ -629,8 +682,9 @@ export function openForumInlineEditor(postId, parentCommentId, ctxKey) {
         // 有图片 → 不收回
         const imgs = _forumReplyImages[ctxKey];
         if (imgs && imgs.files.length > 0) return;
-        // 彻底离开且为空 → 收回
-        closeForumInlineEditor(ctxKey);
+        // 彻底离开且为空 → 收回（只清自己的容器）
+        container.innerHTML = '';
+        delete _forumReplyImages[ctxKey];
       }, 300);
     });
   }, 200);
@@ -678,6 +732,10 @@ export function handleForumReplyImageChange(ctxKey, postId) {
 
   const newFiles = Array.from(input.files).slice(0, remaining);
   newFiles.forEach(file => {
+    if (!file.type.startsWith('image/')) {
+      showToast('仅支持图片文件');
+      return;
+    }
     if (file.size > 20 * 1024 * 1024) {
       showToast(`${file.name} 超过 20MB，已跳过`);
       return;
@@ -778,11 +836,8 @@ export async function submitForumReply(postId, parentCommentId, ctxKey) {
     _forumDailyCount++;
     showToast('回复成功');
 
-    // 刷新评论区
-    if (_forumExpandedComments[postId]) {
-      toggleForumComments(postId);
-      setTimeout(() => toggleForumComments(postId), 30);
-    }
+    // 直接刷新评论区
+    await refreshForumComments(postId);
 
     // 启动 30 秒冷却
     startForumCooldown(postId);
@@ -887,6 +942,7 @@ export function handleForumComposeImageChange() {
   if (remaining <= 0) { showToast('最多 9 张图片'); input.value = ''; return; }
 
   Array.from(input.files).slice(0, remaining).forEach(file => {
+    if (!file.type.startsWith('image/')) { showToast('仅支持图片文件'); return; }
     if (file.size > 20 * 1024 * 1024) { showToast(`${file.name} 超过 20MB`); return; }
     _forumComposeImages.files.push(file);
     _forumComposeImages.urls.push(URL.createObjectURL(file));
@@ -1150,7 +1206,7 @@ export function openUploadMaterialModal(courseId) {
       <div style="display:flex;gap:12px">
         <div class="md-input-group" style="flex:1">
           <input class="md-input" name="chapter" placeholder=" ">
-          <label class="md-label">章节（如：第3章）</label>
+          <label class="md-label">章节</label>
           <fieldset class="md-border" aria-hidden="true"><legend><span>章节</span></legend></fieldset>
         </div>
         <div style="flex:1">

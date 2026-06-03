@@ -89,7 +89,7 @@ registerPage('favorites', async (container) => {
     apiGet('/api/favorites?type=posts'),
   ]);
   container.innerHTML = `
-    <div class="page-header"><h1 class="page-title">我的收藏</h1></div>
+    <div class="page-header"><h1 class="page-title"><span class="mi" style="vertical-align:-4px;margin-right:4px">bookmark</span>我的收藏</h1></div>
     <div class="md-pills" id="favorite-pills">
       <button class="md-pill-btn active" data-tab="courses">
         <span class="mi" style="font-size:16px;vertical-align:-3px">menu_book</span> 课程 ${courses.length}

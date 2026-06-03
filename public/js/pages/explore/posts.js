@@ -37,7 +37,7 @@ export async function renderPosts(container) {
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
-        <h1 class="page-title" style="margin:0">发布</h1>
+        <h1 class="page-title" style="margin:0"><span class="mi" style="vertical-align:-4px;margin-right:4px">post_add</span>发布</h1>
       </div>
     </div>
     <div class="md-pills" id="post-mode-pills">

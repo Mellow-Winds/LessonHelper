@@ -176,7 +176,7 @@ export async function renderMyInvites(container) {
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
-        <h1 class="page-title">我的邀约</h1>
+        <h1 class="page-title"><span class="mi" style="vertical-align:-4px;margin-right:4px">event_available</span>我的邀约</h1>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px">

@@ -196,7 +196,7 @@ module.exports = function (db) {
   // GET /api/auth/me — 获取当前用户信息
   router.get('/me', authMiddleware, (req, res) => {
     const user = db.get(
-      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, wechat, douyin, avatar_desc, mbti, checkin_streak, last_checkin_date, grace_days, privacy_show_profile, privacy_allow_match, email_verified, created_at FROM users WHERE id = ?',
+      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, wechat, douyin, avatar_desc, mbti, gender, checkin_streak, last_checkin_date, grace_days, privacy_show_profile, privacy_allow_match, privacy_show_following, privacy_show_followers, email_verified, created_at FROM users WHERE id = ?',
       [req.user.userId]
     );
     if (!user) {
@@ -207,7 +207,7 @@ module.exports = function (db) {
 
   // PUT /api/auth/me — 更新个人信息
   router.put('/me', authMiddleware, (req, res) => {
-    const { nickname, major, grade, avatar_url, qq, wechat, douyin, avatar_desc, mbti, privacy_show_profile, privacy_allow_match } = req.body;
+    const { nickname, major, grade, avatar_url, qq, wechat, douyin, avatar_desc, mbti, gender, privacy_show_profile, privacy_allow_match, privacy_show_following, privacy_show_followers } = req.body;
     const user = db.get('SELECT * FROM users WHERE id = ?', [req.user.userId]);
     if (!user) {
       return res.status(404).json({ error: '用户不存在' });
@@ -224,8 +224,14 @@ module.exports = function (db) {
       return res.status(400).json({ error: '无效的MBTI人格类型' });
     }
 
+    // 验证 gender 选项
+    const validGender = ['', 'male', 'female'];
+    if (gender !== undefined && !validGender.includes(gender)) {
+      return res.status(400).json({ error: '无效的性别选项' });
+    }
+
     db.run(
-      'UPDATE users SET nickname = ?, major = ?, grade = ?, avatar_url = ?, qq = ?, wechat = ?, douyin = ?, avatar_desc = ?, mbti = ?, privacy_show_profile = ?, privacy_allow_match = ? WHERE id = ?',
+      'UPDATE users SET nickname = ?, major = ?, grade = ?, avatar_url = ?, qq = ?, wechat = ?, douyin = ?, avatar_desc = ?, mbti = ?, gender = ?, privacy_show_profile = ?, privacy_allow_match = ?, privacy_show_following = ?, privacy_show_followers = ? WHERE id = ?',
       [
         nickname !== undefined ? nickname : user.nickname,
         major !== undefined ? major : user.major,
@@ -236,15 +242,18 @@ module.exports = function (db) {
         douyin !== undefined ? douyin : user.douyin,
         avatar_desc !== undefined ? avatar_desc : user.avatar_desc,
         mbti !== undefined ? mbti : user.mbti,
+        gender !== undefined ? gender : user.gender,
         privacy_show_profile !== undefined ? (privacy_show_profile ? 1 : 0) : user.privacy_show_profile,
         privacy_allow_match !== undefined ? (privacy_allow_match ? 1 : 0) : user.privacy_allow_match,
+        privacy_show_following !== undefined ? (privacy_show_following ? 1 : 0) : user.privacy_show_following,
+        privacy_show_followers !== undefined ? (privacy_show_followers ? 1 : 0) : user.privacy_show_followers,
         req.user.userId
       ]
     );
     db.save();
 
     const updated = db.get(
-      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, wechat, douyin, avatar_desc, mbti, checkin_streak, last_checkin_date, grace_days, privacy_show_profile, privacy_allow_match, email_verified, created_at FROM users WHERE id = ?',
+      'SELECT id, username, email, nickname, major, grade, avatar_url, qq, wechat, douyin, avatar_desc, mbti, gender, checkin_streak, last_checkin_date, grace_days, privacy_show_profile, privacy_allow_match, privacy_show_following, privacy_show_followers, email_verified, created_at FROM users WHERE id = ?',
       [req.user.userId]
     );
     res.json(updated);
