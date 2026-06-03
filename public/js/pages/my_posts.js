@@ -14,7 +14,7 @@ import { renderAuth } from './auth.js';
 
 const MY_POST_TABS = [
   { key: 'course',  label: '课程空间', icon: 'menu_book' },
-  { key: 'explore', label: '探索', icon: 'explore' },
+  { key: 'explore', label: '发现', icon: 'explore' },
 ];
 
 /* =============================================
@@ -31,7 +31,7 @@ registerPage('my_post', async (container) => {
 
   container.innerHTML = `
     <div class="page-header">
-      <h1 class="page-title" style="margin:0"><span class="mi" style="vertical-align:-4px;margin-right:4px">edit_note</span>我的创作</h1>
+      <h1 class="page-title" style="margin:0"><span class="mi" style="vertical-align:-4px;margin-right:4px">edit_note</span>我的发布</h1>
     </div>
     <div class="md-pills" id="my-post-pills">
       ${MY_POST_TABS.map(t => `
@@ -82,7 +82,7 @@ async function renderMyPostPage(container, initialTab) {
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('my_post')"><span class="mi">arrow_back</span></button>
-        <h1 class="page-title" style="margin:0">我的创作</h1>
+        <h1 class="page-title" style="margin:0">我的发布</h1>
       </div>
     </div>
     <div class="md-pills" id="my-post-pills">
@@ -229,7 +229,7 @@ async function renderExplorePosts(container) {
     container.innerHTML = `
       <div class="card" style="text-align:center;padding:48px">
         <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">explore</span>
-        <p class="text-secondary" style="margin-top:12px">你还没有在探索板块发布过内容</p>
+        <p class="text-secondary" style="margin-top:12px">你还没有在发现板块发布过内容</p>
       </div>
     `;
     return;

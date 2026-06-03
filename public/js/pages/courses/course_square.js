@@ -35,16 +35,16 @@ export async function renderCourseSquareTab(container, courseId, prefix) {
   const st = getState(prefix);
 
   container.innerHTML = `
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-      <button class="btn btn-primary btn-compact" id="${prefix}-sq-create-btn">
-        <span class="mi">add</span> 发布搭子帖
-      </button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
       ${createMdSelect({
         id: `${prefix}-sq-filter-category`,
         options: [{ text: '全部类型', value: 'all' }, ...COURSE_SQUARE_CATEGORIES.map(c => ({ text: c, value: c }))],
         style: 'width:auto;min-width:120px;margin-bottom:0',
         onchange: `window._refreshCourseSquare_${prefix}(${courseId})`
       })}
+      <button class="btn btn-primary btn-compact" id="${prefix}-sq-create-btn">
+        <span class="mi">add</span> 发布搭子帖
+      </button>
     </div>
     <div id="${prefix}-sq-posts-list"></div>
   `;

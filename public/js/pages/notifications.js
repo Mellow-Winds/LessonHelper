@@ -5,7 +5,7 @@
 
 import { apiGet, apiPut } from '../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../core/router.js';
-import { showToast, escHtml, formatTime, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
+import { showToast, openModal, closeModal, escHtml, formatTime, renderLoginPrompt, bindLoginPrompt, createMdTextarea } from '../components/ui.js';
 import { renderAuth } from './auth.js';
 import { resolveNotificationTarget } from './notification_routes.mjs';
 import { renderFollowingFeed } from './following_feed.js';
@@ -155,6 +155,12 @@ async function handleNotifItemClick(notifId, relatedType, relatedId, courseId, i
     if (window.refreshNotifBadge) window.refreshNotifBadge();
   }
 
+  // 交换联系方式请求特殊处理
+  if (relatedType === 'contact_exchange') {
+    await showExchangeDetailModal(relatedId);
+    return;
+  }
+
   const target = resolveNotificationTarget(relatedType, relatedId, courseId);
   if (target) navigateTo(target.page, target.data);
 }
@@ -182,6 +188,123 @@ function getNotifIcon(type) {
     invite_join: 'person_add',
     invite_cancel: 'event_busy',
     new_follower: 'person_add',
+    contact_exchange_request: 'swap_horiz',
+    contact_exchange_accepted: 'check_circle',
+    contact_exchange_rejected: 'cancel',
   };
   return `<span class="mi" style="font-size:22px">${icons[type] || 'notifications'}</span>`;
+}
+
+/* =============================================
+   交换联系方式详情弹窗
+   ============================================= */
+
+async function showExchangeDetailModal(requestId) {
+  const result = await apiGet(`/api/user/contact-exchange/${requestId}`);
+  if (result.error) {
+    showToast('获取详情失败');
+    return;
+  }
+
+  const isRecipient = String(result.toUserId) === String(window._currentUser?.id);
+  const isPending = result.status === 'pending';
+  const isAccepted = result.status === 'accepted';
+
+  let statusHtml = '';
+  if (result.status === 'pending') {
+    statusHtml = '<span style="color:var(--md-primary);font-weight:600">等待处理</span>';
+  } else if (result.status === 'accepted') {
+    statusHtml = '<span style="color:var(--md-success);font-weight:600">已同意</span>';
+  } else {
+    statusHtml = '<span style="color:var(--md-error);font-weight:600">已拒绝</span>';
+  }
+
+  let contactHtml = '';
+  if (isAccepted && result.contactInfo) {
+    const info = result.contactInfo;
+    contactHtml = `
+      <div style="margin-top:var(--space-4);padding:var(--space-4);background:var(--md-surface-container);border-radius:8px;">
+        <div style="font-weight:600;margin-bottom:var(--space-3);color:var(--md-on-surface)">对方的联系方式</div>
+        ${info.qq ? `<div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-2)"><span style="color:var(--md-on-surface-variant)">QQ：</span><span>${escHtml(info.qq)}</span></div>` : ''}
+        ${info.wechat ? `<div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-2)"><span style="color:var(--md-on-surface-variant)">微信：</span><span>${escHtml(info.wechat)}</span></div>` : ''}
+        ${info.douyin ? `<div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-2)"><span style="color:var(--md-on-surface-variant)">抖音：</span><span>${escHtml(info.douyin)}</span></div>` : ''}
+        ${!info.qq && !info.wechat && !info.douyin ? '<div style="color:var(--md-on-surface-variant)">对方暂未填写联系方式</div>' : ''}
+      </div>
+    `;
+  }
+
+  let actionsHtml = '';
+  if (isPending && isRecipient) {
+    actionsHtml = `
+      <div style="display:flex;gap:var(--space-3);justify-content:flex-end;margin-top:var(--space-4)">
+        <button class="btn btn-secondary" id="exchange-reject-btn">
+          <span class="mi">close</span> 拒绝
+        </button>
+        <button class="btn btn-primary" id="exchange-accept-btn">
+          <span class="mi">check</span> 同意
+        </button>
+      </div>
+    `;
+  }
+
+  const bodyHtml = `
+    <div style="display:flex;flex-direction:column;gap:var(--space-4);">
+      <div style="display:flex;align-items:center;gap:var(--space-3)">
+        <div style="width:48px;height:48px;border-radius:50%;background:var(--md-primary-container);display:flex;align-items:center;justify-content:center">
+          ${result.fromUser?.avatar_url
+            ? `<img src="${escHtml(result.fromUser.avatar_url)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover">`
+            : `<span class="mi" style="font-size:24px;color:var(--md-primary)">person</span>`
+          }
+        </div>
+        <div>
+          <div style="font-weight:600;color:var(--md-on-surface)">${escHtml(result.fromUser?.nickname || '未知用户')}</div>
+          <div style="font-size:var(--text-sm);color:var(--md-on-surface-variant)">${escHtml(result.fromUser?.major || '')} ${escHtml(result.fromUser?.grade || '')}</div>
+        </div>
+        <div style="margin-left:auto">${statusHtml}</div>
+      </div>
+
+      ${result.message ? `
+        <div style="padding:var(--space-3);background:var(--md-surface-container-low);border-radius:8px;">
+          <div style="font-size:var(--text-xs);color:var(--md-on-surface-variant);margin-bottom:var(--space-1)">附带信息</div>
+          <div style="color:var(--md-on-surface)">${escHtml(result.message)}</div>
+        </div>
+      ` : ''}
+
+      ${contactHtml}
+      ${actionsHtml}
+    </div>
+  `;
+
+  openModal('交换联系方式详情', bodyHtml);
+
+  // 绑定同意/拒绝按钮
+  if (isPending && isRecipient) {
+    document.getElementById('exchange-accept-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('exchange-accept-btn');
+      btn.disabled = true;
+      const res = await apiPut(`/api/user/contact-exchange/${requestId}/accept`, {});
+      if (res.error) {
+        showToast(res.error);
+        btn.disabled = false;
+        return;
+      }
+      showToast('已同意');
+      closeModal();
+      await loadNotifications();
+    });
+
+    document.getElementById('exchange-reject-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('exchange-reject-btn');
+      btn.disabled = true;
+      const res = await apiPut(`/api/user/contact-exchange/${requestId}/reject`, {});
+      if (res.error) {
+        showToast(res.error);
+        btn.disabled = false;
+        return;
+      }
+      showToast('已拒绝');
+      closeModal();
+      await loadNotifications();
+    });
+  }
 }

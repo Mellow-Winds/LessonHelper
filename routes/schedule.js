@@ -180,11 +180,13 @@ module.exports = function (db) {
           let courseId;
           if (existing) {
             courseId = existing.id;
+            // 回填 semester（如果为空）
+            db.run('UPDATE courses SET semester = ? WHERE id = ? AND (semester = "" OR semester IS NULL)', [semesterKey, courseId]);
           } else {
             const desc = [c.courseId, c.time, c.location].filter(Boolean).join(' · ');
             const result = db.run(
-              'INSERT INTO courses (title, description, teacher, owner_id) VALUES (?, ?, ?, ?)',
-              [c.className, desc, c.teacher, userId]
+              'INSERT INTO courses (title, description, teacher, owner_id, semester) VALUES (?, ?, ?, ?, ?)',
+              [c.className, desc, c.teacher, userId, semesterKey]
             );
             courseId = result.lastInsertRowid;
           }
@@ -232,14 +234,14 @@ module.exports = function (db) {
   // GET /api/schedule/available - 搜索可选课程
   router.get('/available', authMiddleware, (req, res) => {
     const userId = req.user.userId;
-    const { courseId, name, day, teacher } = req.query;
+    const { courseId, name, day, teacher, year, semester } = req.query;
 
     let sql = `
       SELECT c.*,
         (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id) AS enrollment_count,
         (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id AND uc.user_id = ?) AS is_enrolled
       FROM courses c
-      WHERE 1=1
+      WHERE c.description IS NOT NULL AND c.description != ""
     `;
     const params = [userId];
 
@@ -258,6 +260,13 @@ module.exports = function (db) {
     if (day) {
       sql += ' AND c.description LIKE ?';
       params.push(`%${day}%`);
+    }
+    if (semester) {
+      sql += ' AND c.semester = ?';
+      params.push(semester);
+    } else if (year) {
+      sql += ' AND c.semester LIKE ?';
+      params.push(`${year}-%`);
     }
 
     sql += ' ORDER BY c.created_at DESC LIMIT 100';

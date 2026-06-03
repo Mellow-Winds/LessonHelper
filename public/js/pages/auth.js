@@ -111,7 +111,7 @@ function renderVerifyForm() {
       <form id="verify-form" onsubmit="handleVerify(event)" style="display:flex;flex-direction:column;gap:20px">
         <div class="md-input-group">
           <input class="md-input" type="text" name="code" placeholder=" " required maxlength="6" style="text-align:center;font-size:24px;letter-spacing:8px" autocomplete="one-time-code">
-          <label class="md-label" style="text-align:center;left:50%;transform:translate(-50%,-50%)">${window.t('verify_code')}</label>
+          <label class="md-label">${window.t('verify_code')}</label>
           <fieldset class="md-border" aria-hidden="true"><legend><span>${window.t('verify_code')}</span></legend></fieldset>
         </div>
         <div class="form-error" id="verify-error" style="display:none"></div>
@@ -289,7 +289,7 @@ registerPage('profile', async (container) => {
   // Logged in — show profile
   const user = window._currentUser;
   container.innerHTML = `
-    <h1 class="page-title">个人中心</h1>
+    <h1 class="page-title"><span class="mi" style="vertical-align:-4px;margin-right:4px">person</span>个人中心</h1>
     <div style="max-width:480px">
       <div class="card" style="text-align:center">
         <div class="avatar-placeholder">${(user.nickname || user.username)[0]}</div>
@@ -510,7 +510,7 @@ registerPage('search', async (container, data) => {
 
   container.innerHTML = `
     <div class="page-header">
-      <h1 class="page-title">${q ? '搜索结果' : '搜索'}</h1>
+      <h1 class="page-title"><span class="mi" style="vertical-align:-4px;margin-right:4px">search</span>${q ? '搜索结果' : '搜索'}</h1>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px">
       ${createMdInput({
