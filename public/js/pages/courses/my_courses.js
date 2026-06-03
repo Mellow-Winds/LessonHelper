@@ -55,13 +55,18 @@ let _myCurrentSemester = getCurrentSemesterKey();
 function parseSemesterKey(key) {
   if (!key || key === 'all') return { year: 'all', type: 'all' };
   const parts = key.split('-');
-  if (parts.length < 2) return { year: key, type: 'all' };
+  if (parts.length < 2) {
+    // 纯学期类型（如 "1"、"2"、"summer"）→ type-only
+    if (['1', '2', 'summer'].includes(key)) return { year: 'all', type: key };
+    return { year: key, type: 'all' };
+  }
   return { year: parts[0], type: parts[1] };
 }
 
 function combineYearSemester(year, type) {
   if (year === 'all' && type === 'all') return 'all';
   if (type === 'all') return year;
+  if (year === 'all') return type;        // 只选学期类型 → 按类型筛选所有年份
   return `${year}-${type}`;
 }
 
@@ -122,18 +127,9 @@ registerPage('mycourse', async (container) => {
   bindRipples(container);
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
-  const wrapEl = document.getElementById('my-semester-filter-wrap');
-  if (wrapEl) {
-    wrapEl.addEventListener('md-select-change', () => {
-      const year = document.getElementById('my-year-filter')?.value || 'all';
-      const type = document.getElementById('my-sem-filter')?.value || 'all';
-      _myCurrentSemester = combineYearSemester(year, type);
-      loadMyCourseList(_myCurrentSemester);
-    });
-  }
-
   try {
     const semesters = await apiGet('/api/courses/semesters');
+    console.log('[学期] semesters API 返回:', semesters);
     if (semesters.length > 0) {
       const allKeys = new Set([_myCurrentSemester, ...semesters]);
       const years = [...new Set(Array.from(allKeys).map(k => parseSemesterKey(k).year))].filter(Boolean).sort().reverse();
@@ -141,6 +137,7 @@ registerPage('mycourse', async (container) => {
       const { year: initYear, type: initType } = parseSemesterKey(_myCurrentSemester);
       const yearOptions = [{ text: '全部年份', value: 'all' }, ...years.map(y => ({ text: `${y} 年`, value: y }))];
       const wrap = document.getElementById('my-semester-filter-wrap');
+      console.log('[学期] wrap 元素:', wrap);
       if (wrap) {
         wrap.innerHTML = `
           <div style="min-width:120px">
@@ -150,15 +147,22 @@ registerPage('mycourse', async (container) => {
             ${createMdSelect({ id: 'my-sem-filter', options: SEMESTER_TYPES, selected: initType || 'all' })}
           </div>
         `;
-        wrap.addEventListener('md-select-change', () => {
+        wrap.addEventListener('md-select-change', (ev) => {
+          console.log('[学期] md-select-change 事件触发!', ev.detail);
           const year = document.getElementById('my-year-filter')?.value || 'all';
           const type = document.getElementById('my-sem-filter')?.value || 'all';
           _myCurrentSemester = combineYearSemester(year, type);
+          console.log('[学期筛选] year=%s type=%s → semester=%s', year, type, _myCurrentSemester);
           loadMyCourseList(_myCurrentSemester);
         });
+        console.log('[学期] 事件监听器已绑定到 wrap');
+      } else {
+        console.warn('[学期] 找不到 #my-semester-filter-wrap');
       }
     }
-  } catch {}
+  } catch (err) {
+    console.error('[学期] semesters API 失败:', err);
+  }
 
   await loadMyCourseList(_myCurrentSemester);
 });
@@ -178,7 +182,9 @@ async function loadMyCourseList(semester) {
         url = `/api/courses?semester=${encodeURIComponent(semester)}`;
       }
     }
+    console.log('[loadMyCourseList] semester=%s → url=%s', semester, url);
     const courses = await apiGet(url);
+    console.log('[loadMyCourseList] 返回 %d 门课程', courses.length);
 
     if (courses.length === 0) {
       listEl.innerHTML = `
@@ -193,7 +199,7 @@ async function loadMyCourseList(semester) {
     }
 
     listEl.innerHTML = courses.map(c => {
-      const semText = c.semester ? semesterLabel(c.semester) : '';
+      const semText = c.enrolled_semester ? semesterLabel(c.enrolled_semester) : (c.semester ? semesterLabel(c.semester) : '');
       const descLine = [c.description || '', semText].filter(Boolean).join(' · ');
       return `
       <div class="card mb-4 clickable" onclick="navigateTo('course-detail', ${c.big_course_id || c.id})">

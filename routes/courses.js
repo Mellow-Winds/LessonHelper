@@ -188,7 +188,7 @@ module.exports = function (db) {
     const { semester, year } = req.query;
 
     let sql = `
-      SELECT DISTINCT c.*,
+      SELECT DISTINCT c.*, uc.semester_key AS enrolled_semester,
         (SELECT COUNT(*) FROM user_courses uc2 WHERE uc2.course_id = c.id) AS enrollment_count
       FROM courses c
       JOIN user_courses uc ON uc.course_id = c.id
@@ -197,8 +197,13 @@ module.exports = function (db) {
     const params = [userId];
 
     if (semester && semester !== 'all') {
-      sql += ' AND uc.semester_key = ?';
-      params.push(semester);
+      if (semester.includes('-')) {
+        sql += ' AND uc.semester_key = ?';
+        params.push(semester);
+      } else {
+        sql += ' AND uc.semester_key LIKE ?';
+        params.push(`%-${semester}`);
+      }
     } else if (year && year !== 'all') {
       sql += ' AND uc.semester_key LIKE ?';
       params.push(`${year}-%`);
