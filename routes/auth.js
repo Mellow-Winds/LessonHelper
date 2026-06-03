@@ -50,7 +50,7 @@ module.exports = function (db) {
       if (existing.email_verified) {
         return res.status(409).json({ error: '该邮箱已注册，请直接登录' });
       }
-      // 邮箱存在但未验证 → 重新发送验证码
+      // 邮箱存在但未验证 → 重新生成验证码
       const code = generateCode();
       const expires = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
       db.run(
@@ -58,32 +58,16 @@ module.exports = function (db) {
         [code, expires, existing.id]
       );
       db.save();
-
-      try {
-        const result = await sendVerificationCode(email, code);
-        if (!result.success) {
-          return res.status(500).json({ error: '验证码发送失败: ' + result.error });
-        }
-        res.json({ message: '验证码已重新发送至 ' + email });
-      } catch (e) {
-        console.error('验证码发送异常:', e);
-        res.status(500).json({ error: '验证码发送失败，请稍后重试' });
-      }
-      return;
+      return res.json({ message: '验证码已重新发送', debug_code: code });
     }
 
-    // 新用户注册：先发验证码，成功后再写库
+    // 新用户注册：生成验证码，写库，返回验证码供前端显示
     const code = generateCode();
     const expires = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
     try {
-      const sendResult = await sendVerificationCode(email, code);
-      if (!sendResult.success) {
-        return res.status(500).json({ error: '验证码发送失败: ' + sendResult.error });
-      }
-
       const password_hash = bcrypt.hashSync(password, SALT_ROUNDS);
-      const result = db.run(
+      db.run(
         `INSERT INTO users (username, display_name, email, password_hash, nickname, major, grade, verification_code, verification_code_expires, email_verified)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
         [email, nickname, email, password_hash, nickname, major || '', grade || '', code, expires]
@@ -91,9 +75,7 @@ module.exports = function (db) {
       db.save();
 
       console.log(`[Auth] 注册: ${email}, 验证码: ${code}`);
-      res.status(201).json({
-        message: '验证码已发送至 ' + email + '，请查收邮件完成验证'
-      });
+      res.status(201).json({ message: '验证码已发送', debug_code: code });
     } catch (e) {
       console.error('注册失败:', e);
       res.status(500).json({ error: '服务器错误' });
@@ -204,7 +186,7 @@ module.exports = function (db) {
       if (!result.success) {
         return res.status(500).json({ error: '验证码发送失败: ' + result.error });
       }
-      res.json({ message: '验证码已重新发送至 ' + email });
+      res.json({ message: '验证码已重新发送', debug_code: code });
     }).catch(e => {
       console.error('验证码发送异常:', e);
       res.status(500).json({ error: '验证码发送失败，请稍后重试' });
@@ -333,12 +315,7 @@ module.exports = function (db) {
       graceDays = 0;
     }
 
-    // 更新缓冲天数（用于前端显示"X天后归零"）
-    if (streak >= 45 && daysDiff > 1 && daysDiff <= 8) {
-      graceDays = Math.max(0, 7 - (daysDiff - 1));
-    } else if (streak >= 7 && daysDiff > 1 && daysDiff <= 4) {
-      graceDays = Math.max(0, 3 - (daysDiff - 1));
-    }
+    // graceDays 已在上方逻辑中根据签到结果正确设置（签到成功 = 0，归零 = 0），此处无需再更新
 
     db.run(
       'UPDATE users SET checkin_streak = ?, last_checkin_date = ?, grace_days = ? WHERE id = ?',

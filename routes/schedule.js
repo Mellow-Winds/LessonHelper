@@ -66,6 +66,29 @@ function findExistingCourse(db, course) {
   );
 }
 
+function cleanBigCourseName(title) {
+  if (!title) return '';
+  const parens = title.match(/[（(].+?[)）]/g) || [];
+  let temp = title;
+  parens.forEach((p, i) => { temp = temp.replace(p, `__PH${i}__`); });
+  temp = temp.replace(/\d{1,3}\s*班\s*$/, '');
+  temp = temp.replace(/[\s ]*\d{1,3}\s*$/, '');
+  temp = temp.replace(/\d{1,3}$/, '');
+  parens.forEach((p, i) => { temp = temp.replace(`__PH${i}__`, p); });
+  return temp.trim();
+}
+
+function findOrCreateBigCourse(db, title, userId) {
+  const bigName = cleanBigCourseName(title);
+  if (!bigName || bigName === title) return null;
+  let big = db.get('SELECT id FROM courses WHERE title = ? AND big_course_id IS NULL AND (description = "" OR description IS NULL)', [bigName]);
+  if (!big) {
+    db.run('INSERT INTO courses (title, description, owner_id, teacher) VALUES (?, "", ?, "")', [bigName, userId || 0]);
+    big = db.get('SELECT id FROM courses WHERE title = ? AND big_course_id IS NULL AND (description = "" OR description IS NULL)', [bigName]);
+  }
+  return big ? big.id : null;
+}
+
 module.exports = function (db) {
   const router = express.Router();
 
@@ -109,14 +132,14 @@ module.exports = function (db) {
       });
     }
 
-    // --- 当前用户课程总数检查 ---
+    // --- 当前用户本学期课程数检查 ---
     const courseCount = db.get(
-      'SELECT COUNT(*) AS cnt FROM user_courses WHERE user_id = ?',
-      [userId]
+      'SELECT COUNT(*) AS cnt FROM user_courses WHERE user_id = ? AND semester_key = ?',
+      [userId, semesterKey]
     );
     if (courseCount.cnt >= MAX_COURSES_PER_USER) {
       return res.status(400).json({
-        error: `你的课程总数已达 ${MAX_COURSES_PER_USER} 门上限，请先退出部分课程后再导入`
+        error: `本学期课程数已达 ${MAX_COURSES_PER_USER} 门上限，请先退出部分课程后再导入`
       });
     }
 
@@ -164,6 +187,12 @@ module.exports = function (db) {
               [c.className, desc, c.teacher, userId]
             );
             courseId = result.lastInsertRowid;
+          }
+
+          // 设置 big_course_id
+          const bigId = findOrCreateBigCourse(db, c.className, userId);
+          if (bigId) {
+            db.run('UPDATE courses SET big_course_id = ? WHERE id = ? AND (big_course_id IS NULL OR big_course_id = 0)', [bigId, courseId]);
           }
 
           const enrolled = db.get(

@@ -1082,39 +1082,6 @@ select::-ms-expand {
   transform: translateX(20px);
 }
 
-/* ---- Member Filter ---- */
-.member-filter-select {
-  width: 100%;
-  padding: 6px 8px;
-  font-size: 12px;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--radius-sm, 6px);
-  background: var(--md-surface);
-  color: var(--md-on-surface);
-  outline: none;
-  margin-bottom: 6px;
-  appearance: auto;
-}
-.member-filter-select:focus {
-  border-color: var(--md-primary);
-}
-
-.member-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-}
-.member-item + .member-item {
-  border-top: 1px solid var(--md-outline-variant);
-}
-.member-profile-link {
-  cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
-}
-.member-profile-link:hover {
-  background: var(--md-surface-container-low, #f8f9fb);
-}
 .user-profile-link {
   padding: 0;
   border: 0;
@@ -2914,33 +2881,6 @@ input {
 
 .publish-attach-section {
   margin-bottom: var(--space-4);
-}
-
-/* ---- 发布表单：同步开关联动 ---- */
-
-.publish-sync-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  margin-bottom: var(--space-4);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--radius-md);
-  background: var(--md-surface-container-lowest);
-  transition:
-    border-color var(--dur-normal) var(--ease-standard),
-    background-color var(--dur-normal) var(--ease-standard);
-}
-
-.publish-sync-row.forced {
-  border-color: var(--md-primary);
-  background: var(--md-primary-container);
-}
-
-.publish-sync-row.forced .post-switch-text,
-.publish-sync-row.forced div[style] {
-  color: var(--md-on-primary-container);
 }
 
 /* ---- 禁用态按钮 ---- */

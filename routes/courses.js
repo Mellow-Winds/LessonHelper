@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { authMiddleware } = require('./middleware/auth');
-const { createNotification, notifyCourseMembers } = require('./notifications');
+const { createNotification } = require('./notifications');
 
 const POST_ATTACHMENT_DIR = path.join(__dirname, '..', 'uploads', 'post-attachments');
 const POST_ATTACHMENT_LIMIT = 9;
@@ -104,6 +104,59 @@ module.exports = function (db) {
     );
   }
 
+  // --- 大课体系工具函数 ---
+  function cleanBigCourseName(title) {
+    if (!title) return '';
+    const parens = title.match(/[（(].+?[)）]/g) || [];
+    let temp = title;
+    parens.forEach((p, i) => { temp = temp.replace(p, `__PH${i}__`); });
+    temp = temp.replace(/\d{1,3}\s*班\s*$/, '');
+    temp = temp.replace(/[\s ]*\d{1,3}\s*$/, '');
+    temp = temp.replace(/\d{1,3}$/, '');
+    parens.forEach((p, i) => { temp = temp.replace(`__PH${i}__`, p); });
+    return temp.trim();
+  }
+
+  function findOrCreateBigCourse(title) {
+    const bigName = cleanBigCourseName(title);
+    if (!bigName) return null;
+    let big = db.get('SELECT id FROM courses WHERE title = ? AND big_course_id IS NULL AND (description = "" OR description IS NULL)', [bigName]);
+    if (!big) {
+      db.run('INSERT INTO courses (title, description, owner_id, teacher) VALUES (?, "", 0, "")', [bigName]);
+      big = db.get('SELECT id FROM courses WHERE title = ? AND big_course_id IS NULL AND (description = "" OR description IS NULL)', [bigName]);
+    }
+    return big ? big.id : null;
+  }
+
+  function isEnrolledInBigCourse(userId, bigCourseId) {
+    // 检查是否直接选了这门大课，或选了其下的任意小课
+    return !!db.get(
+      `SELECT 1 FROM user_courses uc
+       JOIN courses c ON uc.course_id = c.id
+       WHERE uc.user_id = ? AND (c.id = ? OR c.big_course_id = ?)`,
+      [userId, bigCourseId, bigCourseId]
+    );
+  }
+
+  function getSmallCourseIds(bigCourseId) {
+    return db.all('SELECT id FROM courses WHERE big_course_id = ?', [bigCourseId]).map(r => r.id);
+  }
+
+  function notifyBigCourseMembers(bigCourseId, excludeUserId, type, title, message, relatedType, relatedId) {
+    const smallIds = getSmallCourseIds(bigCourseId);
+    if (smallIds.length === 0) return;
+    const placeholders = smallIds.map(() => '?').join(',');
+    const members = db.all(
+      `SELECT DISTINCT user_id FROM user_courses WHERE course_id IN (${placeholders}) AND user_id != ?`,
+      [...smallIds, excludeUserId]
+    );
+    for (const m of members) {
+      createNotification(db, {
+        userId: m.user_id, type, title, message, relatedType, relatedId, courseId: bigCourseId
+      });
+    }
+  }
+
   // GET /api/courses/semesters — 当前用户已选课程涉及的学期列表
   router.get('/semesters', authMiddleware, (req, res) => {
     const userId = req.user.userId;
@@ -114,12 +167,15 @@ module.exports = function (db) {
     res.json(rows.map(r => r.semester_key));
   });
 
-  // GET /api/courses/all — 全校课程列表（公开，供课程广场使用，不需要登录）
+  // GET /api/courses/all — 全校大课列表（公开，供课程广场使用，不需要登录）
   router.get('/all', (req, res) => {
     const courses = db.all(`
       SELECT c.*,
-        (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id) AS enrollment_count
+        (SELECT COUNT(*) FROM user_courses uc
+         JOIN courses c2 ON uc.course_id = c2.id
+         WHERE c2.big_course_id = c.id) AS enrollment_count
       FROM courses c
+      WHERE c.big_course_id IS NULL AND (c.description = '' OR c.description IS NULL)
       ORDER BY c.title ASC
     `);
     res.json(courses);
@@ -128,7 +184,7 @@ module.exports = function (db) {
   // GET /api/courses — 当前用户的课程列表（支持学期筛选）
   router.get('/', authMiddleware, (req, res) => {
     const userId = req.user.userId;
-    const { semester } = req.query;
+    const { semester, year } = req.query;
 
     let sql = `
       SELECT DISTINCT c.*,
@@ -142,6 +198,9 @@ module.exports = function (db) {
     if (semester && semester !== 'all') {
       sql += ' AND uc.semester_key = ?';
       params.push(semester);
+    } else if (year && year !== 'all') {
+      sql += ' AND uc.semester_key LIKE ?';
+      params.push(`${year}-%`);
     }
 
     sql += ' ORDER BY c.created_at DESC';
@@ -149,15 +208,30 @@ module.exports = function (db) {
     res.json(courses);
   });
 
-  // GET /api/courses/:id — 课程详情
+  // GET /api/courses/:id — 课程详情（支持大课和小课 ID）
   router.get('/:id', (req, res) => {
-    const course = db.get(`
-      SELECT c.*,
-        (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id) AS enrollment_count
-      FROM courses c
-      WHERE c.id = ?
-    `, [Number(req.params.id)]);
+    const courseId = Number(req.params.id);
+    const course = db.get('SELECT * FROM courses WHERE id = ?', [courseId]);
     if (!course) return res.status(404).json({ error: '课程不存在' });
+
+    // 判断是大课还是小课
+    const isBig = !course.big_course_id && (!course.description || course.description === '');
+    if (isBig) {
+      // 大课：enrollment_count = 所有小课的选课人数总和
+      const count = db.get(
+        'SELECT COUNT(*) AS cnt FROM user_courses uc JOIN courses c ON uc.course_id = c.id WHERE c.big_course_id = ?',
+        [courseId]
+      );
+      course.enrollment_count = count ? count.cnt : 0;
+    } else {
+      // 小课：enrollment_count = 该小课的选课人数
+      const count = db.get(
+        'SELECT COUNT(*) AS cnt FROM user_courses WHERE course_id = ?',
+        [courseId]
+      );
+      course.enrollment_count = count ? count.cnt : 0;
+    }
+
     res.json(course);
   });
 
@@ -176,18 +250,20 @@ module.exports = function (db) {
       return res.status(400).json({ error: '已加入该课程' });
     }
 
-    // 检查课程总数上限
+    const semesterKey = req.body.semester_key || '';
+
+    // 检查本学期课程数上限（每学期 50 门）
     const count = db.get(
-      'SELECT COUNT(*) AS cnt FROM user_courses WHERE user_id = ?',
-      [userId]
+      'SELECT COUNT(*) AS cnt FROM user_courses WHERE user_id = ? AND semester_key = ?',
+      [userId, semesterKey]
     );
     if (count.cnt >= 50) {
-      return res.status(400).json({ error: '课程总数已达 50 门上限，请先退出部分课程' });
+      return res.status(400).json({ error: '本学期课程数已达 50 门上限，请先退出部分课程' });
     }
 
     db.run(
-      'INSERT INTO user_courses (user_id, course_id) VALUES (?, ?)',
-      [userId, courseId]
+      'INSERT INTO user_courses (user_id, course_id, semester_key) VALUES (?, ?, ?)',
+      [userId, courseId, semesterKey]
     );
     db.save();
     res.json({ message: '加入成功' });
@@ -214,84 +290,30 @@ module.exports = function (db) {
     res.json({ message: '已退出课程' });
   });
 
-  // GET /api/courses/:id/members — 课程成员列表（支持 major/grade 筛选）
-  router.get('/:id/members', authMiddleware, (req, res) => {
+  // PUT /api/courses/:id/move-semester — 移动课程到指定学期 [Auth]
+  router.put('/:id/move-semester', authMiddleware, (req, res) => {
+    const userId = req.user.userId;
     const courseId = Number(req.params.id);
-    const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
-    if (!course) return res.status(404).json({ error: '课程不存在' });
-    if (!isEnrolled(req.user.userId, courseId)) {
-      return res.status(403).json({ error: '只有课程成员可以查看成员列表' });
+    const { semester_key } = req.body;
+
+    if (!semester_key) {
+      return res.status(400).json({ error: '请指定目标学期' });
     }
 
-    const { major, grade, match_only } = req.query;
-
-    let sql = `
-      SELECT u.id AS user_id, u.nickname, u.major, u.grade, u.avatar_url, u.qq, u.privacy_show_profile, u.privacy_allow_match
-      FROM user_courses uc
-      JOIN users u ON uc.user_id = u.id
-      WHERE uc.course_id = ?
-    `;
-    const params = [courseId];
-
-    // match_only=1 时过滤掉不允许匹配的用户
-    if (match_only === '1') {
-      sql += ' AND u.privacy_allow_match = 1';
+    const enrolled = db.get(
+      'SELECT * FROM user_courses WHERE user_id = ? AND course_id = ?',
+      [userId, courseId]
+    );
+    if (!enrolled) {
+      return res.status(400).json({ error: '未加入该课程' });
     }
 
-    if (major) {
-      sql += ' AND u.major LIKE ?';
-      params.push(`%${major}%`);
-    }
-    if (grade) {
-      sql += ' AND u.grade = ?';
-      params.push(grade);
-    }
-
-    sql += ' ORDER BY uc.enrolled_at ASC';
-
-    const members = db.all(sql, params);
-
-    // 隐私过滤：privacy_show_profile=0 时隐藏敏感信息
-    const result = members.map(m => {
-      const { privacy_show_profile, privacy_allow_match, ...rest } = m;
-      if (!privacy_show_profile) {
-        return { ...rest, major: '', grade: '', qq: '' };
-      }
-      return rest;
-    });
-
-    res.json(result);
-  });
-
-  // GET /api/courses/:id/members/stats — 成员专业和年级分布
-  router.get('/:id/members/stats', authMiddleware, (req, res) => {
-    const courseId = Number(req.params.id);
-    const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
-    if (!course) return res.status(404).json({ error: '课程不存在' });
-    if (!isEnrolled(req.user.userId, courseId)) {
-      return res.status(403).json({ error: '只有课程成员可以查看成员统计' });
-    }
-
-    const majors = db.all(`
-      SELECT DISTINCT u.major FROM user_courses uc
-      JOIN users u ON uc.user_id = u.id
-      WHERE uc.course_id = ? AND u.major != '' AND u.privacy_allow_match = 1
-      ORDER BY u.major ASC
-    `, [courseId]).map(r => r.major);
-
-    const grades = db.all(`
-      SELECT DISTINCT u.grade FROM user_courses uc
-      JOIN users u ON uc.user_id = u.id
-      WHERE uc.course_id = ? AND u.grade != '' AND u.privacy_allow_match = 1
-      ORDER BY u.grade DESC
-    `, [courseId]).map(r => r.grade);
-
-    const total = db.get(
-      'SELECT COUNT(*) AS cnt FROM user_courses WHERE course_id = ?',
-      [courseId]
-    ).cnt;
-
-    res.json({ majors, grades, total });
+    db.run(
+      'UPDATE user_courses SET semester_key = ? WHERE user_id = ? AND course_id = ?',
+      [semester_key, userId, courseId]
+    );
+    db.save();
+    res.json({ message: '移动成功' });
   });
 
   // GET /api/courses/:id/posts — 帖子列表
@@ -313,7 +335,7 @@ module.exports = function (db) {
     res.json(posts);
   });
 
-  // POST /api/courses/:id/posts — 发帖 [Auth]
+  // POST /api/courses/:id/posts — 发帖 [Auth]（:id 为大课 ID）
   router.post('/:id/posts', authMiddleware, parsePostAttachments, (req, res) => {
     const { title, content } = req.body;
     if (!title || !content) {
@@ -321,20 +343,20 @@ module.exports = function (db) {
       return res.status(400).json({ error: 'title 和 content 为必填项' });
     }
 
-    const courseId = Number(req.params.id);
-    const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    const bigCourseId = Number(req.params.id);
+    const course = db.get('SELECT id FROM courses WHERE id = ?', [bigCourseId]);
     if (!course) {
       cleanupUploadedFiles(req.files);
       return res.status(404).json({ error: '课程不存在' });
     }
-    if (!isEnrolled(req.user.userId, courseId)) {
+    if (!isEnrolledInBigCourse(req.user.userId, bigCourseId)) {
       cleanupUploadedFiles(req.files);
       return res.status(403).json({ error: '只有课程成员可以发布帖子' });
     }
 
     const result = db.run(
       'INSERT INTO posts (course_id, author_id, title, content) VALUES (?, ?, ?, ?)',
-      [courseId, req.user.userId, title, content]
+      [bigCourseId, req.user.userId, title, content]
     );
     const attachments = (req.files || []).map(file => {
       const ext = path.extname(file.originalname).toLowerCase();
@@ -351,20 +373,19 @@ module.exports = function (db) {
     });
     db.save();
 
-    // 通知：课程有新帖
+    // 通知：大课空间有新帖
     const author = db.get('SELECT nickname FROM users WHERE id = ?', [req.user.userId]);
-    const courseInfo = db.get('SELECT title FROM courses WHERE id = ?', [courseId]);
-    notifyCourseMembers(db, {
-      courseId, excludeUserId: req.user.userId,
-      type: 'new_post', title: '新帖子',
-      message: `${author?.nickname || '匿名'} 在「${courseInfo?.title || ''}」发布了「${title}」`,
-      relatedType: 'post', relatedId: result.lastInsertRowid
-    });
+    const courseInfo = db.get('SELECT title FROM courses WHERE id = ?', [bigCourseId]);
+    notifyBigCourseMembers(bigCourseId, req.user.userId,
+      'new_post', '新帖子',
+      `${author?.nickname || '匿名'} 在「${courseInfo?.title || ''}」发布了「${title}」`,
+      'post', result.lastInsertRowid
+    );
     db.save();
 
     res.status(201).json({
       id: result.lastInsertRowid,
-      course_id: courseId,
+      course_id: bigCourseId,
       author_id: req.user.userId,
       title,
       content,
@@ -565,11 +586,11 @@ module.exports = function (db) {
   const COURSE_SQUARE_CATEGORIES = ['考研搭子', '考公搭子', '考证搭子', '项目组队', '技能交换', '竞赛组队', '其他'];
   const COURSE_SQUARE_EXPIRY_DAYS = 7;
 
-  // POST /api/courses/:id/square-posts — 发布课程搭子帖 [Auth + 选课]
+  // POST /api/courses/:id/square-posts — 发布课程搭子帖 [Auth + 选课]（:id 为大课 ID）
   router.post('/:id/square-posts', authMiddleware, (req, res) => {
-    const courseId = Number(req.params.id);
+    const bigCourseId = Number(req.params.id);
     const userId = req.user.userId;
-    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+    if (!isEnrolledInBigCourse(userId, bigCourseId)) return res.status(403).json({ error: '未选修该课程' });
 
     const { title, category, description, max_people } = req.body;
     if (!title || !category) return res.status(400).json({ error: '标题和类型为必填项' });
@@ -580,22 +601,22 @@ module.exports = function (db) {
     const result = db.run(
       `INSERT INTO square_posts (creator_id, title, category, description, max_people, current_count, status, expires_at, course_id)
        VALUES (?, ?, ?, ?, ?, 0, 'open', ?, ?)`,
-      [userId, title.trim(), category, (description || '').trim(), max_people || 1, expiresAt, courseId]
+      [userId, title.trim(), category, (description || '').trim(), max_people || 1, expiresAt, bigCourseId]
     );
     db.save();
 
     res.status(201).json({ id: result.lastInsertRowid, message: '发布成功' });
   });
 
-  // GET /api/courses/:id/square-posts — 课程搭子帖列表 [Auth + 选课]
+  // GET /api/courses/:id/square-posts — 课程搭子帖列表 [Auth + 选课]（:id 为大课 ID）
   router.get('/:id/square-posts', authMiddleware, (req, res) => {
-    const courseId = Number(req.params.id);
+    const bigCourseId = Number(req.params.id);
     const userId = req.user.userId;
-    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+    if (!isEnrolledInBigCourse(userId, bigCourseId)) return res.status(403).json({ error: '未选修该课程' });
 
     const { category } = req.query;
     let where = " WHERE sp.course_id = ? AND sp.expires_at > datetime('now', '+8 hours') AND sp.status != 'expired'";
-    const params = [courseId];
+    const params = [bigCourseId];
 
     if (category && category !== 'all') {
       where += ' AND sp.category = ?';
@@ -621,19 +642,19 @@ module.exports = function (db) {
     res.json({ posts: result });
   });
 
-  // GET /api/courses/:id/square-posts/:postId — 帖子详情 [Auth + 选课]
+  // GET /api/courses/:id/square-posts/:postId — 帖子详情 [Auth + 选课]（:id 为大课 ID）
   router.get('/:id/square-posts/:postId', authMiddleware, (req, res) => {
-    const courseId = Number(req.params.id);
+    const bigCourseId = Number(req.params.id);
     const postId = Number(req.params.postId);
     const userId = req.user.userId;
-    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+    if (!isEnrolledInBigCourse(userId, bigCourseId)) return res.status(403).json({ error: '未选修该课程' });
 
     const post = db.get(`
       SELECT sp.*, u.nickname AS creator_name, u.major AS creator_major, u.grade AS creator_grade
       FROM square_posts sp
       JOIN users u ON sp.creator_id = u.id
       WHERE sp.id = ? AND sp.course_id = ?
-    `, [postId, courseId]);
+    `, [postId, bigCourseId]);
 
     if (!post) return res.status(404).json({ error: '帖子不存在' });
     if (new Date(post.expires_at) <= new Date()) post.status = 'expired';
@@ -670,11 +691,11 @@ module.exports = function (db) {
 
   // DELETE /api/courses/:id/square-posts/:postId — 删除帖子 [Auth, 仅创建者]
   router.delete('/:id/square-posts/:postId', authMiddleware, (req, res) => {
-    const courseId = Number(req.params.id);
+    const bigCourseId = Number(req.params.id);
     const postId = Number(req.params.postId);
     const userId = req.user.userId;
 
-    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [postId, courseId]);
+    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [postId, bigCourseId]);
     if (!post) return res.status(404).json({ error: '帖子不存在' });
     if (post.creator_id !== userId) return res.status(403).json({ error: '只能删除自己发布的帖子' });
 
@@ -683,14 +704,14 @@ module.exports = function (db) {
     res.json({ message: '已删除' });
   });
 
-  // POST /api/courses/:id/square-posts/:postId/interest — 表示感兴趣 [Auth + 选课]
+  // POST /api/courses/:id/square-posts/:postId/interest — 表示感兴趣 [Auth + 选课]（:id 为大课 ID）
   router.post('/:id/square-posts/:postId/interest', authMiddleware, (req, res) => {
-    const courseId = Number(req.params.id);
+    const bigCourseId = Number(req.params.id);
     const postId = Number(req.params.postId);
     const userId = req.user.userId;
-    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+    if (!isEnrolledInBigCourse(userId, bigCourseId)) return res.status(403).json({ error: '未选修该课程' });
 
-    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [postId, courseId]);
+    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [postId, bigCourseId]);
     if (!post) return res.status(404).json({ error: '帖子不存在' });
     if (post.creator_id === userId) return res.status(400).json({ error: '不能对自己的帖子感兴趣' });
     if (post.status !== 'open') return res.status(400).json({ error: '该帖子已不再接受申请' });
@@ -715,7 +736,7 @@ module.exports = function (db) {
 
   // PUT /api/courses/:id/square-interests/:interestId — 接受/拒绝 [Auth]
   router.put('/:id/square-interests/:interestId', authMiddleware, (req, res) => {
-    const courseId = Number(req.params.id);
+    const bigCourseId = Number(req.params.id);
     const interestId = Number(req.params.interestId);
     const userId = req.user.userId;
     const { action } = req.body;
@@ -723,7 +744,7 @@ module.exports = function (db) {
     const interest = db.get('SELECT * FROM square_interests WHERE id = ?', [interestId]);
     if (!interest) return res.status(404).json({ error: '记录不存在' });
 
-    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [interest.post_id, courseId]);
+    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [interest.post_id, bigCourseId]);
     if (!post || post.creator_id !== userId) return res.status(403).json({ error: '无权操作' });
     if (interest.status !== 'pending') return res.status(400).json({ error: '该申请已处理' });
 
@@ -776,12 +797,12 @@ module.exports = function (db) {
     res.json({ comments, total, page, pageSize });
   });
 
-  // POST /api/courses/:id/square-posts/:postId/comments — 发评论 [Auth + 选课]
+  // POST /api/courses/:id/square-posts/:postId/comments — 发评论 [Auth + 选课]（:id 为大课 ID）
   router.post('/:id/square-posts/:postId/comments', authMiddleware, parseCourseSquareCommentImage, (req, res) => {
-    const courseId = Number(req.params.id);
+    const bigCourseId = Number(req.params.id);
     const postId = Number(req.params.postId);
     const userId = req.user.userId;
-    if (!isEnrolled(userId, courseId)) return res.status(403).json({ error: '未选修该课程' });
+    if (!isEnrolledInBigCourse(userId, bigCourseId)) return res.status(403).json({ error: '未选修该课程' });
 
     const { content, parent_id } = req.body;
     const imageFile = req.file;
@@ -795,7 +816,7 @@ module.exports = function (db) {
       return res.status(400).json({ error: '回复内容不能超过 500 字' });
     }
 
-    const post = db.get('SELECT id, creator_id, title FROM square_posts WHERE id = ? AND course_id = ?', [postId, courseId]);
+    const post = db.get('SELECT id, creator_id, title FROM square_posts WHERE id = ? AND course_id = ?', [postId, bigCourseId]);
     if (!post) {
       if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
       return res.status(404).json({ error: '帖子不存在' });

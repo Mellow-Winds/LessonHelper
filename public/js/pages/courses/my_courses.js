@@ -6,7 +6,7 @@
  * 详情页逻辑已迁移至 detail.js（统一 course-detail 页面）
  */
 
-import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
+import { apiGet, apiPost, apiPut, apiDelete, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../../core/router.js';
 import { showToast, openModal, closeModal, createMdInput, createMdTextarea, createMdSelect, escHtml, formatTime, formatFileSize, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
 import { renderAuth } from '../auth.js';
@@ -53,6 +53,26 @@ export function semesterFullLabel(key) {
 
 let _myCurrentSemester = getCurrentSemesterKey();
 
+function parseSemesterKey(key) {
+  if (!key || key === 'all') return { year: 'all', type: 'all' };
+  const parts = key.split('-');
+  if (parts.length < 2) return { year: key, type: 'all' };
+  return { year: parts[0], type: parts[1] };
+}
+
+function combineYearSemester(year, type) {
+  if (year === 'all' && type === 'all') return 'all';
+  if (type === 'all') return year;
+  return `${year}-${type}`;
+}
+
+const SEMESTER_TYPES = [
+  { text: '全部学期', value: 'all' },
+  { text: '第一学期', value: '1' },
+  { text: '第二学期', value: '2' },
+  { text: '暑期', value: 'summer' },
+];
+
 /* =============================================
    Page: 我的课程列表
    ============================================= */
@@ -79,12 +99,21 @@ registerPage('mycourse', async (container) => {
         </button>
       </div>
     </div>
-    <div id="my-semester-filter-wrap" style="margin-bottom:var(--space-4);width:auto;min-width:180px;display:inline-block">
-      ${createMdSelect({
-        id: 'my-semester-filter',
-        options: [{ text: semesterLabel(_myCurrentSemester), value: _myCurrentSemester }],
-        selected: _myCurrentSemester,
-      })}
+    <div id="my-semester-filter-wrap" style="margin-bottom:var(--space-4);display:flex;gap:8px;width:auto">
+      <div style="min-width:120px">
+        ${createMdSelect({
+          id: 'my-year-filter',
+          options: [{ text: '全部年份', value: 'all' }],
+          selected: 'all',
+        })}
+      </div>
+      <div style="min-width:120px">
+        ${createMdSelect({
+          id: 'my-sem-filter',
+          options: SEMESTER_TYPES,
+          selected: 'all',
+        })}
+      </div>
     </div>
     <div id="my-course-list">
       <div class="card"><p class="text-secondary">加载中...</p></div>
@@ -94,10 +123,12 @@ registerPage('mycourse', async (container) => {
   bindRipples(container);
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
-  const semContainer = document.getElementById('my-semester-filter-container');
-  if (semContainer) {
-    semContainer.addEventListener('md-select-change', (e) => {
-      _myCurrentSemester = e.detail.value;
+  const wrapEl = document.getElementById('my-semester-filter-wrap');
+  if (wrapEl) {
+    wrapEl.addEventListener('md-select-change', () => {
+      const year = document.getElementById('my-year-filter')?.value || 'all';
+      const type = document.getElementById('my-sem-filter')?.value || 'all';
+      _myCurrentSemester = combineYearSemester(year, type);
       loadMyCourseList(_myCurrentSemester);
     });
   }
@@ -106,25 +137,26 @@ registerPage('mycourse', async (container) => {
     const semesters = await apiGet('/api/courses/semesters');
     if (semesters.length > 0) {
       const allKeys = new Set([_myCurrentSemester, ...semesters]);
-      const sorted = Array.from(allKeys).sort().reverse();
-      const options = [
-        { text: '全部学期', value: 'all' },
-        ...sorted.map(k => ({ text: semesterLabel(k), value: k }))
-      ];
+      const years = [...new Set(Array.from(allKeys).map(k => parseSemesterKey(k).year))].filter(Boolean).sort().reverse();
+
+      const { year: initYear, type: initType } = parseSemesterKey(_myCurrentSemester);
+      const yearOptions = [{ text: '全部年份', value: 'all' }, ...years.map(y => ({ text: `${y} 年`, value: y }))];
       const wrap = document.getElementById('my-semester-filter-wrap');
       if (wrap) {
-        wrap.innerHTML = createMdSelect({
-          id: 'my-semester-filter',
-          options,
-          selected: _myCurrentSemester,
+        wrap.innerHTML = `
+          <div style="min-width:120px">
+            ${createMdSelect({ id: 'my-year-filter', options: yearOptions, selected: years.includes(initYear) ? initYear : 'all' })}
+          </div>
+          <div style="min-width:120px">
+            ${createMdSelect({ id: 'my-sem-filter', options: SEMESTER_TYPES, selected: initType || 'all' })}
+          </div>
+        `;
+        wrap.addEventListener('md-select-change', () => {
+          const year = document.getElementById('my-year-filter')?.value || 'all';
+          const type = document.getElementById('my-sem-filter')?.value || 'all';
+          _myCurrentSemester = combineYearSemester(year, type);
+          loadMyCourseList(_myCurrentSemester);
         });
-        const newSemContainer = document.getElementById('my-semester-filter-container');
-        if (newSemContainer) {
-          newSemContainer.addEventListener('md-select-change', (e) => {
-            _myCurrentSemester = e.detail.value;
-            loadMyCourseList(_myCurrentSemester);
-          });
-        }
       }
     }
   } catch {}
@@ -138,7 +170,15 @@ async function loadMyCourseList(semester) {
   listEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
 
   try {
-    const url = semester === 'all' ? '/api/courses' : `/api/courses?semester=${encodeURIComponent(semester)}`;
+    let url = '/api/courses';
+    if (semester !== 'all') {
+      const parsed = parseSemesterKey(semester);
+      if (parsed.type === 'all') {
+        url = `/api/courses?year=${encodeURIComponent(parsed.year)}`;
+      } else {
+        url = `/api/courses?semester=${encodeURIComponent(semester)}`;
+      }
+    }
     const courses = await apiGet(url);
 
     if (courses.length === 0) {
@@ -154,7 +194,7 @@ async function loadMyCourseList(semester) {
     }
 
     listEl.innerHTML = courses.map(c => `
-      <div class="card mb-4 clickable" onclick="navigateTo('course-detail', ${c.id})">
+      <div class="card mb-4 clickable" onclick="navigateTo('course-detail', ${c.big_course_id || c.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1;min-width:0">
             <h3 class="card-title">${escHtml(c.title)}</h3>
@@ -165,9 +205,14 @@ async function loadMyCourseList(semester) {
             <span style="font-size:var(--text-sm);color:var(--md-primary);font-weight:600;white-space:nowrap">
               <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> ${c.enrollment_count || 0} 人
             </span>
-            <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();handleLeaveCourse(${c.id})">
-              <span class="mi" style="font-size:14px">logout</span> 退出课程
-            </button>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();openMoveSemesterModal(${c.id}, '${escHtml(c.title)}')">
+                <span class="mi" style="font-size:14px">swap_horiz</span> 移动学期
+              </button>
+              <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();handleLeaveCourse(${c.id})">
+                <span class="mi" style="font-size:14px">logout</span> 退出课程
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -266,7 +311,11 @@ export async function doCourseSearch() {
 }
 
 export async function handleEnrollFromSearch(courseId) {
-  const result = await apiPost(`/api/courses/${courseId}/enroll`, {});
+  let enrollSemester = _myCurrentSemester;
+  if (enrollSemester === 'all' || parseSemesterKey(enrollSemester).type === 'all') {
+    enrollSemester = getCurrentSemesterKey();
+  }
+  const result = await apiPost(`/api/courses/${courseId}/enroll`, { semester_key: enrollSemester });
   if (result.error) {
     showToast(result.error);
   } else {
@@ -381,6 +430,74 @@ export async function handleLeaveCourse(courseId) {
 }
 
 /* =============================================
+   移动学期
+   ============================================= */
+
+export async function openMoveSemesterModal(courseId, courseTitle) {
+  try {
+    const semesters = await apiGet('/api/courses/semesters');
+    const allKeys = new Set([...semesters]);
+    // 添加常用学期选项
+    const now = new Date();
+    const y = now.getFullYear();
+    [`${y}-1`, `${y}-2`, `${y}-summer`, `${y - 1}-1`, `${y - 1}-2`].forEach(k => allKeys.add(k));
+
+    const years = [...new Set(Array.from(allKeys).filter(Boolean).map(k => parseSemesterKey(k).year))].sort().reverse();
+    const yearOptions = years.map(y => ({ text: `${y} 年`, value: y }));
+
+    const { year: initYear, type: initType } = parseSemesterKey(_myCurrentSemester === 'all' ? getCurrentSemesterKey() : _myCurrentSemester);
+
+    const bodyHtml = `
+      <p style="margin-bottom:16px;color:var(--md-on-surface-variant)">将「${escHtml(courseTitle)}」移动到：</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <div style="flex:1">
+          ${createMdSelect({
+            id: 'move-year-target',
+            options: yearOptions,
+            selected: years.includes(initYear) ? initYear : years[0],
+          })}
+        </div>
+        <div style="flex:1">
+          ${createMdSelect({
+            id: 'move-sem-target',
+            options: SEMESTER_TYPES.filter(o => o.value !== 'all'),
+            selected: initType || '1',
+          })}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" onclick="handleMoveSemester(${courseId})">确认移动</button>
+      </div>
+    `;
+
+    openModal('移动学期', bodyHtml);
+  } catch {
+    showToast('加载学期列表失败');
+  }
+}
+
+export async function handleMoveSemester(courseId) {
+  const year = document.getElementById('move-year-target')?.value;
+  const type = document.getElementById('move-sem-target')?.value;
+  if (!year || !type) {
+    showToast('请选择目标学期');
+    return;
+  }
+  const target = `${year}-${type}`;
+
+  const result = await apiPut(`/api/courses/${courseId}/move-semester`, { semester_key: target });
+  if (result.error) {
+    showToast(result.error);
+  } else {
+    _myCurrentSemester = target;
+    showToast('移动成功');
+    closeModal();
+    navigateTo('mycourse');
+  }
+}
+
+/* =============================================
    Page: 我的课程详情（小班空间 · 三段式药丸）
    ============================================= */
 
@@ -397,8 +514,9 @@ registerPage('mycourse-detail', async (container, courseId) => {
       return;
     }
 
-    window._myCourseSpace = { courseId, course, activeTab: null };
-    const portalName = cleanPortalName(course.title);
+    // 内容归属于大课空间
+    const bigCourseId = course.big_course_id || courseId;
+    window._myCourseSpace = { courseId, bigCourseId, course, activeTab: null };
     const favoriteCourseIds = await getFavoriteCourseIds();
 
     container.innerHTML = `
@@ -410,22 +528,22 @@ registerPage('mycourse-detail', async (container, courseId) => {
             ${course.enrollment_count || 0} 人选课
           </p>
       </div>
-        ${renderCourseFavoriteButton(courseId, favoriteCourseIds.has(Number(courseId)))}
-        <button class="btn btn-secondary btn-compact" onclick="handlePortalToPlaza('${escHtml(portalName)}')" title="穿梭到课程广场·大课主页">
-          <span class="mi">open_in_new</span> 穿梭到广场
+        ${renderCourseFavoriteButton(bigCourseId, favoriteCourseIds.has(Number(bigCourseId)))}
+        <button class="btn btn-secondary btn-compact" onclick="navigateTo('course-detail', ${bigCourseId})" title="进入大课空间">
+          <span class="mi">open_in_new</span> 课程空间
         </button>
-        <button class="btn btn-primary btn-compact" onclick="navigateTo('publish', ${courseId})">
+        <button class="btn btn-primary btn-compact" onclick="navigateTo('publish', ${bigCourseId})">
           <span class="mi">edit</span> 发布
         </button>
       </div>
       <div class="md-pills" id="my-course-pills">
-        <button class="md-pill-btn active" data-tab="forum" onclick="switchMyCourseTab('forum', ${courseId})">
+        <button class="md-pill-btn active" data-tab="forum" onclick="switchMyCourseTab('forum', ${bigCourseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">forum</span> 论坛
         </button>
-        <button class="md-pill-btn" data-tab="materials" onclick="switchMyCourseTab('materials', ${courseId})">
+        <button class="md-pill-btn" data-tab="materials" onclick="switchMyCourseTab('materials', ${bigCourseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料
         </button>
-        <button class="md-pill-btn" data-tab="square" onclick="switchMyCourseTab('square', ${courseId})">
+        <button class="md-pill-btn" data-tab="square" onclick="switchMyCourseTab('square', ${bigCourseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 交友
         </button>
       </div>
@@ -436,7 +554,7 @@ registerPage('mycourse-detail', async (container, courseId) => {
     animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
     animIn(container.querySelector('.md-pills'), { y: 12, delay: 80, dur: 350 });
 
-    await switchMyCourseTab('forum', courseId);
+    await switchMyCourseTab('forum', bigCourseId);
   } catch (e) {
     container.innerHTML = `<div class="card"><p class="text-secondary">加载失败: ${e.message}</p></div>`;
   }
@@ -476,30 +594,27 @@ async function renderMyForumTab(contentEl, courseId) {
   const favoritePostIds = await getFavoritePostIds();
 
   contentEl.innerHTML = `
-    <div style="display:flex;gap:24px">
-      <div style="flex:1;min-width:0" id="my-posts-area">
-        ${posts.length === 0 ? `
-          <div class="card" style="text-align:center;padding:48px">
-            <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">forum</span>
-            <p class="text-secondary" style="margin-top:12px">暂无帖子，来发第一个吧</p>
+    <div id="my-posts-area">
+      ${posts.length === 0 ? `
+        <div class="card" style="text-align:center;padding:48px">
+          <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">forum</span>
+          <p class="text-secondary" style="margin-top:12px">暂无帖子，来发第一个吧</p>
+        </div>
+      ` : posts.map(p => `
+        <div class="card mb-4 post-card clickable" id="post-${p.id}">
+          <h3 class="card-title" style="cursor:pointer" onclick="toggleComments(${p.id})">${escHtml(p.title)}</h3>
+          <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
+          ${renderPostAttachments(p.attachments)}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
+            <span><button class="user-profile-link" onclick="event.stopPropagation();navigateTo('profile-user', ${p.author_id})">${escHtml(p.author_name)}</button> · ${formatTime(p.created_at)}</span>
+            ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
+            <span style="cursor:pointer;color:var(--md-primary);font-weight:500" onclick="toggleComments(${p.id})">
+              <span class="mi" style="font-size:16px;vertical-align:-3px">chat_bubble_outline</span> ${p.comment_count || 0} 回复
+            </span>
           </div>
-        ` : posts.map(p => `
-          <div class="card mb-4 post-card clickable" id="post-${p.id}">
-            <h3 class="card-title" style="cursor:pointer" onclick="toggleComments(${p.id})">${escHtml(p.title)}</h3>
-            <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
-            ${renderPostAttachments(p.attachments)}
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
-              <span><button class="user-profile-link" onclick="event.stopPropagation();navigateTo('profile-user', ${p.author_id})">${escHtml(p.author_name)}</button> · ${formatTime(p.created_at)}</span>
-              ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
-              <span style="cursor:pointer;color:var(--md-primary);font-weight:500" onclick="toggleComments(${p.id})">
-                <span class="mi" style="font-size:16px;vertical-align:-3px">chat_bubble_outline</span> ${p.comment_count || 0} 回复
-              </span>
-            </div>
-            <div class="comments-section" id="comments-${p.id}" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--md-outline-variant)"></div>
-          </div>
-        `).join('')}
-      </div>
-      ${await renderMyMemberSidebar(courseId)}
+          <div class="comments-section" id="comments-${p.id}" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--md-outline-variant)"></div>
+        </div>
+      `).join('')}
     </div>
   `;
 
@@ -508,74 +623,6 @@ async function renderMyForumTab(contentEl, courseId) {
   if (window._myCourseTargetPostId) {
     document.getElementById(`post-${window._myCourseTargetPostId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     window._myCourseTargetPostId = null;
-  }
-}
-
-/* ---- 成员侧栏 ---- */
-
-async function renderMyMemberSidebar(courseId) {
-  const members = await apiGet(`/api/courses/${courseId}/members`);
-  const stats = await apiGet(`/api/courses/${courseId}/members/stats`);
-
-  return `
-    <div style="width:220px;flex-shrink:0">
-      <div class="card" id="my-members-sidebar">
-        <h3 style="font-size:var(--text-sm);font-weight:600;margin-bottom:12px;color:var(--md-on-surface-variant)">
-          <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 成员 (<span id="my-member-count">${members.length}</span>)
-        </h3>
-        <div id="my-member-filters" style="margin-bottom:12px">
-          ${createMdSelect({
-            id: 'my-filter-major',
-            options: [{ text: '全部专业', value: '' }, ...(stats?.majors || []).map(m => ({ text: m, value: m }))],
-            onchange: `filterMyMembers(${courseId})`
-          })}
-          ${createMdSelect({
-            id: 'my-filter-grade',
-            options: [{ text: '全部年级', value: '' }, ...(stats?.grades || []).map(g => ({ text: g, value: g }))],
-            onchange: `filterMyMembers(${courseId})`
-          })}
-        </div>
-        <div id="my-members-list">
-          ${renderMyMembersList(members)}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderMyMembersList(members) {
-  if (members.length === 0) {
-    return '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">暂无匹配成员</p>';
-  }
-  return members.map(m => `
-    <div class="member-item member-profile-link" onclick="navigateTo('profile-user', ${m.user_id})">
-      <div class="avatar-small">${(m.nickname || '?')[0]}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:var(--text-sm);font-weight:500">${escHtml(m.nickname)}</div>
-        ${(m.major || m.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([m.major, m.grade].filter(Boolean).join(' · '))}</div>` : ''}
-        ${m.qq ? `<div style="font-size:12px;color:var(--md-primary);cursor:pointer" onclick="event.stopPropagation();navigator.clipboard.writeText('${escHtml(m.qq)}');showToast('QQ号已复制')"><span class="mi" style="font-size:12px;vertical-align:-1px">qq</span> ${escHtml(m.qq)}</div>` : ''}
-      </div>
-    </div>
-  `).join('');
-}
-
-export async function filterMyMembers(courseId) {
-  const major = document.getElementById('my-filter-major')?.value || '';
-  const grade = document.getElementById('my-filter-grade')?.value || '';
-  const params = new URLSearchParams();
-  if (major) params.set('major', major);
-  if (grade) params.set('grade', grade);
-
-  const listEl = document.getElementById('my-members-list');
-  if (listEl) listEl.innerHTML = '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">加载中...</p>';
-
-  try {
-    const members = await apiGet(`/api/courses/${courseId}/members?${params.toString()}`);
-    if (listEl) listEl.innerHTML = renderMyMembersList(members);
-    const countEl = document.getElementById('my-member-count');
-    if (countEl) countEl.textContent = members.length;
-  } catch {
-    if (listEl) listEl.innerHTML = '<p class="text-secondary" style="font-size:12px;text-align:center;padding:8px 0">加载失败</p>';
   }
 }
 
@@ -597,43 +644,38 @@ async function loadMyMaterials(contentEl, courseId, opts = {}) {
   const categories = ['全部', '课件', '笔记', '作业', '真题', '其他'];
 
   contentEl.innerHTML = `
-    <div style="display:flex;gap:24px">
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            ${createMdSelect({
-              id: 'my-mat-category',
-              options: categories.map(c => ({ text: c, value: c === '全部' ? 'all' : c })),
-              style: 'width:auto;min-width:100px;margin-bottom:0',
-              onchange: `refreshMyMaterials(${courseId})`
-            })}
-            ${createMdInput({
-              id: 'my-mat-chapter',
-              label: '按章节搜索',
-              style: 'width:auto;min-width:120px;margin-bottom:0',
-              onchange: `refreshMyMaterials(${courseId})`,
-              placeholder: ' '
-            })}
-            ${createMdSelect({
-              id: 'my-mat-sort',
-              options: [
-                { text: '最新上传', value: 'newest' },
-                { text: '评分最高', value: 'rating' },
-                { text: '下载最多', value: 'downloads' }
-              ],
-              style: 'width:auto;min-width:100px;margin-bottom:0',
-              onchange: `refreshMyMaterials(${courseId})`
-            })}
-          </div>
-          <button class="btn btn-primary" onclick="openUploadMaterialModal(${courseId})">
-            <span class="mi">upload</span> 上传资料
-          </button>
-        </div>
-        <div id="my-materials-list">
-          ${renderMyMaterialsList(materials, courseId)}
-        </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        ${createMdSelect({
+          id: 'my-mat-category',
+          options: categories.map(c => ({ text: c, value: c === '全部' ? 'all' : c })),
+          style: 'width:auto;min-width:100px;margin-bottom:0',
+          onchange: `refreshMyMaterials(${courseId})`
+        })}
+        ${createMdInput({
+          id: 'my-mat-chapter',
+          label: '按章节搜索',
+          style: 'width:auto;min-width:120px;margin-bottom:0',
+          onchange: `refreshMyMaterials(${courseId})`,
+          placeholder: ' '
+        })}
+        ${createMdSelect({
+          id: 'my-mat-sort',
+          options: [
+            { text: '最新上传', value: 'newest' },
+            { text: '评分最高', value: 'rating' },
+            { text: '下载最多', value: 'downloads' }
+          ],
+          style: 'width:auto;min-width:100px;margin-bottom:0',
+          onchange: `refreshMyMaterials(${courseId})`
+        })}
       </div>
-      ${await renderMyMemberSidebar(courseId)}
+      <button class="btn btn-primary" onclick="openUploadMaterialModal(${courseId})">
+        <span class="mi">upload</span> 上传资料
+      </button>
+    </div>
+    <div id="my-materials-list">
+      ${renderMyMaterialsList(materials, courseId)}
     </div>
   `;
 

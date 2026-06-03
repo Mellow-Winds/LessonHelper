@@ -26,7 +26,7 @@ function createDb(SQL) {
   const raw = new SQL.Database();
   raw.run(`
     CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, nickname TEXT);
-    CREATE TABLE courses (id INTEGER PRIMARY KEY, title TEXT);
+    CREATE TABLE courses (id INTEGER PRIMARY KEY, title TEXT, description TEXT DEFAULT '', big_course_id INTEGER);
     CREATE TABLE user_courses (id INTEGER PRIMARY KEY, user_id INTEGER, course_id INTEGER);
     CREATE TABLE posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT, course_id INTEGER, author_id INTEGER,
@@ -43,7 +43,7 @@ function createDb(SQL) {
     );
     INSERT INTO users VALUES (1, 'u1', '小林');
     INSERT INTO users VALUES (2, 'u2', '小周');
-    INSERT INTO courses VALUES (10, '线性代数');
+    INSERT INTO courses (id, title, description, big_course_id) VALUES (10, '线性代数', '', NULL);
     INSERT INTO user_courses VALUES (1, 1, 10);
   `);
   return {
