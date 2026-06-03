@@ -40,9 +40,13 @@ export async function renderPosts(container) {
         <h1 class="page-title" style="margin:0">发布</h1>
       </div>
     </div>
-    <div class="md-tabs" id="post-mode-tabs">
-      <button class="md-tab-btn active" data-post-mode="square">交友</button>
-      <button class="md-tab-btn" data-post-mode="invite">自习邀约</button>
+    <div class="md-pills" id="post-mode-pills">
+      <button class="md-pill-btn active" data-tab="square">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 交友
+      </button>
+      <button class="md-pill-btn" data-tab="invite">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">event_available</span> 自习邀约
+      </button>
     </div>
     <div id="post-form-container" class="post-form-container"></div>
   `;
@@ -51,8 +55,8 @@ export async function renderPosts(container) {
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
   // 绑定模式切换
-  container.querySelectorAll('#post-mode-tabs .md-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchPostMode(btn.dataset.postMode, container));
+  container.querySelectorAll('#post-mode-pills .md-pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchPostMode(btn.dataset.tab, container));
   });
 
   // 渲染默认模式
@@ -64,8 +68,8 @@ export async function renderPosts(container) {
    ============================================= */
 
 async function switchPostMode(mode, container) {
-  document.querySelectorAll('#post-mode-tabs .md-tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.postMode === mode);
+  document.querySelectorAll('#post-mode-pills .md-pill-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === mode);
   });
   await renderModeForm(mode);
 }
@@ -112,7 +116,7 @@ function buildSquareForm() {
           <div class="post-chip-add" id="post-chip-add">
             <span class="mi" style="font-size:18px">add</span>
           </div>
-          <input type="text" class="post-chip-input" id="post-chip-input" placeholder="输入标签，回车确认" style="display:none">
+          <input type="text" class="post-chip-input" id="post-chip-input" placeholder=" " style="display:none">
         </div>
         <input type="hidden" id="post-tags" name="tags" value="[]">
       </div>

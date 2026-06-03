@@ -90,16 +90,20 @@ registerPage('favorites', async (container) => {
   ]);
   container.innerHTML = `
     <div class="page-header"><h1 class="page-title">我的收藏</h1></div>
-    <div class="md-tabs">
-      <button class="md-tab-btn active" data-favorite-tab="courses">课程 ${courses.length}</button>
-      <button class="md-tab-btn" data-favorite-tab="posts">帖子 ${posts.length}</button>
+    <div class="md-pills" id="favorite-pills">
+      <button class="md-pill-btn active" data-tab="courses">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">menu_book</span> 课程 ${courses.length}
+      </button>
+      <button class="md-pill-btn" data-tab="posts">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">article</span> 帖子 ${posts.length}
+      </button>
     </div>
     <div id="favorite-list">${renderCourseCards(courses)}</div>
   `;
-  container.querySelectorAll('[data-favorite-tab]').forEach(button => {
+  container.querySelectorAll('#favorite-pills .md-pill-btn').forEach(button => {
     button.addEventListener('click', () => {
-      container.querySelectorAll('[data-favorite-tab]').forEach(item => item.classList.toggle('active', item === button));
-      document.getElementById('favorite-list').innerHTML = button.dataset.favoriteTab === 'courses'
+      container.querySelectorAll('#favorite-pills .md-pill-btn').forEach(item => item.classList.toggle('active', item === button));
+      document.getElementById('favorite-list').innerHTML = button.dataset.tab === 'courses'
         ? renderCourseCards(courses)
         : renderPostCards(posts);
     });

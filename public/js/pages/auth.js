@@ -374,11 +374,11 @@ export async function executeSearch(type) {
     return;
   }
 
-  const activeTab = type || document.querySelector('#search-tabs .md-tab-btn.active')?.dataset?.tab || 'all';
+  const activeTab = type || document.querySelector('#search-pills .md-pill-btn.active')?.dataset?.tab || 'all';
   const resultsEl = document.getElementById('search-results');
   if (resultsEl) resultsEl.innerHTML = '<div class="card"><p class="text-secondary">搜索中...</p></div>';
 
-  document.querySelectorAll('#search-tabs .md-tab-btn').forEach(el => {
+  document.querySelectorAll('#search-pills .md-pill-btn').forEach(el => {
     el.classList.toggle('active', el.dataset.tab === activeTab);
   });
 
@@ -512,25 +512,32 @@ registerPage('search', async (container, data) => {
     <div class="page-header">
       <h1 class="page-title">${q ? '搜索结果' : '搜索'}</h1>
     </div>
-    <div class="card" style="margin-bottom:16px">
-      <div style="display:flex;gap:8px;align-items:flex-start">
-        <span class="mi" style="font-size:20px;color:var(--md-on-surface-variant);margin-top:18px">search</span>
-        ${createMdInput({
-          id: 'search-page-input',
-          label: '搜索课程、资料、帖子、广场...',
-          value: q,
-          style: 'flex:1;margin-bottom:0',
-          attrs: `onkeydown="handleSearchPageKey(event)"`
-        })}
-        <button class="btn btn-primary" style="height:56px" onclick="executeSearch()">搜索</button>
-      </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      ${createMdInput({
+        id: 'search-page-input',
+        label: '搜索课程、资料、帖子、广场...',
+        value: q,
+        style: 'flex:1;margin-bottom:0',
+        attrs: `onkeydown="handleSearchPageKey(event)"`
+      })}
+      <button class="btn btn-primary" style="height:56px" onclick="executeSearch()">搜索</button>
     </div>
-    <div class="md-tabs" id="search-tabs">
-      <button class="md-tab-btn ${activeTab === 'all' ? 'active' : ''}" data-tab="all">全部</button>
-      <button class="md-tab-btn ${activeTab === 'courses' ? 'active' : ''}" data-tab="courses">课程</button>
-      <button class="md-tab-btn ${activeTab === 'materials' ? 'active' : ''}" data-tab="materials">资料</button>
-      <button class="md-tab-btn ${activeTab === 'posts' ? 'active' : ''}" data-tab="posts">帖子</button>
-      <button class="md-tab-btn ${activeTab === 'squarePosts' ? 'active' : ''}" data-tab="squarePosts">广场</button>
+    <div class="md-pills" id="search-pills">
+      <button class="md-pill-btn ${activeTab === 'all' ? 'active' : ''}" data-tab="all">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">apps</span> 全部
+      </button>
+      <button class="md-pill-btn ${activeTab === 'courses' ? 'active' : ''}" data-tab="courses">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">menu_book</span> 课程
+      </button>
+      <button class="md-pill-btn ${activeTab === 'materials' ? 'active' : ''}" data-tab="materials">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料
+      </button>
+      <button class="md-pill-btn ${activeTab === 'posts' ? 'active' : ''}" data-tab="posts">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">article</span> 帖子
+      </button>
+      <button class="md-pill-btn ${activeTab === 'squarePosts' ? 'active' : ''}" data-tab="squarePosts">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">forum</span> 广场
+      </button>
     </div>
     <div id="search-results"></div>
   `;
@@ -539,7 +546,7 @@ registerPage('search', async (container, data) => {
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
   // 绑定 Tab 切换
-  container.querySelectorAll('#search-tabs .md-tab-btn').forEach(btn => {
+  container.querySelectorAll('#search-pills .md-pill-btn').forEach(btn => {
     btn.addEventListener('click', () => switchSearchTab(btn.dataset.tab));
   });
 

@@ -118,6 +118,11 @@ import {
   showPublishBlockedToast, switchDetailTab, toggleComments, handleAddComment,
   refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
   openUploadMaterialModal, onFileSelected, handleUploadMaterial,
+  // forum stream architecture
+  toggleForumLike, openForumInlineEditor, submitForumReply,
+  autoResizeForumTextarea, handleForumReplyImageChange, removeForumReplyImage,
+  toggleForumReplies, focusForumCompose, openForumCompose, closeForumCompose,
+  handleForumComposeImageChange, removeForumComposeImage, submitForumPost,
 } from './pages/courses/detail.js';
 
 import {
@@ -237,6 +242,20 @@ Object.assign(window, {
   openUploadMaterialModal,
   onFileSelected,
   handleUploadMaterial,
+  // forum stream architecture
+  toggleForumLike,
+  openForumInlineEditor,
+  submitForumReply,
+  autoResizeForumTextarea,
+  handleForumReplyImageChange,
+  removeForumReplyImage,
+  toggleForumReplies,
+  focusForumCompose,
+  openForumCompose,
+  closeForumCompose,
+  handleForumComposeImageChange,
+  removeForumComposeImage,
+  submitForumPost,
   // publish
   onPublishFileSelected,
   // my course detail extras

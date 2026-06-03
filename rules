@@ -114,6 +114,12 @@ createMdSelect({ id, label, options, selected, style, onchange })
 - No magic numbers — every value must reference a design token
 - No more than 2 shadow depth levels per page
 
+## Input Field Rules
+- **禁止在 placeholder 中使用汉字**：所有输入框（input、textarea、select）的 `placeholder` 属性只能使用 `placeholder: ' '`（一个空格），不得包含任何中文或英文提示文字
+- 标签文字（label）不受此限制，可以使用中文
+- 正确示例：`createMdInput({ id: 'title', label: '标题', placeholder: ' ' })`
+- 错误示例：`createMdInput({ id: 'title', label: '标题', placeholder: '如：找考研搭子' })`
+
 ---
 
 ## Additional Components

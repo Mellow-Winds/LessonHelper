@@ -56,10 +56,11 @@ function toAttachmentResponse(attachment) {
   };
 }
 
-// 评论图片上传配置（单张，JPG/PNG，≤1MB）
+// 评论图片上传配置（最多 9 张，JPG/PNG/GIF/WebP，每张 ≤ 20MB）
 const COMMENT_IMAGE_DIR = path.join(__dirname, '..', 'uploads', 'comment-images');
-const COMMENT_IMAGE_MAX = 1 * 1024 * 1024;
-const COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png']);
+const COMMENT_IMAGE_MAX = 20 * 1024 * 1024;
+const COMMENT_IMAGE_LIMIT = 9;
+const COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
 
 const commentImageUpload = multer({
   storage: multer.diskStorage({
@@ -72,7 +73,7 @@ const commentImageUpload = multer({
       cb(null, `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${ext}`);
     },
   }),
-  limits: { fileSize: COMMENT_IMAGE_MAX, files: 1 },
+  limits: { fileSize: COMMENT_IMAGE_MAX, files: COMMENT_IMAGE_LIMIT },
   fileFilter: (req, file, cb) => {
     try { file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8'); } catch {}
     const ext = path.extname(file.originalname).toLowerCase();
@@ -82,14 +83,14 @@ const commentImageUpload = multer({
 
 function parseCommentImage(req, res, next) {
   if (!req.is('multipart/form-data')) return next();
-  commentImageUpload.single('image')(req, res, (error) => {
+  commentImageUpload.array('image', COMMENT_IMAGE_LIMIT)(req, res, (error) => {
     if (!error) return next();
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    (req.files || []).forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
     const message = error.code === 'LIMIT_FILE_SIZE'
-      ? '图片不能超过 1MB'
-      : error.code === 'LIMIT_FILE_COUNT'
-        ? '只能上传一张图片'
-        : '仅支持 JPG、PNG 格式';
+      ? '单张图片不能超过 20MB'
+      : error.code === 'LIMIT_FILE_COUNT' || error.code === 'LIMIT_UNEXPECTED_FILE'
+        ? '最多上传 9 张图片'
+        : '仅支持 JPG、PNG、GIF、WebP 格式';
     res.status(400).json({ error: message });
   });
 }
@@ -427,27 +428,21 @@ module.exports = function (db) {
     res.json({ comments, total, page, pageSize });
   });
 
-  // POST /api/courses/posts/:postId/comments — 发评论 [Auth]（支持图片 + 楼中楼）
+  // POST /api/courses/posts/:postId/comments — 发评论 [Auth]（支持多图 + 楼中楼）
   router.post('/posts/:postId/comments', authMiddleware, parseCommentImage, (req, res) => {
     const { content, parent_id } = req.body;
-    const imageFile = req.file;
+    const imageFiles = req.files || [];
 
     // 至少需要文字或图片
-    if ((!content || !content.trim()) && !imageFile) {
-      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+    if ((!content || !content.trim()) && imageFiles.length === 0) {
+      imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
       return res.status(400).json({ error: '请输入内容或上传图片' });
-    }
-
-    // 字数限制
-    if (content && content.length > 500) {
-      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
-      return res.status(400).json({ error: '回复内容不能超过 500 字' });
     }
 
     const postId = Number(req.params.postId);
     const post = db.get('SELECT id FROM posts WHERE id = ?', [postId]);
     if (!post) {
-      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
       return res.status(404).json({ error: '帖子不存在' });
     }
 
@@ -457,16 +452,18 @@ module.exports = function (db) {
       parentId = Number(parent_id);
       const parentComment = db.get('SELECT id, post_id FROM comments WHERE id = ?', [parentId]);
       if (!parentComment || parentComment.post_id !== postId) {
-        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+        imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
         return res.status(400).json({ error: '被回复的评论不存在' });
       }
     }
 
-    const imageUrl = imageFile ? `/uploads/comment-images/${imageFile.filename}` : '';
+    // 多图：用分号连接多张图片 URL
+    const imageUrls = imageFiles.map(f => `/uploads/comment-images/${f.filename}`);
+    const imageUrlStr = imageUrls.join(';');
 
     const result = db.run(
       'INSERT INTO comments (post_id, author_id, content, parent_id, image_url) VALUES (?, ?, ?, ?, ?)',
-      [postId, req.user.userId, (content || '').trim(), parentId, imageUrl]
+      [postId, req.user.userId, (content || '').trim(), parentId, imageUrlStr]
     );
     db.save();
 
@@ -474,7 +471,6 @@ module.exports = function (db) {
     const commenter = db.get('SELECT nickname FROM users WHERE id = ?', [req.user.userId]);
 
     if (parentId) {
-      // 楼中楼回复：通知被回复的用户
       const parentComment = db.get('SELECT author_id FROM comments WHERE id = ?', [parentId]);
       if (parentComment && parentComment.author_id !== req.user.userId) {
         createNotification(db, {
@@ -485,7 +481,6 @@ module.exports = function (db) {
         db.save();
       }
     } else {
-      // 主回复：通知帖子作者
       const postDetail = db.get('SELECT author_id, title, course_id FROM posts WHERE id = ?', [postId]);
       if (postDetail && postDetail.author_id !== req.user.userId) {
         createNotification(db, {
@@ -503,7 +498,8 @@ module.exports = function (db) {
       author_id: req.user.userId,
       content: (content || '').trim(),
       parent_id: parentId,
-      image_url: imageUrl
+      image_url: imageUrlStr,
+      image_urls: imageUrls
     });
   });
 
@@ -517,10 +513,12 @@ module.exports = function (db) {
     if (!comment) return res.status(404).json({ error: '评论不存在' });
     if (comment.author_id !== userId) return res.status(403).json({ error: '只能删除自己的回复' });
 
-    // 删除图片文件
+    // 删除图片文件（支持多图，分号分隔）
     if (comment.image_url) {
-      const imgPath = path.join(__dirname, '..', comment.image_url);
-      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+      comment.image_url.split(';').filter(Boolean).forEach(url => {
+        const imgPath = path.join(__dirname, '..', url);
+        if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+      });
     }
 
     // 软删除：标记为已删除，保留楼层号

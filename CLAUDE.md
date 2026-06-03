@@ -25,7 +25,7 @@
 Lessonhelper/
 ├── server.js                    # Express 入口，数据库初始化，路由挂载
 ├── package.json                 # 依赖配置
-├── themerules                   # 前端设计规范（颜色/排版/间距/组件）
+├── rules                        # 前端设计规范 + 统一规则（颜色/排版/间距/组件/输入框规范）
 ├── CLAUDE.md                    # 本文件 — 项目指南
 ├── data/
 │   └── schedule/
@@ -119,7 +119,7 @@ Lessonhelper/
 | 开发到哪一步了 | [docs/development-steps.md](docs/development-steps.md) |
 | API怎么调用 | [docs/api-spec.md](docs/api-spec.md) |
 | 今天的进度 | [devlog/](devlog/) 最新文件 |
-| 样式规则 | [themerules](themerules) |
+| 样式规则 + 统一规范 | [rules](rules) |
 | 待办事项 | [todolist/](todolist/) |
 | 测试文件 | [tests/](tests/) |
 
@@ -132,12 +132,14 @@ Lessonhelper/
 4. **提交代码**：每轮完成后 git commit
 
 ### 代码规范
+- **每次修改代码前，必须先阅读 [rules](rules) 文件**，了解统一设定要求
 - 所有 API 错误消息用中文
 - author_id/owner_id 从 JWT 提取，不从请求体获取
 - 密码用 bcryptjs 哈希（cost=10）
-- 前端样式遵循 themerules（无渐变、无玻璃态、色值用设计Token）
+- 前端样式遵循 rules（无渐变、无玻璃态、色值用设计Token）
 - 新页面用 `registerPage(name, renderFn)` 注册
 - 输入框必须用 `createMdInput()` / `createMdSelect()` 工厂，禁止原生 `<select>`
+- **输入框 placeholder 禁止使用汉字**，只允许 `placeholder: ' '`（一个空格）
 
 ### 启动命令
 ```bash
@@ -153,4 +155,4 @@ npm run dev          # 启动服务器 http://localhost:3000
 
 ---
 
-> 创建于 2026-05-30 | 最后更新：2026-06-02（课程搭子帖 + 合并远程）
+> 创建于 2026-05-30 | 最后更新：2026-06-03（输入框规范 + rules 重命名）

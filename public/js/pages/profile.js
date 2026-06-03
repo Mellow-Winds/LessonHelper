@@ -531,7 +531,7 @@ function startInlineEdit(el) {
   el.innerHTML = `
     <input class="profile-inline-input" type="text"
       value="${escHtml(currentValue)}"
-      placeholder="填写${label}"
+      placeholder=" "
       maxlength="${maxLen}"
       data-key="${key}">
   `;

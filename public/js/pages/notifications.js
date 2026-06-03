@@ -31,9 +31,13 @@ registerPage('notifications', async (container) => {
         <span class="mi">done_all</span> 全部已读
       </button>
     </div>
-    <div class="md-tabs" id="notification-tabs">
-      <button class="md-tab-btn${activeTab === 'messages' ? ' active' : ''}" data-notification-tab="messages">消息通知</button>
-      <button class="md-tab-btn${activeTab === 'following' ? ' active' : ''}" data-notification-tab="following">关注动态</button>
+    <div class="md-pills" id="notification-pills">
+      <button class="md-pill-btn${activeTab === 'messages' ? ' active' : ''}" data-tab="messages">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">notifications</span> 消息通知
+      </button>
+      <button class="md-pill-btn${activeTab === 'following' ? ' active' : ''}" data-tab="following">
+        <span class="mi" style="font-size:16px;vertical-align:-3px">rss_feed</span> 关注动态
+      </button>
     </div>
     <div id="notification-tab-content"></div>
   `;
@@ -43,8 +47,8 @@ registerPage('notifications', async (container) => {
 
   document.getElementById('notif-mark-all-btn')?.addEventListener('click', handleMarkAllRead);
 
-  container.querySelectorAll('[data-notification-tab]').forEach(btn => {
-    btn.addEventListener('click', () => switchNotificationTab(btn.dataset.notificationTab));
+  container.querySelectorAll('#notification-pills .md-pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchNotificationTab(btn.dataset.tab));
   });
 
   await renderActiveTab();
@@ -57,8 +61,8 @@ registerPage('notifications', async (container) => {
 async function switchNotificationTab(tab) {
   if (tab === activeTab) return;
   activeTab = tab;
-  document.querySelectorAll('[data-notification-tab]').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.notificationTab === tab);
+  document.querySelectorAll('#notification-pills .md-pill-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
   });
   await renderActiveTab();
 }
