@@ -513,7 +513,7 @@ registerPage('search', async (container, data) => {
     <div class="page-header">
       <h1 class="page-title"><span class="mi" style="vertical-align:-4px;margin-right:4px">search</span>${q ? '搜索结果' : '搜索'}</h1>
     </div>
-    <div class="search-bar-row" style="display:flex;gap:8px;margin-bottom:16px">
+    <div class="search-bar-row form-row" style="margin-bottom:16px">
       ${createMdInput({
         id: 'search-page-input',
         label: '搜索课程、资料、帖子、广场...',
@@ -521,7 +521,7 @@ registerPage('search', async (container, data) => {
         style: 'flex:1;margin-bottom:0',
         attrs: `onkeydown="handleSearchPageKey(event)"`
       })}
-      <button class="btn btn-primary" style="height:56px" onclick="executeSearch()">搜索</button>
+      <button class="btn btn-primary" onclick="executeSearch()">搜索</button>
     </div>
     <div class="md-pills" id="search-pills">
       <button class="md-pill-btn ${activeTab === 'all' ? 'active' : ''}" data-tab="all">

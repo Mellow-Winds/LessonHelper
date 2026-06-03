@@ -160,6 +160,19 @@ select::-ms-expand {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ---- SVG Icon (inline replacement for .mi) ---- */
+.mi-svg {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  fill: currentColor;
+  vertical-align: -0.125em;
+  pointer-events: none;
+}
+
 /* ---- Layout: Sidebar ---- */
 .sidebar {
   width: 240px;
@@ -194,6 +207,10 @@ select::-ms-expand {
 
 .brand .mi {
   font-size: 26px;
+}
+.brand .mi-svg {
+  width: 26px;
+  height: 26px;
 }
 
 /* ---- Sidebar: Navigation ---- */
@@ -247,11 +264,21 @@ select::-ms-expand {
   transition: transform var(--dur-normal) var(--ease-spring);
 }
 
-.nav-item:hover .mi {
+.nav-item .mi-svg {
+  --mi-y: 1.5px;
+  width: 22px;
+  height: 22px;
+  transform: translateY(var(--mi-y));
+  transition: transform var(--dur-normal) var(--ease-spring);
+}
+
+.nav-item:hover .mi,
+.nav-item:hover .mi-svg {
   transform: translateY(var(--mi-y)) scale(1.1);
 }
 
-.nav-item.active .mi {
+.nav-item.active .mi,
+.nav-item.active .mi-svg {
   transform: translateY(var(--mi-y)) scale(1.05);
 }
 
@@ -787,7 +814,7 @@ select::-ms-expand {
   opacity: 0;
   transform: scale(0.85) translateY(24px);
   will-change: transform, opacity;
-  overflow: visible !important;
+  overflow: hidden;
 }
 
 .modal-header {
@@ -833,7 +860,9 @@ select::-ms-expand {
 
 .modal-body {
   padding: 0 var(--space-6) var(--space-6);
-  overflow: visible !important;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ---- Import Modal Sections ---- */
@@ -1098,11 +1127,48 @@ select::-ms-expand {
 
 /* ---- Course Tabs (uses .md-tabs / .md-tab-btn) ---- */
 
+/* ---- Form Row: unified height for inline inputs/selects/buttons ---- */
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form-row .md-input-group .md-input,
+.form-row .md-input-group .md-border,
+.form-row .md-select-trigger,
+.form-row > .btn,
+.form-row > button {
+  height: 48px;
+  border-radius: 12px;
+}
+.form-row .md-input-group .md-border {
+  top: 0;
+}
+.form-row .md-input-group .md-input {
+  padding: 0 16px;
+  line-height: 48px;
+}
+.form-row .md-select-trigger {
+  padding: 0 36px 0 14px;
+}
+.form-row .md-input-group {
+  margin-bottom: 0;
+}
+.form-row .md-select-container {
+  margin-bottom: 0;
+}
+.form-row > .btn,
+.form-row > button {
+  padding: 0 24px;
+  line-height: 48px;
+  flex-shrink: 0;
+}
+
 /* ---- Material Filter Bar ---- */
 .material-filter-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
   width: 100%;
   margin-bottom: 16px;
 }
@@ -1110,30 +1176,9 @@ select::-ms-expand {
 .material-filter-bar .md-input-group {
   margin-bottom: 0;
 }
-.material-filter-bar .mat-filter-category,
-.material-filter-bar .mat-filter-sort {
-  flex: 0 0 140px;
-  width: 140px;
-}
-.material-filter-bar .mat-filter-category .md-select-trigger,
-.material-filter-bar .mat-filter-sort .md-select-trigger,
-.material-filter-bar .mat-filter-search .md-input,
-.material-filter-bar .mat-filter-search .md-border {
-  border-radius: 12px;
-  height: 44px;
-}
-.material-filter-bar .mat-filter-category .md-select-trigger,
-.material-filter-bar .mat-filter-sort .md-select-trigger {
-  padding: 10px 36px 10px 14px;
-}
-.material-filter-bar .mat-filter-search {
+.material-filter-bar .md-input-group {
   flex: 1;
   min-width: 0;
-}
-.material-filter-bar .mat-filter-search .md-label {
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 14px;
 }
 
 /* ---- Material Card ---- */
@@ -2618,6 +2663,10 @@ input {
 
 .sidebar-avatar-icon {
   font-size: 22px;
+}
+.mi-svg.sidebar-avatar-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .sidebar-avatar-img {
@@ -4204,13 +4253,20 @@ input, textarea, select, button,
     transform: none;
   }
 
+  .bottom-tab-bar .nav-item .mi-svg {
+    width: 22px;
+    height: 22px;
+    transform: none;
+  }
+
   .bottom-tab-bar .nav-item.active {
     color: var(--md-primary);
     background: var(--md-primary-container);
     font-weight: 600;
   }
 
-  .bottom-tab-bar .nav-item.active .mi {
+  .bottom-tab-bar .nav-item.active .mi,
+  .bottom-tab-bar .nav-item.active .mi-svg {
     transform: none;
   }
 
@@ -4642,14 +4698,16 @@ input, textarea, select, button,
     flex-wrap: wrap;
     gap: 8px;
   }
-  .material-filter-bar .mat-filter-category,
-  .material-filter-bar .mat-filter-sort {
+  .material-filter-bar > .md-select-container {
     flex: 0 0 calc(50% - 4px);
     width: calc(50% - 4px);
   }
-  .material-filter-bar .mat-filter-search {
+  .material-filter-bar > .md-input-group {
     flex-basis: 100%;
     order: 3;
+  }
+  .material-filter-bar > .btn {
+    flex: 1;
   }
 
   /* ---- 资料卡片操作按钮 ---- */
@@ -4701,10 +4759,10 @@ input, textarea, select, button,
     overflow: hidden;
   }
 
-  /* 输入框本体：52px 高，12px 圆角 */
+  /* 输入框本体：48px 高，12px 圆角 */
   .search-bar-row .md-input,
   .search-bar-row input {
-    height: 52px !important;
+    height: 48px !important;
     border-radius: 12px !important;
     border: 1px solid #e2e8f0 !important;
     padding: 0 16px !important;
@@ -4713,14 +4771,14 @@ input, textarea, select, button,
     box-sizing: border-box !important;
   }
 
-  /* 搜索按钮：固定 96px 宽，52px 高，12px 圆角 */
+  /* 搜索按钮：固定 96px 宽，48px 高，12px 圆角 */
   .search-bar-row > .btn,
   .search-bar-row > button {
     flex-shrink: 0;
     width: 96px !important;
     min-width: 96px;
     max-width: 96px;
-    height: 52px !important;
+    height: 48px !important;
     border-radius: 12px !important;
     font-size: 16px !important;
     font-weight: 500;

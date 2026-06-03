@@ -28,7 +28,7 @@ export async function renderSquare(container) {
   }
 
   container.innerHTML = `
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <div class="form-row" style="margin-bottom:16px;flex-wrap:wrap">
       ${createMdSelect({
         id: 'square-filter-category',
         options: [{ text: '全部类型', value: 'all' }, ...SQUARE_CATEGORIES.map(c => ({ text: c, value: c }))],

@@ -98,7 +98,7 @@ registerPage('mycourse', async (container) => {
         </button>
       </div>
     </div>
-    <div id="my-semester-filter-wrap" style="margin-bottom:var(--space-4);display:flex;gap:8px;width:auto">
+    <div id="my-semester-filter-wrap" class="form-row" style="margin-bottom:var(--space-4);width:auto">
       <div style="min-width:120px">
         ${createMdSelect({
           id: 'my-year-filter',
@@ -150,12 +150,6 @@ registerPage('mycourse', async (container) => {
             ${createMdSelect({ id: 'my-sem-filter', options: SEMESTER_TYPES, selected: initType || 'all' })}
           </div>
         `;
-        wrap.addEventListener('md-select-change', () => {
-          const year = document.getElementById('my-year-filter')?.value || 'all';
-          const type = document.getElementById('my-sem-filter')?.value || 'all';
-          _myCurrentSemester = combineYearSemester(year, type);
-          loadMyCourseList(_myCurrentSemester);
-        });
       }
     }
   } catch {}
@@ -172,7 +166,10 @@ async function loadMyCourseList(semester) {
     let url = '/api/courses';
     if (semester !== 'all') {
       const parsed = parseSemesterKey(semester);
-      if (parsed.type === 'all') {
+      if (parsed.year === 'all' && parsed.type !== 'all') {
+        // 全部年份 + 指定学期类型 → 按类型筛选
+        url = `/api/courses?type=${encodeURIComponent(parsed.type)}`;
+      } else if (parsed.type === 'all') {
         url = `/api/courses?year=${encodeURIComponent(parsed.year)}`;
       } else {
         url = `/api/courses?semester=${encodeURIComponent(semester)}`;
@@ -193,7 +190,7 @@ async function loadMyCourseList(semester) {
     }
 
     listEl.innerHTML = courses.map(c => {
-      const semText = c.semester ? semesterLabel(c.semester) : '';
+      const semText = c.enrolled_semester_key ? semesterLabel(c.enrolled_semester_key) : (c.semester ? semesterLabel(c.semester) : '');
       const descLine = [c.description || '', semText].filter(Boolean).join(' · ');
       return `
       <div class="card mb-4 clickable" onclick="navigateTo('course-detail', ${c.big_course_id || c.id})">

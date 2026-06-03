@@ -137,9 +137,6 @@ async function renderProfilePage(container) {
     return;
   }
 
-  // 从 localStorage 恢复签到状态
-  syncCheckinToUser();
-
   const mode = previewMode ? 'preview' : 'owner';
   const data = previewMode
     ? (await fetchPreviewData().catch(() => null)) || window._currentUser

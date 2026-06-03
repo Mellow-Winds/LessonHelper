@@ -76,9 +76,9 @@ registerPage('allcourse', async (container) => {
         <p class="text-secondary" style="margin-top:4px;font-size:var(--text-sm)">全校课程档案馆 · 跨届检索</p>
       </div>
     </div>
-    <div class="search-bar-row" style="display:flex;gap:8px;margin-bottom:var(--space-6)">
+    <div class="search-bar-row form-row" style="margin-bottom:var(--space-6)">
       ${createMdInput({ id: 'plaza-search', label: '搜索课程', placeholder: ' ', style: 'flex:1;margin-bottom:0', attrs: 'oninput="filterPlazaCourses(this.value)"' })}
-      <button class="btn btn-primary" style="height:56px" onclick="filterPlazaCourses(document.getElementById('plaza-search').value)">搜索</button>
+      <button class="btn btn-primary" onclick="filterPlazaCourses(document.getElementById('plaza-search').value)">搜索</button>
     </div>
     <div id="plaza-course-list">
       <div class="card"><p class="text-secondary">加载中...</p></div>
