@@ -9,8 +9,8 @@ test('course detail enforces read-only mode for non-enrolled users', () => {
   assert.match(detailSource, /showPublishBlockedToast/);
   // Publish button is disabled for non-enrolled users
   assert.match(detailSource, /btn-disabled/);
-  // Members/交友 tab is only shown for enrolled users
-  assert.match(detailSource, /if \(enrolled\).*renderMembersTab/s);
+  // 交友 tab is only shown for enrolled users
+  assert.match(detailSource, /if \(enrolled\) await renderCourseSquareTab/);
 });
 
 test('course detail never renders a publish button for non-enrolled users in the plaza', () => {

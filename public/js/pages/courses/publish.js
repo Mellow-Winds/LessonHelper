@@ -114,17 +114,6 @@ registerPage('publish', async (container, courseId) => {
         </div>
       </div>
 
-      <div class="publish-sync-row" id="publish-sync-row">
-        <div style="flex:1">
-          <div style="font-size:var(--text-sm);font-weight:600;color:var(--md-on-surface)">同步发送到课程广场</div>
-          <div style="font-size:var(--text-xs);color:var(--md-on-surface-variant);margin-top:2px">勾选后帖子将在大课广场公开可见</div>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="publish-sync-toggle">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-
       <div class="form-error" id="publish-error" style="display:none"></div>
 
       <button class="btn btn-primary" id="publish-submit-btn" style="width:100%;justify-content:center">
@@ -200,39 +189,6 @@ registerPage('publish', async (container, courseId) => {
     }
   });
 
-  // ---- 同步开关联动状态机 ----
-
-  const syncToggle = document.getElementById('publish-sync-toggle');
-  const syncRow = document.getElementById('publish-sync-row');
-  const categoryContainer = document.getElementById('publish-category-container');
-
-  function checkSyncForceState() {
-    const selectedCategory = categoryContainer?.querySelector('.md-select-value')?.textContent?.trim() || '';
-    const hasFile = fileInput.files.length > 0;
-    const shouldForce = (selectedCategory === '资料分享') || hasFile;
-
-    if (shouldForce) {
-      syncToggle.checked = true;
-      syncToggle.disabled = true;
-      syncRow.classList.add('forced');
-    } else {
-      syncToggle.disabled = false;
-      syncRow.classList.remove('forced');
-    }
-  }
-
-  // 分类变更监听
-  if (categoryContainer) {
-    categoryContainer.addEventListener('md-select-change', () => {
-      checkSyncForceState();
-    });
-  }
-
-  // 文件变更时检查
-  fileInput.addEventListener('change', () => {
-    checkSyncForceState();
-  });
-
   // ---- 提交 ----
 
   container.querySelector('#publish-submit-btn').addEventListener('click', async () => {
@@ -254,7 +210,6 @@ registerPage('publish', async (container, courseId) => {
     }
 
     const category = document.getElementById('publish-category')?.value || '讨论';
-    const syncToPlaza = syncToggle.checked;
     const hasFile = fileInput.files.length > 0;
 
     const btn = container.querySelector('#publish-submit-btn');
@@ -270,7 +225,6 @@ registerPage('publish', async (container, courseId) => {
         formData.append('title', title);
         formData.append('content', content);
         formData.append('category', category);
-        formData.append('sync_to_plaza', syncToPlaza ? '1' : '0');
         for (const file of fileInput.files) formData.append('files', file);
 
         const token = getToken();
@@ -288,7 +242,6 @@ registerPage('publish', async (container, courseId) => {
           title,
           content,
           category,
-          sync_to_plaza: syncToPlaza,
         });
       }
 
@@ -336,22 +289,5 @@ export function onPublishFileSelected(input) {
     }
     nameEl.textContent = `📎 已选择 ${files.length} 个附件：${files.map(file => file.name).join('、')}`;
     nameEl.style.display = 'block';
-  }
-
-  // 触发联动检查
-  const syncToggle = document.getElementById('publish-sync-toggle');
-  const syncRow = document.getElementById('publish-sync-row');
-  const categoryContainer = document.getElementById('publish-category-container');
-  const selectedCategory = categoryContainer?.querySelector('.md-select-value')?.textContent?.trim() || '';
-  const hasFile = input.files.length > 0;
-  const shouldForce = (selectedCategory === '资料分享') || hasFile;
-
-  if (shouldForce) {
-    syncToggle.checked = true;
-    syncToggle.disabled = true;
-    syncRow.classList.add('forced');
-  } else {
-    syncToggle.disabled = false;
-    syncRow.classList.remove('forced');
   }
 }

@@ -30,41 +30,25 @@ export function cleanBigCourseName(title) {
 }
 
 /* =============================================
-   全校课程聚合缓存
+   全校大课缓存（API 已只返回大课）
    ============================================= */
 
-let _allCoursesRaw = [];
-let _bigCoursesMap = {};  // { bigName: [course, course, ...] }
-let _bigCoursesList = []; // [{ name, courseIds, totalCount, courseCount }, ...]
+let _bigCoursesList = []; // [{ id, name, totalCount }, ...]
 let _plazaLoaded = false;
 
 async function loadPlazaDataOnce() {
   if (_plazaLoaded) return;
   try {
-    _allCoursesRaw = await apiGet('/api/courses/all');
+    const raw = await apiGet('/api/courses/all');
+    // API 已只返回大课，直接映射
+    _bigCoursesList = raw.map(c => ({
+      id: c.id,
+      name: c.title,
+      totalCount: c.enrollment_count || 0,
+    })).sort((a, b) => b.totalCount - a.totalCount);
   } catch {
-    _allCoursesRaw = [];
+    _bigCoursesList = [];
   }
-
-  // 按大课名聚合
-  _bigCoursesMap = {};
-  for (const c of _allCoursesRaw) {
-    const big = cleanBigCourseName(c.title);
-    if (!big) continue;
-    if (!_bigCoursesMap[big]) _bigCoursesMap[big] = [];
-    _bigCoursesMap[big].push(c);
-  }
-
-  _bigCoursesList = Object.entries(_bigCoursesMap).map(([name, courses]) => {
-    const totalEnrollment = courses.reduce((sum, c) => sum + (c.enrollment_count || 0), 0);
-    return {
-      name,
-      courseIds: courses.map(c => c.id),
-      totalCount: totalEnrollment,
-      courseCount: courses.length,
-    };
-  }).sort((a, b) => b.totalCount - a.totalCount);
-
   _plazaLoaded = true;
 }
 
@@ -74,11 +58,9 @@ async function loadPlazaDataOnce() {
  */
 export async function navigateToPlazaCourseById(courseId, postId) {
   await loadPlazaDataOnce();
-  const bigCourse = _bigCoursesList.find(item => item.courseIds.includes(Number(courseId)));
-  if (!bigCourse) return false;
+  // 直接用 courseId 导航（已经是大课 ID，或通过 API 查询）
   window._courseDetailTargetPostId = postId || null;
-  // 导航到统一详情页，使用该大课的第一个 courseId
-  navigateTo('course-detail', bigCourse.courseIds[0]);
+  navigateTo('course-detail', courseId);
   return true;
 }
 
@@ -127,11 +109,10 @@ function renderPlazaList(list) {
   }
 
   listEl.innerHTML = list.map(item => `
-    <div class="card mb-4 clickable plaza-course-card" onclick="navigateTo('course-detail', ${item.courseIds[0]})">
+    <div class="card mb-4 clickable plaza-course-card" onclick="navigateTo('course-detail', ${item.id})">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="flex:1;min-width:0">
           <h3 class="card-title">${escHtml(item.name)}</h3>
-          <p class="text-secondary" style="margin-top:4px;font-size:var(--text-sm)">${item.courseCount} 个班级</p>
         </div>
         <div style="flex-shrink:0;margin-left:16px">
           <span style="font-size:var(--text-sm);color:var(--md-primary);font-weight:600;white-space:nowrap">

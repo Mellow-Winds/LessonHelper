@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { authMiddleware } = require('./middleware/auth');
-const { notifyCourseMembers } = require('./notifications');
+const { createNotification } = require('./notifications');
 
 // 文件类型映射
 const FILE_TYPE_MAP = {
@@ -47,15 +47,50 @@ const upload = multer({
 module.exports = function (db) {
   const router = express.Router();
 
-  // POST /api/materials/courses/:courseId — 上传资料 [Auth]
+  // 大课体系工具函数
+  function isEnrolledInBigCourse(userId, bigCourseId) {
+    // 检查是否直接选了这门大课，或选了其下的任意小课
+    return !!db.get(
+      `SELECT 1 FROM user_courses uc
+       JOIN courses c ON uc.course_id = c.id
+       WHERE uc.user_id = ? AND (c.id = ? OR c.big_course_id = ?)`,
+      [userId, bigCourseId, bigCourseId]
+    );
+  }
+
+  function getSmallCourseIds(bigCourseId) {
+    return db.all('SELECT id FROM courses WHERE big_course_id = ?', [bigCourseId]).map(r => r.id);
+  }
+
+  function notifyBigCourseMembers(bigCourseId, excludeUserId, type, title, message, relatedType, relatedId) {
+    const smallIds = getSmallCourseIds(bigCourseId);
+    if (smallIds.length === 0) return;
+    const placeholders = smallIds.map(() => '?').join(',');
+    const members = db.all(
+      `SELECT DISTINCT user_id FROM user_courses WHERE course_id IN (${placeholders}) AND user_id != ?`,
+      [...smallIds, excludeUserId]
+    );
+    for (const m of members) {
+      createNotification(db, {
+        userId: m.user_id, type, title, message, relatedType, relatedId, courseId: bigCourseId
+      });
+    }
+  }
+
+  // POST /api/materials/courses/:courseId — 上传资料 [Auth]（:courseId 为大课 ID）
   router.post('/courses/:courseId', authMiddleware, upload.single('file'), (req, res) => {
-    const courseId = Number(req.params.courseId);
+    const bigCourseId = Number(req.params.courseId);
     const userId = req.user.userId;
 
     if (!req.file) return res.status(400).json({ error: '请选择文件' });
 
-    const course = db.get('SELECT id FROM courses WHERE id = ?', [courseId]);
+    const course = db.get('SELECT id FROM courses WHERE id = ?', [bigCourseId]);
     if (!course) { fs.unlinkSync(req.file.path); return res.status(404).json({ error: '课程不存在' }); }
+
+    if (!isEnrolledInBigCourse(userId, bigCourseId)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({ error: '未选修该课程，无法上传资料' });
+    }
 
     const { title, description, chapter, category } = req.body;
     if (!title) { fs.unlinkSync(req.file.path); return res.status(400).json({ error: '标题为必填项' }); }
@@ -65,20 +100,19 @@ module.exports = function (db) {
     const result = db.run(
       `INSERT INTO materials (course_id, uploader_id, title, description, file_path, file_name, file_type, file_size, chapter, category)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [courseId, userId, title.trim(), (description || '').trim(), req.file.filename, req.file.originalname,
+      [bigCourseId, userId, title.trim(), (description || '').trim(), req.file.filename, req.file.originalname,
        FILE_TYPE_MAP[ext] || 'other', req.file.size, (chapter || '').trim(), category || '其他']
     );
     db.save();
 
-    // 通知：课程有新资料
+    // 通知：大课空间有新资料
     const uploader = db.get('SELECT nickname FROM users WHERE id = ?', [userId]);
-    const courseInfo = db.get('SELECT title FROM courses WHERE id = ?', [courseId]);
-    notifyCourseMembers(db, {
-      courseId, excludeUserId: userId,
-      type: 'new_material', title: '新资料',
-      message: `${uploader?.nickname || '匿名'} 在「${courseInfo?.title || ''}」上传了「${title.trim()}」`,
-      relatedType: 'material', relatedId: result.lastInsertRowid
-    });
+    const courseInfo = db.get('SELECT title FROM courses WHERE id = ?', [bigCourseId]);
+    notifyBigCourseMembers(bigCourseId, userId,
+      'new_material', '新资料',
+      `${uploader?.nickname || '匿名'} 在「${courseInfo?.title || ''}」上传了「${title.trim()}」`,
+      'material', result.lastInsertRowid
+    );
     db.save();
 
     res.status(201).json({ id: result.lastInsertRowid, message: '上传成功' });

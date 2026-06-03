@@ -106,8 +106,8 @@ import {
   handleLeaveCourse, openCourseSearchModal, doCourseSearch, handleEnrollFromSearch,
   openImportModal, handleAgreeAndImport, handleScheduleImport,
   switchMyCourseTab,
-  filterMyMembers,
   handlePortalToPlaza,
+  openMoveSemesterModal, handleMoveSemester,
 } from './pages/courses/my_courses.js';
 
 import {
@@ -118,7 +118,6 @@ import {
   showPublishBlockedToast, switchDetailTab, toggleComments, handleAddComment,
   refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
   openUploadMaterialModal, onFileSelected, handleUploadMaterial,
-  filterMembers,
 } from './pages/courses/detail.js';
 
 import {
@@ -222,6 +221,8 @@ Object.assign(window, {
   openImportModal,
   handleAgreeAndImport,
   handleScheduleImport,
+  openMoveSemesterModal,
+  handleMoveSemester,
   // all courses (plaza search)
   filterPlazaCourses,
   navigateToPlazaCourseById,
@@ -236,8 +237,6 @@ Object.assign(window, {
   openUploadMaterialModal,
   onFileSelected,
   handleUploadMaterial,
-  filterMembers,
-  filterMyMembers,
   // publish
   onPublishFileSelected,
   // my course detail extras

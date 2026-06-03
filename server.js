@@ -134,6 +134,7 @@ async function start() {
   migrateTable('users', 'grace_days', "INTEGER DEFAULT 0");
   migrateTable('courses', 'semester', "TEXT DEFAULT ''");
   migrateTable('courses', 'teacher', "TEXT DEFAULT ''");
+  migrateTable('courses', 'big_course_id', 'INTEGER');
   migrateTable('comments', 'parent_id', 'INTEGER');
   migrateTable('comments', 'image_url', "TEXT DEFAULT ''");
   migrateTable('square_comments', 'parent_id', 'INTEGER');
@@ -322,6 +323,74 @@ async function start() {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
   )`);
+
+  // --- 大课体系数据迁移：为现有小课创建大课记录，迁移内容归属 ---
+  {
+    function cleanBigCourseName(title) {
+      if (!title) return '';
+      const parens = title.match(/[（(].+?[)）]/g) || [];
+      let temp = title;
+      parens.forEach((p, i) => { temp = temp.replace(p, `__PH${i}__`); });
+      temp = temp.replace(/\d{1,3}\s*班\s*$/, '');
+      temp = temp.replace(/[\s ]*\d{1,3}\s*$/, '');
+      temp = temp.replace(/\d{1,3}$/, '');
+      parens.forEach((p, i) => { temp = temp.replace(`__PH${i}__`, p); });
+      return temp.trim();
+    }
+
+    // 检查是否有小课尚未关联大课
+    const unlinked = db.all('SELECT id, title, owner_id FROM courses WHERE big_course_id IS NULL AND description != ""');
+    if (unlinked.length > 0) {
+      console.log(`  ✓ 大课迁移: 发现 ${unlinked.length} 门小课需要关联大课`);
+
+      // 按大课名分组
+      const bigCourseMap = new Map(); // bigName -> { bigCourseId, smallCourseIds: [] }
+
+      for (const small of unlinked) {
+        const bigName = cleanBigCourseName(small.title);
+        if (!bigName || bigName === small.title) {
+          // 无法提取大课名（没有班号），自身即为大课
+          continue;
+        }
+        if (!bigCourseMap.has(bigName)) {
+          bigCourseMap.set(bigName, { bigCourseId: null, smallCourseIds: [] });
+        }
+        bigCourseMap.get(bigName).smallCourseIds.push(small.id);
+      }
+
+      // 为每个大课名查找或创建大课记录
+      for (const [bigName, info] of bigCourseMap) {
+        let big = db.get('SELECT id FROM courses WHERE title = ? AND big_course_id IS NULL AND description = ""', [bigName]);
+        if (!big) {
+          const owner = unlinked.find(s => info.smallCourseIds.includes(s.id));
+          db.run('INSERT INTO courses (title, description, owner_id, teacher) VALUES (?, "", ?, "")', [bigName, owner ? owner.owner_id : 0]);
+          big = db.get('SELECT id FROM courses WHERE title = ? AND big_course_id IS NULL AND description = ""', [bigName]);
+          console.log(`    + 创建大课: ${bigName} (id=${big.id})`);
+        }
+        info.bigCourseId = big.id;
+
+        // 更新小课的 big_course_id
+        for (const smallId of info.smallCourseIds) {
+          db.run('UPDATE courses SET big_course_id = ? WHERE id = ?', [info.bigCourseId, smallId]);
+        }
+      }
+
+      // 迁移 posts/materials/square_posts 的 course_id 到大课
+      let migratedPosts = 0, migratedMaterials = 0, migratedSquare = 0;
+      for (const [, info] of bigCourseMap) {
+        if (info.smallCourseIds.length === 0) continue;
+        const placeholders = info.smallCourseIds.map(() => '?').join(',');
+        const r1 = db.run(`UPDATE posts SET course_id = ? WHERE course_id IN (${placeholders})`, [info.bigCourseId, ...info.smallCourseIds]);
+        migratedPosts += r1.changes || 0;
+        const r2 = db.run(`UPDATE materials SET course_id = ? WHERE course_id IN (${placeholders})`, [info.bigCourseId, ...info.smallCourseIds]);
+        migratedMaterials += r2.changes || 0;
+        const r3 = db.run(`UPDATE square_posts SET course_id = ? WHERE course_id IN (${placeholders})`, [info.bigCourseId, ...info.smallCourseIds]);
+        migratedSquare += r3.changes || 0;
+      }
+
+      console.log(`  ✓ 大课迁移完成: ${bigCourseMap.size} 个大课, 帖子 ${migratedPosts}, 资料 ${migratedMaterials}, 搭子 ${migratedSquare}`);
+    }
+  }
 
   db.save();
 
