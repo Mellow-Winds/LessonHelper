@@ -140,10 +140,7 @@ async function start() {
   migrateTable('courses', 'big_course_id', 'INTEGER');
   migrateTable('comments', 'parent_id', 'INTEGER');
   migrateTable('comments', 'image_url', "TEXT DEFAULT ''");
-  migrateTable('square_comments', 'parent_id', 'INTEGER');
-  migrateTable('square_comments', 'image_url', "TEXT DEFAULT ''");
-  migrateTable('square_posts', 'course_id', 'INTEGER');
-  db.run('CREATE INDEX IF NOT EXISTS idx_square_posts_course_id ON square_posts(course_id)');
+  // square_comments/square_posts migrations moved after table creation
 
   // New table: user_courses (many-to-many enrollment)
   db.run(`CREATE TABLE IF NOT EXISTS user_courses (
@@ -263,6 +260,10 @@ async function start() {
     FOREIGN KEY (creator_id) REFERENCES users(id)
   )`);
 
+  // Migrations for square_posts (must be after table creation)
+  migrateTable('square_posts', 'course_id', 'INTEGER');
+  db.run('CREATE INDEX IF NOT EXISTS idx_square_posts_course_id ON square_posts(course_id)');
+
   // New table: square_interests (感兴趣记录)
   db.run(`CREATE TABLE IF NOT EXISTS square_interests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -285,6 +286,10 @@ async function start() {
     FOREIGN KEY (post_id) REFERENCES square_posts(id) ON DELETE CASCADE,
     FOREIGN KEY (author_id) REFERENCES users(id)
   )`);
+
+  // Migrations for square_comments (must be after table creation)
+  migrateTable('square_comments', 'parent_id', 'INTEGER');
+  migrateTable('square_comments', 'image_url', "TEXT DEFAULT ''");
 
   // New table: follows (关注关系)
   db.run(`CREATE TABLE IF NOT EXISTS follows (
