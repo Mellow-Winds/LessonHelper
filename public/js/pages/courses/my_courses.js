@@ -8,9 +8,8 @@
 
 import { apiGet, apiPost, apiPut, apiDelete, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../../core/router.js';
-import { showToast, openModal, closeModal, createMdInput, createMdTextarea, createMdSelect, escHtml, formatTime, formatFileSize, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
+import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
 import { renderAuth } from '../auth.js';
-import { renderCourseSquareTab } from './course_square.js';
 
 /* =============================================
    学期工具函数
@@ -87,7 +86,7 @@ registerPage('mycourse', async (container) => {
   container.innerHTML = `
     <div class="page-header">
       <div>
-        <h1 class="page-title" style="margin-bottom:0">我的课程</h1>
+        <h1 class="page-title" style="margin-bottom:0"><span class="mi" style="vertical-align:-4px;margin-right:4px">school</span>我的课程</h1>
         <p class="text-secondary" style="margin-top:4px;font-size:var(--text-sm)">当前学期的班级课程</p>
       </div>
       <div style="display:flex;gap:8px">
@@ -193,13 +192,16 @@ async function loadMyCourseList(semester) {
       return;
     }
 
-    listEl.innerHTML = courses.map(c => `
+    listEl.innerHTML = courses.map(c => {
+      const semText = c.semester ? semesterLabel(c.semester) : '';
+      const descLine = [c.description || '', semText].filter(Boolean).join(' · ');
+      return `
       <div class="card mb-4 clickable" onclick="navigateTo('course-detail', ${c.big_course_id || c.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1;min-width:0">
             <h3 class="card-title">${escHtml(c.title)}</h3>
             <p class="text-secondary" style="margin-top:4px">${escHtml(c.teacher || '')}</p>
-            <p class="text-secondary" style="margin-top:2px;font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.description || '暂无描述')}</p>
+            <p class="text-secondary" style="margin-top:2px;font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(descLine || '暂无描述')}</p>
           </div>
           <div style="flex-shrink:0;margin-left:16px;display:flex;flex-direction:column;align-items:flex-end;gap:8px">
             <span style="font-size:var(--text-sm);color:var(--md-primary);font-weight:600;white-space:nowrap">
@@ -216,7 +218,7 @@ async function loadMyCourseList(semester) {
           </div>
         </div>
       </div>
-    `).join('');
+    `}).join('');
 
     const cards = listEl.querySelectorAll('.card');
     animStagger(Array.from(cards), { y: 22, dur: 420, gap: 60 });
@@ -230,6 +232,14 @@ async function loadMyCourseList(semester) {
    ============================================= */
 
 export async function openCourseSearchModal() {
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const yearOptions = [
+    { text: '全部学年', value: '' },
+    { text: `${curYear}`, value: `${curYear}` },
+    { text: `${curYear - 1}`, value: `${curYear - 1}` },
+    { text: `${curYear - 2}`, value: `${curYear - 2}` },
+  ];
   const weekdaySelect = createMdSelect({
     id: 'search-course-day',
     options: [
@@ -244,6 +254,17 @@ export async function openCourseSearchModal() {
     ],
     selected: '',
   });
+  const yearSelect = createMdSelect({ id: 'search-course-year', options: yearOptions, selected: '' });
+  const semSelect = createMdSelect({
+    id: 'search-course-semester',
+    options: [
+      { text: '全部学期', value: '' },
+      { text: '第一学期', value: '1' },
+      { text: '第二学期', value: '2' },
+      { text: '暑期', value: 'summer' },
+    ],
+    selected: '',
+  });
 
   const bodyHtml = `
     <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px">
@@ -254,6 +275,10 @@ export async function openCourseSearchModal() {
       <div style="display:flex;gap:12px">
         <div style="flex:1">${weekdaySelect}</div>
         <div style="flex:1">${createMdInput({ id: 'search-course-teacher', label: '教师' })}</div>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">${yearSelect}</div>
+        <div style="flex:1">${semSelect}</div>
       </div>
       <button class="btn btn-primary" onclick="doCourseSearch()" style="align-self:flex-end">
         <span class="mi">search</span> 搜索
@@ -272,12 +297,20 @@ export async function doCourseSearch() {
   const name = document.getElementById('search-course-name').value.trim();
   const day = document.getElementById('search-course-day').value;
   const teacher = document.getElementById('search-course-teacher').value.trim();
+  const year = document.getElementById('search-course-year').value;
+  const semVal = document.getElementById('search-course-semester').value;
 
   const params = new URLSearchParams();
   if (courseId) params.set('courseId', courseId);
   if (name) params.set('name', name);
   if (day) params.set('day', day);
   if (teacher) params.set('teacher', teacher);
+  // 学期筛选：优先精确匹配 semester=year-tag，否则按年份匹配
+  if (year && semVal) {
+    params.set('semester', `${year}-${semVal}`);
+  } else if (year) {
+    params.set('year', year);
+  }
 
   const resultsEl = document.getElementById('search-results');
   resultsEl.innerHTML = '<p class="text-secondary" style="text-align:center">搜索中...</p>';
@@ -289,12 +322,18 @@ export async function doCourseSearch() {
       return;
     }
 
-    resultsEl.innerHTML = courses.map(c => `
+    resultsEl.innerHTML = courses.map(c => {
+      // description 格式: "课程号 · 时间 · 地点"
+      const descParts = (c.description || '').split(' · ').filter(Boolean);
+      const semText = c.semester ? semesterLabel(c.semester) : '';
+      // 构建详情行: 教师 · 课程号 · 时间 · 地点 · 学期
+      const detailParts = [c.teacher || '', ...descParts, semText].filter(Boolean);
+      return `
       <div class="card mb-4" style="padding:12px 16px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;font-size:var(--text-sm)">${escHtml(c.title)}</div>
-            <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:2px">${escHtml(c.teacher || '')} · ${escHtml(c.description || '')}</div>
+            <div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:2px">${detailParts.map(p => escHtml(p)).join(' · ')}</div>
           </div>
           <div style="flex-shrink:0;margin-left:12px">
             ${c.is_enrolled
@@ -304,7 +343,7 @@ export async function doCourseSearch() {
           </div>
         </div>
       </div>
-    `).join('');
+    `}).join('');
   } catch {
     resultsEl.innerHTML = '<p class="text-secondary" style="text-align:center">搜索失败</p>';
   }
@@ -497,400 +536,6 @@ export async function handleMoveSemester(courseId) {
   }
 }
 
-/* =============================================
-   Page: 我的课程详情（小班空间 · 三段式药丸）
-   ============================================= */
-
-window._myCourseSpace = {};
-
-registerPage('mycourse-detail', async (container, courseId) => {
-  loadedComments = {}; // 切换课程时清空评论缓存
-  container.innerHTML = `<div class="card"><p class="text-secondary">加载中...</p></div>`;
-
-  try {
-    const course = await apiGet(`/api/courses/${courseId}`);
-    if (course.error) {
-      container.innerHTML = `<div class="card"><p class="text-secondary">${course.error}</p></div>`;
-      return;
-    }
-
-    // 内容归属于大课空间
-    const bigCourseId = course.big_course_id || courseId;
-    window._myCourseSpace = { courseId, bigCourseId, course, activeTab: null };
-    const favoriteCourseIds = await getFavoriteCourseIds();
-
-    container.innerHTML = `
-      <div class="page-header">
-        <div style="flex:1;min-width:0">
-          <h1 class="page-title" style="margin-bottom:4px">${escHtml(course.title)}</h1>
-          <p class="text-secondary">
-            ${course.teacher ? escHtml(course.teacher) + ' · ' : ''}
-            ${course.enrollment_count || 0} 人选课
-          </p>
-      </div>
-        ${renderCourseFavoriteButton(bigCourseId, favoriteCourseIds.has(Number(bigCourseId)))}
-        <button class="btn btn-secondary btn-compact" onclick="navigateTo('course-detail', ${bigCourseId})" title="进入大课空间">
-          <span class="mi">open_in_new</span> 课程空间
-        </button>
-        <button class="btn btn-primary btn-compact" onclick="navigateTo('publish', ${bigCourseId})">
-          <span class="mi">edit</span> 发布
-        </button>
-      </div>
-      <div class="md-pills" id="my-course-pills">
-        <button class="md-pill-btn active" data-tab="forum" onclick="switchMyCourseTab('forum', ${bigCourseId})">
-          <span class="mi" style="font-size:16px;vertical-align:-3px">forum</span> 论坛
-        </button>
-        <button class="md-pill-btn" data-tab="materials" onclick="switchMyCourseTab('materials', ${bigCourseId})">
-          <span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料
-        </button>
-        <button class="md-pill-btn" data-tab="square" onclick="switchMyCourseTab('square', ${bigCourseId})">
-          <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> 交友
-        </button>
-      </div>
-      <div id="my-course-tab-content" style="min-height:200px"></div>
-    `;
-
-    bindRipples(container);
-    animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
-    animIn(container.querySelector('.md-pills'), { y: 12, delay: 80, dur: 350 });
-
-    await switchMyCourseTab('forum', bigCourseId);
-  } catch (e) {
-    container.innerHTML = `<div class="card"><p class="text-secondary">加载失败: ${e.message}</p></div>`;
-  }
-});
-
-/* ---- 药丸Tab切换 ---- */
-
-export async function switchMyCourseTab(tab, courseId) {
-  if (tab === window._myCourseSpace.activeTab) return;
-  window._myCourseSpace.activeTab = tab;
-
-  document.querySelectorAll('#my-course-pills .md-pill-btn').forEach(el => {
-    el.classList.toggle('active', el.dataset.tab === tab);
-  });
-
-  const contentEl = document.getElementById('my-course-tab-content');
-  if (!contentEl) return;
-
-  switch (tab) {
-    case 'forum':
-      await renderMyForumTab(contentEl, courseId);
-      break;
-    case 'materials':
-      await renderMyMaterialsTab(contentEl, courseId);
-      break;
-    case 'square':
-      await renderCourseSquareTab(contentEl, courseId, 'mc');
-      break;
-  }
-}
-
-/* ---- 论坛标签页 ---- */
-
-async function renderMyForumTab(contentEl, courseId) {
-  contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
-  const posts = await apiGet(`/api/courses/${courseId}/posts`);
-  const favoritePostIds = await getFavoritePostIds();
-
-  contentEl.innerHTML = `
-    <div id="my-posts-area">
-      ${posts.length === 0 ? `
-        <div class="card" style="text-align:center;padding:48px">
-          <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">forum</span>
-          <p class="text-secondary" style="margin-top:12px">暂无帖子，来发第一个吧</p>
-        </div>
-      ` : posts.map(p => `
-        <div class="card mb-4 post-card clickable" id="post-${p.id}">
-          <h3 class="card-title" style="cursor:pointer" onclick="toggleComments(${p.id})">${escHtml(p.title)}</h3>
-          <p style="margin-top:8px;white-space:pre-wrap">${escHtml(p.content)}</p>
-          ${renderPostAttachments(p.attachments)}
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:var(--text-sm);color:var(--md-on-surface-variant)">
-            <span><button class="user-profile-link" onclick="event.stopPropagation();navigateTo('profile-user', ${p.author_id})">${escHtml(p.author_name)}</button> · ${formatTime(p.created_at)}</span>
-            ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
-            <span style="cursor:pointer;color:var(--md-primary);font-weight:500" onclick="toggleComments(${p.id})">
-              <span class="mi" style="font-size:16px;vertical-align:-3px">chat_bubble_outline</span> ${p.comment_count || 0} 回复
-            </span>
-          </div>
-          <div class="comments-section" id="comments-${p.id}" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--md-outline-variant)"></div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-
-  const cards = contentEl.querySelectorAll('.post-card');
-  if (cards.length) animStagger(Array.from(cards), { y: 20, dur: 400, gap: 50 });
-  if (window._myCourseTargetPostId) {
-    document.getElementById(`post-${window._myCourseTargetPostId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    window._myCourseTargetPostId = null;
-  }
-}
-
-/* ---- 资料标签页 ---- */
-
-async function renderMyMaterialsTab(contentEl, courseId) {
-  contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
-  await loadMyMaterials(contentEl, courseId);
-}
-
-async function loadMyMaterials(contentEl, courseId, opts = {}) {
-  const params = new URLSearchParams();
-  if (opts.category && opts.category !== 'all') params.set('category', opts.category);
-  if (opts.chapter) params.set('chapter', opts.chapter);
-  if (opts.sort) params.set('sort', opts.sort);
-
-  const data = await apiGet(`/api/materials/courses/${courseId}?${params.toString()}`);
-  const materials = data?.materials || [];
-  const categories = ['全部', '课件', '笔记', '作业', '真题', '其他'];
-
-  contentEl.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        ${createMdSelect({
-          id: 'my-mat-category',
-          options: categories.map(c => ({ text: c, value: c === '全部' ? 'all' : c })),
-          style: 'width:auto;min-width:100px;margin-bottom:0',
-          onchange: `refreshMyMaterials(${courseId})`
-        })}
-        ${createMdInput({
-          id: 'my-mat-chapter',
-          label: '按章节搜索',
-          style: 'width:auto;min-width:120px;margin-bottom:0',
-          onchange: `refreshMyMaterials(${courseId})`,
-          placeholder: ' '
-        })}
-        ${createMdSelect({
-          id: 'my-mat-sort',
-          options: [
-            { text: '最新上传', value: 'newest' },
-            { text: '评分最高', value: 'rating' },
-            { text: '下载最多', value: 'downloads' }
-          ],
-          style: 'width:auto;min-width:100px;margin-bottom:0',
-          onchange: `refreshMyMaterials(${courseId})`
-        })}
-      </div>
-      <button class="btn btn-primary" onclick="openUploadMaterialModal(${courseId})">
-        <span class="mi">upload</span> 上传资料
-      </button>
-    </div>
-    <div id="my-materials-list">
-      ${renderMyMaterialsList(materials, courseId)}
-    </div>
-  `;
-
-  const cards = contentEl.querySelectorAll('.material-card');
-  if (cards.length) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });
-}
-
-function renderMyMaterialsList(materials, courseId) {
-  if (materials.length === 0) {
-    return `
-      <div class="card" style="text-align:center;padding:48px">
-        <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">folder_open</span>
-        <p class="text-secondary" style="margin-top:12px">暂无资料，来上传第一份吧</p>
-      </div>
-    `;
-  }
-
-  const typeIcons = { pdf: 'picture_as_pdf', ppt: 'slideshow', doc: 'description', image: 'image', other: 'insert_drive_file' };
-  const typeColors = { pdf: '#e53935', ppt: '#FB8C00', doc: '#1E88E5', image: '#43A047', other: '#757575' };
-
-  return materials.map(m => `
-    <div class="card material-card">
-      <div style="display:flex;gap:12px;align-items:flex-start">
-        <div class="material-icon" style="color:${typeColors[m.file_type] || typeColors.other}">
-          <span class="mi" style="font-size:28px">${typeIcons[m.file_type] || typeIcons.other}</span>
-          <span style="font-size:10px;text-transform:uppercase">${m.file_type}</span>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:var(--text-base)">${escHtml(m.title)}</div>
-          ${m.description ? `<div style="font-size:12px;color:var(--md-on-surface-variant);margin-top:4px">${escHtml(m.description)}</div>` : ''}
-          <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;font-size:12px;color:var(--md-on-surface-variant)">
-            ${m.chapter ? `<span><span class="mi" style="font-size:14px;vertical-align:-2px">bookmark</span> ${escHtml(m.chapter)}</span>` : ''}
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">category</span> ${escHtml(m.category)}</span>
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.uploader_id})">${escHtml(m.uploader_name)}</button></span>
-            <span>${formatFileSize(m.file_size)}</span>
-            <span><span class="mi" style="font-size:14px;vertical-align:-2px">download</span> ${m.download_count}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-            ${renderMyStars(m.avg_rating, m.id)}
-            <span style="font-size:12px;color:var(--md-on-surface-variant)">${m.rating_count > 0 ? m.avg_rating.toFixed(1) + ' 分' : '暂无评分'}</span>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
-          <a href="/api/materials/${m.id}/download" class="btn btn-primary" style="font-size:12px;padding:6px 12px">
-            <span class="mi" style="font-size:16px">download</span> 下载
-          </a>
-          ${m.uploader_id === window._currentUser?.id ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 12px" onclick="deleteMyMaterial(${m.id}, ${courseId})"><span class="mi" style="font-size:16px">delete</span> 删除</button>` : ''}
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function renderMyStars(avgRating, materialId) {
-  let html = '<div class="stars-row">';
-  for (let i = 1; i <= 5; i++) {
-    const filled = i <= Math.round(avgRating) ? 'star' : 'star_border';
-    html += `<span class="mi star-icon" style="font-size:18px;cursor:pointer;color:${i <= Math.round(avgRating) ? '#FB8C00' : 'var(--md-outline-variant)'}" onclick="rateMyMaterial(${materialId}, ${i})">${filled}</span>`;
-  }
-  html += '</div>';
-  return html;
-}
-
-export async function rateMyMaterial(materialId, rating) {
-  if (!window._currentUser) {
-    showToast('请先登录后再评分');
-    return;
-  }
-  const result = await apiPost(`/api/materials/${materialId}/rate`, { rating });
-  if (result.error) {
-    showToast(result.error);
-    return;
-  }
-  showToast(`评分成功 (${result.avg_rating} 分)`);
-  const courseId = window._myCourseSpace.courseId;
-  const contentEl = document.getElementById('my-course-tab-content');
-  if (contentEl && courseId) await loadMyMaterials(contentEl, courseId);
-}
-
-export async function refreshMyMaterials(courseId) {
-  const category = document.getElementById('my-mat-category')?.value || 'all';
-  const chapter = document.getElementById('my-mat-chapter')?.value || '';
-  const sort = document.getElementById('my-mat-sort')?.value || 'newest';
-  const contentEl = document.getElementById('my-course-tab-content');
-  if (contentEl) await loadMyMaterials(contentEl, courseId, { category, chapter, sort });
-}
-
-export async function deleteMyMaterial(materialId, courseId) {
-  if (!confirm('确定删除这份资料？')) return;
-  const result = await apiDelete(`/api/materials/${materialId}`);
-  if (result.error) {
-    showToast(result.error);
-    return;
-  }
-  showToast('删除成功');
-  const contentEl = document.getElementById('my-course-tab-content');
-  if (contentEl) await loadMyMaterials(contentEl, courseId);
-}
-
-export function openUploadMaterialModal(courseId) {
-  const categories = ['课件', '笔记', '作业', '真题', '其他'];
-  const html = `
-    <form id="upload-material-form" onsubmit="handleUploadMaterial(event, ${courseId})" style="display:flex;flex-direction:column;gap:16px">
-      <div id="upload-drop-zone" class="upload-drop-zone">
-        <span class="mi" style="font-size:36px;color:var(--md-outline-variant)">cloud_upload</span>
-        <p style="margin-top:8px;color:var(--md-on-surface-variant);font-size:14px">点击选择文件或拖拽到此处</p>
-        <p style="font-size:12px;color:var(--md-outline)">支持 PDF、PPT、Word、图片，最大 20MB</p>
-        <input type="file" id="upload-file-input" style="display:none" accept=".pdf,.ppt,.pptx,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp" onchange="onFileSelected(this)">
-        <p id="upload-file-name" style="display:none;font-size:14px;font-weight:500;color:var(--md-primary);margin-top:8px"></p>
-      </div>
-      <div class="md-input-group">
-        <input class="md-input" name="title" placeholder=" " required>
-        <label class="md-label">资料标题</label>
-        <fieldset class="md-border" aria-hidden="true"><legend><span>资料标题</span></legend></fieldset>
-      </div>
-      <div class="md-input-group">
-        <input class="md-input" name="description" placeholder=" ">
-        <label class="md-label">描述（可选）</label>
-        <fieldset class="md-border" aria-hidden="true"><legend><span>描述（可选）</span></legend></fieldset>
-      </div>
-      <div style="display:flex;gap:12px">
-        <div class="md-input-group" style="flex:1">
-          <input class="md-input" name="chapter" placeholder=" ">
-          <label class="md-label">章节（如：第3章）</label>
-          <fieldset class="md-border" aria-hidden="true"><legend><span>章节</span></legend></fieldset>
-        </div>
-        <div style="flex:1">
-          ${createMdSelect({
-            id: 'upload-category',
-            label: '分类',
-            options: categories.map(c => ({ text: c, value: c })),
-            selected: '其他'
-          })}
-        </div>
-      </div>
-      <div class="form-error" id="upload-error" style="display:none"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">上传</button>
-    </form>
-  `;
-  openModal('上传资料', html);
-
-  setTimeout(() => {
-    const dropZone = document.getElementById('upload-drop-zone');
-    const fileInput = document.getElementById('upload-file-input');
-    if (dropZone && fileInput) {
-      dropZone.addEventListener('click', () => fileInput.click());
-      dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-      dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
-        if (e.dataTransfer.files.length) {
-          fileInput.files = e.dataTransfer.files;
-          onFileSelected(fileInput);
-        }
-      });
-    }
-  }, 100);
-}
-
-export function onFileSelected(input) {
-  const nameEl = document.getElementById('upload-file-name');
-  if (input.files.length && nameEl) {
-    nameEl.textContent = '📎 ' + input.files[0].name;
-    nameEl.style.display = 'block';
-  }
-}
-
-export async function handleUploadMaterial(e, courseId) {
-  e.preventDefault();
-  const form = e.target;
-  const fileInput = document.getElementById('upload-file-input');
-  const errEl = document.getElementById('upload-error');
-
-  if (!fileInput.files.length) {
-    if (errEl) { errEl.textContent = '请选择文件'; errEl.style.display = 'block'; }
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append('file', fileInput.files[0]);
-  formData.append('title', form.title.value.trim());
-  formData.append('description', form.description.value.trim());
-  formData.append('chapter', form.chapter.value.trim());
-  formData.append('category', document.getElementById('upload-category')?.value || '其他');
-
-  const btn = form.querySelector('button[type="submit"]');
-  btn.disabled = true;
-  btn.textContent = '上传中...';
-
-  try {
-    const { getToken } = await import('../../core/api.js');
-    const token = getToken();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(`/api/materials/courses/${courseId}`, { method: 'POST', headers, body: formData });
-    const result = await res.json();
-
-    if (result.error) {
-      if (errEl) { errEl.textContent = result.error; errEl.style.display = 'block'; }
-      btn.disabled = false;
-      btn.textContent = '上传';
-      return;
-    }
-
-    closeModal();
-    showToast('上传成功');
-    const contentEl = document.getElementById('my-course-tab-content');
-    if (contentEl) await loadMyMaterials(contentEl, courseId);
-  } catch (err) {
-    if (errEl) { errEl.textContent = '上传失败'; errEl.style.display = 'block'; }
-    btn.disabled = false;
-    btn.textContent = '上传';
-  }
-}
 
 /* =============================================
    穿梭门：清洗班级名 → 导航到广场

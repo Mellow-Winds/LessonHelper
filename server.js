@@ -132,6 +132,9 @@ async function start() {
   migrateTable('users', 'checkin_streak', "INTEGER DEFAULT 0");
   migrateTable('users', 'last_checkin_date', "TEXT DEFAULT ''");
   migrateTable('users', 'grace_days', "INTEGER DEFAULT 0");
+  migrateTable('users', 'gender', "TEXT DEFAULT ''");
+  migrateTable('users', 'privacy_show_following', "INTEGER DEFAULT 1");
+  migrateTable('users', 'privacy_show_followers', "INTEGER DEFAULT 1");
   migrateTable('courses', 'semester', "TEXT DEFAULT ''");
   migrateTable('courses', 'teacher', "TEXT DEFAULT ''");
   migrateTable('courses', 'big_course_id', 'INTEGER');
@@ -154,6 +157,18 @@ async function start() {
   )`);
 
   migrateTable('user_courses', 'semester_key', "TEXT DEFAULT ''");
+
+  // 批量回填小课的 semester 字段（从 user_courses.semester_key 提取）
+  db.run(`
+    UPDATE courses SET semester = (
+      SELECT uc.semester_key FROM user_courses uc
+      WHERE uc.course_id = courses.id AND uc.semester_key != ''
+      ORDER BY uc.semester_key DESC LIMIT 1
+    )
+    WHERE big_course_id IS NOT NULL
+      AND (semester = '' OR semester IS NULL)
+      AND EXISTS (SELECT 1 FROM user_courses uc2 WHERE uc2.course_id = courses.id AND uc2.semester_key != '')
+  `);
 
   // New table: materials (学习资料)
   db.run(`CREATE TABLE IF NOT EXISTS materials (
@@ -322,6 +337,19 @@ async function start() {
     file_size INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+  )`);
+
+  // New table: contact_exchange_requests (交换联系方式请求)
+  db.run(`CREATE TABLE IF NOT EXISTS contact_exchange_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user_id INTEGER NOT NULL,
+    to_user_id INTEGER NOT NULL,
+    message TEXT DEFAULT '',
+    status TEXT DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME,
+    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
   // --- 大课体系数据迁移：为现有小课创建大课记录，迁移内容归属 ---

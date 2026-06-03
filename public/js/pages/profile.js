@@ -17,6 +17,12 @@ const MBTI_OPTIONS = [
   'ISTJ','ISFJ','ESTJ','ESFJ','ISTP','ISFP','ESTP','ESFP'
 ];
 
+const GENDER_OPTIONS = [
+  { text: '不设置', value: '' },
+  { text: '男', value: 'male' },
+  { text: '女', value: 'female' }
+];
+
 const COMPLETION_FACTORS = [
   { key: 'nickname',   label: '昵称' },
   { key: 'major',      label: '专业' },
@@ -25,6 +31,7 @@ const COMPLETION_FACTORS = [
   { key: 'wechat',     label: '微信号' },
   { key: 'avatar_desc', label: '肖像描述' },
   { key: 'mbti',       label: 'MBTI人格' },
+  { key: 'gender',     label: '性别' },
 ];
 
 const PROFILE_SUB_PAGES = {
@@ -315,9 +322,11 @@ function updateCompletionBar(container, data) {
    ============================================= */
 
 function renderProfileFields(data) {
+  const genderText = data.gender === 'male' ? '男' : data.gender === 'female' ? '女' : '';
   const fields = [
     { icon: 'school',            remixIcon: null,             label: '专业',     value: data.major },
     { icon: 'class',             remixIcon: null,             label: '年级',     value: data.grade },
+    { icon: 'person',            remixIcon: null,             label: '性别',     value: genderText },
     { icon: '',                  remixIcon: 'ri-qq-fill',     label: 'QQ号',     value: data.qq },
     { icon: '',                  remixIcon: 'ri-wechat-fill', label: '微信号',   value: data.wechat },
     { icon: '',                  remixIcon: 'ri-tiktok-fill', label: '抖音号',   value: data.douyin },
@@ -357,19 +366,38 @@ function renderProfileField(field) {
    ============================================= */
 
 function renderStatsRow(data) {
-  const following = data.followingCount || 0;
-  const followers = data.followerCount || 0;
+  const isSelf = window._currentUser && String(window._currentUser.id) === String(data.id);
+  const showFollowing = isSelf || data.privacyShowFollowing !== false;
+  const showFollowers = isSelf || data.privacyShowFollowers !== false;
+
+  const following = data.followingCount;
+  const followers = data.followerCount;
+
+  const followingHtml = following !== null
+    ? `<button class="profile-stat-btn" data-stat="following" data-user-id="${data.id}">
+        <span class="profile-stat-count">${following || 0}</span>
+        <span class="profile-stat-label">关注</span>
+      </button>`
+    : `<div class="profile-stat-item">
+        <span class="profile-stat-count">--</span>
+        <span class="profile-stat-label">关注</span>
+      </div>`;
+
+  const followersHtml = followers !== null
+    ? `<button class="profile-stat-btn" data-stat="followers" data-user-id="${data.id}">
+        <span class="profile-stat-count">${followers || 0}</span>
+        <span class="profile-stat-label">粉丝</span>
+      </button>`
+    : `<div class="profile-stat-item">
+        <span class="profile-stat-count">--</span>
+        <span class="profile-stat-label">粉丝</span>
+      </div>`;
+
   return `
     <div class="profile-stats-row">
-      <button class="profile-stat-btn" data-stat="following" data-user-id="${data.id}">
-        <span class="profile-stat-count">${following}</span>
-        <span class="profile-stat-label">关注</span>
-      </button>
+      ${followingHtml}
       <div class="profile-stat-divider"></div>
-      <button class="profile-stat-btn" data-stat="followers" data-user-id="${data.id}">
-        <span class="profile-stat-count">${followers}</span>
-        <span class="profile-stat-label">粉丝</span>
-      </button>
+      ${followersHtml}
     </div>
   `;
 }
@@ -442,6 +470,15 @@ function bindProfileInteractions(container) {
     if (btn) handleFollow(btn);
     const unfollowBtn = e.target.closest('.profile-unfollow-btn');
     if (unfollowBtn) handleUnfollow(unfollowBtn);
+  });
+
+  // 交换联系方式
+  container.addEventListener('click', (e) => {
+    const exchangeBtn = e.target.closest('.profile-exchange-btn');
+    if (exchangeBtn) {
+      const userId = exchangeBtn.dataset.userId;
+      showExchangeModal(userId);
+    }
   });
 
   // 统计点击（粉丝/关注列表）
@@ -521,6 +558,12 @@ function startInlineEdit(el) {
   // MBTI 特殊处理：下拉选择
   if (key === 'mbti') {
     startMbtiSelect(el, currentValue);
+    return;
+  }
+
+  // 性别特殊处理：下拉选择
+  if (key === 'gender') {
+    startGenderSelect(el, currentValue);
     return;
   }
 
@@ -654,6 +697,62 @@ function startMbtiSelect(el, currentValue) {
   setTimeout(() => document.addEventListener('click', closeHandler), 0);
 }
 
+function startGenderSelect(el, currentValue) {
+  const genderDisplay = { male: '男', female: '女' };
+  const optionsHtml = GENDER_OPTIONS.map(g =>
+    `<div class="profile-mbti-option ${g.value === currentValue ? 'selected' : ''}" data-value="${g.value}">${g.text}</div>`
+  ).join('');
+
+  el.innerHTML = `
+    <div class="profile-mbti-dropdown">
+      ${optionsHtml}
+    </div>
+  `;
+
+  const dropdown = el.querySelector('.profile-mbti-dropdown');
+
+  dropdown.addEventListener('click', async (e) => {
+    const opt = e.target.closest('.profile-mbti-option');
+    if (!opt) return;
+
+    const newValue = opt.dataset.value;
+    if (newValue === currentValue) {
+      el.innerHTML = genderDisplay[currentValue]
+        ? escHtml(genderDisplay[currentValue])
+        : '<span class="profile-field-empty">未填写</span>';
+      return;
+    }
+
+    const result = await apiPut('/api/auth/me', { gender: newValue });
+    if (result.error) {
+      showToast('保存失败：' + result.error);
+      return;
+    }
+
+    window._currentUser.gender = newValue;
+    el.innerHTML = genderDisplay[newValue]
+      ? escHtml(genderDisplay[newValue])
+      : '<span class="profile-field-empty">未填写</span>';
+    el.dataset.editValue = newValue;
+    el.classList.toggle('empty', !newValue);
+    showToast('性别已更新');
+
+    const page = el.closest('.profile-page');
+    if (page) updateCompletionBar(page, window._currentUser);
+  });
+
+  // 点击外部关闭
+  const closeHandler = (e) => {
+    if (!el.contains(e.target)) {
+      el.innerHTML = genderDisplay[currentValue]
+        ? escHtml(genderDisplay[currentValue])
+        : '<span class="profile-field-empty">未填写</span>';
+      document.removeEventListener('click', closeHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeHandler), 0);
+}
+
 /* =============================================
    关注 / 取关
    ============================================= */
@@ -686,6 +785,51 @@ async function handleUnfollow(btn) {
 
   showToast('已取消关注');
   navigateTo('profile-user', userId);
+}
+
+/* =============================================
+   交换联系方式
+   ============================================= */
+
+async function showExchangeModal(userId) {
+  const bodyHtml = `
+    <div style="display:flex;flex-direction:column;gap:var(--space-4);">
+      <p style="color:var(--md-on-surface-variant);font-size:var(--text-sm);margin:0;">
+        发送交换请求后，对方可以在通知中查看并决定是否同意。同意后双方可以看到彼此的联系方式。
+      </p>
+      ${createMdTextarea({
+        id: 'exchange-message',
+        label: '附带信息',
+        rows: 3,
+        placeholder: ' '
+      })}
+      <div style="display:flex;gap:var(--space-3);justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" id="exchange-confirm-btn">
+          <span class="mi">send</span> 发送请求
+        </button>
+      </div>
+    </div>
+  `;
+
+  openModal('交换联系方式', bodyHtml);
+
+  document.getElementById('exchange-confirm-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('exchange-confirm-btn');
+    btn.disabled = true;
+
+    const message = document.getElementById('exchange-message')?.value?.trim() || '';
+    const result = await apiPost(`/api/user/${userId}/contact-exchange`, { message });
+
+    if (result.error) {
+      showToast(result.error);
+      btn.disabled = false;
+      return;
+    }
+
+    showToast('请求已发送');
+    closeModal();
+  });
 }
 
 /* =============================================
@@ -800,9 +944,17 @@ function renderPublicProfileCard(data) {
         <span class="mi">person_add</span> 关注
       </button>`;
 
+  const exchangeBtn = window._currentUser
+    ? `<button class="btn btn-secondary btn-compact profile-exchange-btn" data-user-id="${data.id}">
+        <span class="mi">swap_horiz</span> 交换联系方式
+      </button>`
+    : '';
+
+  const genderText = data.gender === 'male' ? '男' : data.gender === 'female' ? '女' : '';
   const fields = [
     { icon: 'school',      remixIcon: null,             label: '专业', value: data.major },
     { icon: 'class',       remixIcon: null,             label: '年级', value: data.grade },
+    { icon: 'person',      remixIcon: null,             label: '性别', value: genderText },
     { icon: '',            remixIcon: 'ri-qq-fill',     label: 'QQ号', value: data.qq },
     { icon: '',            remixIcon: 'ri-wechat-fill', label: '微信号', value: data.wechat },
     { icon: '',            remixIcon: 'ri-tiktok-fill', label: '抖音号', value: data.douyin },
@@ -831,7 +983,10 @@ function renderPublicProfileCard(data) {
         <div class="profile-avatar">${avatar}</div>
         <div class="profile-identity">
           <div class="profile-name">${escHtml(data.nickname || '未设置昵称')}</div>
-          ${window._currentUser ? followBtn : ''}
+          <div class="profile-action-btns">
+            ${window._currentUser ? followBtn : ''}
+            ${exchangeBtn}
+          </div>
         </div>
       </div>
       <div class="profile-fields">${fieldsHtml}</div>
@@ -865,6 +1020,13 @@ function renderPrivacyLocked(data) {
     : `<button class="btn btn-primary btn-compact profile-follow-btn" data-user-id="${data.id}">
         <span class="mi">person_add</span> 关注
       </button>`;
+
+  const exchangeBtn = window._currentUser
+    ? `<button class="btn btn-secondary btn-compact profile-exchange-btn" data-user-id="${data.id}">
+        <span class="mi">swap_horiz</span> 交换联系方式
+      </button>`
+    : '';
+
   return `
     <div class="profile-page">
       ${renderBackButton()}
@@ -872,7 +1034,10 @@ function renderPrivacyLocked(data) {
         <span class="mi profile-empty-icon">lock</span>
         <h2 class="profile-empty-title">该用户已设置隐私</h2>
         <p class="profile-empty-desc">${escHtml(data.nickname || '该用户')} 暂未公开个人资料</p>
-        ${window._currentUser ? followBtn : ''}
+        <div class="profile-action-btns">
+          ${window._currentUser ? followBtn : ''}
+          ${exchangeBtn}
+        </div>
       </div>
     </div>
   `;
@@ -956,6 +1121,12 @@ async function renderEditPage(container) {
           ],
           selected: data.mbti || ''
         })}
+        ${createMdSelect({
+          id: 'edit-gender',
+          label: '性别',
+          options: GENDER_OPTIONS,
+          selected: data.gender || ''
+        })}
       </div>
 
       <div class="profile-section">
@@ -993,6 +1164,7 @@ async function handleSaveProfile() {
       douyin:   document.getElementById('edit-douyin')?.value?.trim() || '',
       avatar_desc: document.getElementById('edit-avatar-desc')?.value?.trim() || '',
       mbti:     document.getElementById('edit-mbti')?.value?.trim() || '',
+      gender:   document.getElementById('edit-gender')?.value?.trim() || '',
     };
 
     const btn = document.getElementById('profile-save-btn');
@@ -1028,8 +1200,8 @@ async function renderPrivacyPage(container) {
   }
 
   const user = window._currentUser;
-  const showProfile = user.privacy_show_profile !== 0;
-  const allowMatch = user.privacy_allow_match !== 0;
+  const showFollowing = user.privacy_show_following !== 0;
+  const showFollowers = user.privacy_show_followers !== 0;
 
   container.innerHTML = `
     <div class="profile-page">
@@ -1043,44 +1215,32 @@ async function renderPrivacyPage(container) {
       <div class="profile-card">
         <h2 class="profile-section-title">隐私设置</h2>
 
-        <div class="profile-toggle-row" data-field="privacy_show_profile">
+        <div class="profile-toggle-row" data-field="privacy_show_following">
           <div class="profile-toggle-info">
             <span class="mi profile-toggle-icon">visibility</span>
             <div>
-              <div class="profile-toggle-title">公开个人资料</div>
-              <div class="profile-toggle-desc">其他用户可以查看你的名片信息</div>
+              <div class="profile-toggle-title">允许其他人查看关注列表</div>
+              <div class="profile-toggle-desc">其他用户可以查看你的关注列表</div>
             </div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" id="toggle-show-profile" ${showProfile ? 'checked' : ''}>
+            <input type="checkbox" id="toggle-show-following" ${showFollowing ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>
 
-        <div class="profile-toggle-row" data-field="privacy_allow_match">
+        <div class="profile-toggle-row" data-field="privacy_show_followers">
           <div class="profile-toggle-info">
             <span class="mi profile-toggle-icon">group</span>
             <div>
-              <div class="profile-toggle-title">允许同学匹配</div>
-              <div class="profile-toggle-desc">在同课程成员列表中展示你的信息</div>
+              <div class="profile-toggle-title">允许其他人查看粉丝列表</div>
+              <div class="profile-toggle-desc">其他用户可以查看你的粉丝列表</div>
             </div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" id="toggle-allow-match" ${allowMatch ? 'checked' : ''}>
+            <input type="checkbox" id="toggle-show-followers" ${showFollowers ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
-        </div>
-      </div>
-
-      <div class="profile-card">
-        <h2 class="profile-section-title">安全</h2>
-        <div class="profile-list-item disabled">
-          <span class="mi profile-list-icon">phonelink_lock</span>
-          <div class="profile-list-content">
-            <div class="profile-list-title">登录保护</div>
-            <div class="profile-list-desc">白名单设备登录验证（即将上线）</div>
-          </div>
-          <span class="mi profile-list-arrow">chevron_right</span>
         </div>
       </div>
     </div>
@@ -1089,11 +1249,11 @@ async function renderPrivacyPage(container) {
   animIn(container.querySelector('.profile-card'));
 
   // 绑定开关
-  document.getElementById('toggle-show-profile').addEventListener('change', (e) => {
-    handlePrivacyToggle('privacy_show_profile', e.target.checked);
+  document.getElementById('toggle-show-following').addEventListener('change', (e) => {
+    handlePrivacyToggle('privacy_show_following', e.target.checked);
   });
-  document.getElementById('toggle-allow-match').addEventListener('change', (e) => {
-    handlePrivacyToggle('privacy_allow_match', e.target.checked);
+  document.getElementById('toggle-show-followers').addEventListener('change', (e) => {
+    handlePrivacyToggle('privacy_show_followers', e.target.checked);
   });
 }
 

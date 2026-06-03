@@ -72,7 +72,7 @@ registerPage('allcourse', async (container) => {
   container.innerHTML = `
     <div class="page-header">
       <div>
-        <h1 class="page-title" style="margin-bottom:0">课程广场</h1>
+        <h1 class="page-title" style="margin-bottom:0"><span class="mi" style="vertical-align:-4px;margin-right:4px">public</span>课程广场</h1>
         <p class="text-secondary" style="margin-top:4px;font-size:var(--text-sm)">全校课程档案馆 · 跨届检索</p>
       </div>
     </div>

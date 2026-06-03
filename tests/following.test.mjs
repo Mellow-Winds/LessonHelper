@@ -9,8 +9,9 @@ function createDb(SQL) {
   raw.run(`
     CREATE TABLE users (
       id INTEGER PRIMARY KEY, username TEXT, nickname TEXT, major TEXT, grade TEXT,
-      avatar_url TEXT, avatar_desc TEXT, mbti TEXT, qq TEXT, wechat TEXT, douyin TEXT,
-      privacy_show_profile INTEGER, created_at TEXT
+      avatar_url TEXT, avatar_desc TEXT, mbti TEXT, gender TEXT, qq TEXT, wechat TEXT, douyin TEXT,
+      privacy_show_profile INTEGER, privacy_show_following INTEGER, privacy_show_followers INTEGER,
+      created_at TEXT
     );
     CREATE TABLE courses (id INTEGER PRIMARY KEY, title TEXT, teacher TEXT);
     CREATE TABLE user_courses (id INTEGER PRIMARY KEY, user_id INTEGER, course_id INTEGER);
@@ -35,9 +36,9 @@ function createDb(SQL) {
       id INTEGER PRIMARY KEY, creator_id INTEGER, title TEXT, category TEXT,
       description TEXT, status TEXT, expires_at TEXT, created_at TEXT
     );
-    INSERT INTO users VALUES (1, 'u1@example.com', '小林', '数学', '2024', '', '', '', '', '', '', 1, '2026-06-01');
-    INSERT INTO users VALUES (2, 'u2@example.com', '隐私用户', '物理', '2023', '', '', '', '123', '', '', 0, '2026-06-01');
-    INSERT INTO users VALUES (3, 'u3@example.com', '公开用户', '数学', '2024', '', '', '', '', '', '', 1, '2026-06-01');
+    INSERT INTO users VALUES (1, 'u1@example.com', '小林', '数学', '2024', '', '', '', '', '', '', '', 1, 1, 1, '2026-06-01');
+    INSERT INTO users VALUES (2, 'u2@example.com', '隐私用户', '物理', '2023', '', '', '', '', '123', '', '', 0, 1, 1, '2026-06-01');
+    INSERT INTO users VALUES (3, 'u3@example.com', '公开用户', '数学', '2024', '', '', '', '', '', '', '', 1, 1, 1, '2026-06-01');
     INSERT INTO courses VALUES (10, '线性代数', '张老师');
     INSERT INTO user_courses VALUES (1, 1, 10);
     INSERT INTO user_courses VALUES (2, 3, 10);
