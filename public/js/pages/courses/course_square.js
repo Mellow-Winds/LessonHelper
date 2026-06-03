@@ -318,7 +318,7 @@ async function handleCourseSquareInterest(courseId, interestId, action, postId, 
 export function openCourseSquareCreateModal(courseId, prefix) {
   openModal('发布搭子帖', `
     <div style="display:flex;flex-direction:column;gap:16px">
-      ${createMdInput({ id: `${prefix}-sq-title`, label: '标题', placeholder: '如：找考研搭子一起自习' })}
+      ${createMdInput({ id: `${prefix}-sq-title`, label: '标题', placeholder: ' ' })}
       ${createMdSelect({
         id: `${prefix}-sq-category`,
         label: '类型',

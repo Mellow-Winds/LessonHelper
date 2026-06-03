@@ -41,8 +41,8 @@ let _exploreContainer = null;
    ============================================= */
 
 const TABS = [
-  { key: 'invites', label: '自习邀约' },
-  { key: 'square',  label: '交友广场' },
+  { key: 'invites', label: '自习邀约', icon: 'event_available' },
+  { key: 'square',  label: '交友广场', icon: 'people' },
 ];
 
 /* =============================================
@@ -66,9 +66,11 @@ async function renderExplore(container, initialTab) {
         </button>
       </div>
     </div>
-    <div class="md-tabs" id="explore-tabs">
+    <div class="md-pills" id="explore-pills">
       ${TABS.map(t => `
-        <button class="md-tab-btn${t.key === tab ? ' active' : ''}" data-explore-tab="${t.key}">${t.label}</button>
+        <button class="md-pill-btn${t.key === tab ? ' active' : ''}" data-tab="${t.key}">
+          <span class="mi" style="font-size:16px;vertical-align:-3px">${t.icon}</span> ${t.label}
+        </button>
       `).join('')}
     </div>
     <div id="explore-tab-content" class="explore-content-container"></div>
@@ -78,8 +80,8 @@ async function renderExplore(container, initialTab) {
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
   // 绑定 Tab 切换
-  container.querySelectorAll('.md-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchExploreTab(btn.dataset.exploreTab));
+  container.querySelectorAll('#explore-pills .md-pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchExploreTab(btn.dataset.tab));
   });
 
   // 绑定发布按钮
@@ -98,8 +100,8 @@ async function switchExploreTab(tabName) {
   _activeTab = tabName;
 
   // 更新 Tab 高亮
-  document.querySelectorAll('#explore-tabs .md-tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.exploreTab === tabName);
+  document.querySelectorAll('#explore-pills .md-pill-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
 
   await loadTabContent(tabName);

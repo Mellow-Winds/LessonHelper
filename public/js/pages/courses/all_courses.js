@@ -8,7 +8,7 @@
 
 import { apiGet } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../../core/router.js';
-import { escHtml } from '../../components/ui.js';
+import { escHtml, createMdInput } from '../../components/ui.js';
 
 /* =============================================
    大课名称清洗
@@ -76,9 +76,9 @@ registerPage('allcourse', async (container) => {
         <p class="text-secondary" style="margin-top:4px;font-size:var(--text-sm)">全校课程档案馆 · 跨届检索</p>
       </div>
     </div>
-    <div class="plaza-search-bar">
-      <span class="mi plaza-search-icon">search</span>
-      <input class="plaza-search-input" id="plaza-search" type="text" placeholder="搜索课程名称..." oninput="filterPlazaCourses(this.value)">
+    <div style="display:flex;gap:8px;margin-bottom:var(--space-6)">
+      ${createMdInput({ id: 'plaza-search', label: '搜索课程', placeholder: ' ', style: 'flex:1;margin-bottom:0', attrs: 'oninput="filterPlazaCourses(this.value)"' })}
+      <button class="btn btn-primary" style="height:56px" onclick="filterPlazaCourses(document.getElementById('plaza-search').value)">搜索</button>
     </div>
     <div id="plaza-course-list">
       <div class="card"><p class="text-secondary">加载中...</p></div>
@@ -87,7 +87,7 @@ registerPage('allcourse', async (container) => {
 
   bindRipples(container);
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
-  animIn(container.querySelector('.plaza-search-bar'), { y: 12, delay: 60, dur: 350 });
+  animIn(container.querySelector('#plaza-search')?.closest('[style*="display:flex"]') || container.querySelector('#plaza-search')?.closest('div'), { y: 12, delay: 60, dur: 350 });
 
   await loadPlazaDataOnce();
   renderPlazaList(_bigCoursesList);

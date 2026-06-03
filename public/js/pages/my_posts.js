@@ -13,8 +13,8 @@ import { renderAuth } from './auth.js';
    ============================================= */
 
 const MY_POST_TABS = [
-  { key: 'course',  label: '课程空间' },
-  { key: 'explore', label: '探索' },
+  { key: 'course',  label: '课程空间', icon: 'menu_book' },
+  { key: 'explore', label: '探索', icon: 'explore' },
 ];
 
 /* =============================================
@@ -33,9 +33,11 @@ registerPage('my_post', async (container) => {
     <div class="page-header">
       <h1 class="page-title" style="margin:0"><span class="mi" style="vertical-align:-4px;margin-right:4px">edit_note</span>我的创作</h1>
     </div>
-    <div class="md-tabs" id="my-post-tabs">
+    <div class="md-pills" id="my-post-pills">
       ${MY_POST_TABS.map(t => `
-        <button class="md-tab-btn${t.key === 'course' ? ' active' : ''}" data-my-post-tab="${t.key}">${t.label}</button>
+        <button class="md-pill-btn${t.key === 'course' ? ' active' : ''}" data-tab="${t.key}">
+          <span class="mi" style="font-size:16px;vertical-align:-3px">${t.icon}</span> ${t.label}
+        </button>
       `).join('')}
     </div>
     <div id="my-post-content" class="my-post-content"></div>
@@ -44,8 +46,8 @@ registerPage('my_post', async (container) => {
   bindRipples(container);
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
-  container.querySelectorAll('#my-post-tabs .md-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchMyPostTab(btn.dataset.myPostTab, container));
+  container.querySelectorAll('#my-post-pills .md-pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchMyPostTab(btn.dataset.tab, container));
   });
 
   await loadMyPostTab('course');
@@ -83,9 +85,11 @@ async function renderMyPostPage(container, initialTab) {
         <h1 class="page-title" style="margin:0">我的创作</h1>
       </div>
     </div>
-    <div class="md-tabs" id="my-post-tabs">
+    <div class="md-pills" id="my-post-pills">
       ${MY_POST_TABS.map(t => `
-        <button class="md-tab-btn${t.key === initialTab ? ' active' : ''}" data-my-post-tab="${t.key}">${t.label}</button>
+        <button class="md-pill-btn${t.key === initialTab ? ' active' : ''}" data-tab="${t.key}">
+          <span class="mi" style="font-size:16px;vertical-align:-3px">${t.icon}</span> ${t.label}
+        </button>
       `).join('')}
     </div>
     <div id="my-post-content" class="my-post-content"></div>
@@ -94,8 +98,8 @@ async function renderMyPostPage(container, initialTab) {
   bindRipples(container);
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
-  container.querySelectorAll('#my-post-tabs .md-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchMyPostTab(btn.dataset.myPostTab, container));
+  container.querySelectorAll('#my-post-pills .md-pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchMyPostTab(btn.dataset.tab, container));
   });
 
   await loadMyPostTab(initialTab);
@@ -106,9 +110,9 @@ async function renderMyPostPage(container, initialTab) {
    ============================================= */
 
 async function switchMyPostTab(tabName, container) {
-  const tabs = container.querySelectorAll('#my-post-tabs .md-tab-btn');
+  const tabs = container.querySelectorAll('#my-post-pills .md-pill-btn');
   tabs.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.myPostTab === tabName);
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
   await loadMyPostTab(tabName);
 }
