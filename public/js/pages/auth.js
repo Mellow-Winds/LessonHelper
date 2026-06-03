@@ -346,15 +346,16 @@ export async function refreshNotifBadge() {
   if (!window._currentUser) return;
   try {
     const data = await apiGet('/api/notifications/unread-count');
-    const badge = document.getElementById('notif-badge');
-    if (badge) {
-      if (data?.count > 0) {
-        badge.textContent = data.count > 99 ? '99+' : data.count;
-        badge.style.display = 'flex';
-      } else {
-        badge.style.display = 'none';
+    const count = data?.count || 0;
+    const display = count > 0 ? 'flex' : 'none';
+    const text = count > 99 ? '99+' : String(count);
+    ['notif-badge', 'bottom-notif-badge'].forEach(id => {
+      const badge = document.getElementById(id);
+      if (badge) {
+        badge.textContent = text;
+        badge.style.display = display;
       }
-    }
+    });
   } catch { /* ignore */ }
 }
 

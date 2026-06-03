@@ -3943,3 +3943,502 @@ input, textarea, select, button,
   padding-top: 12px;
   border-top: 1px solid var(--md-surface-container);
 }
+
+/* ============================================================
+   响应式适配 — 底部 Tab 栏（默认隐藏，仅手机端显示）
+   ============================================================ */
+
+.bottom-tab-bar {
+  display: none;
+}
+
+/* ============================================================
+   平板端适配（≤1199px）
+   ============================================================ */
+
+@media (max-width: 1199px) {
+  /* ---- 侧边栏压缩 ---- */
+  .sidebar {
+    width: 200px;
+    padding: var(--space-3);
+  }
+
+  .brand {
+    font-size: var(--text-base);
+    padding: var(--space-3);
+  }
+
+  .nav-item {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  /* ---- 主内容区 ---- */
+  .main-content {
+    padding: var(--space-6);
+  }
+
+  /* ---- 模态框 ---- */
+  .modal {
+    width: 80%;
+    max-width: 600px;
+  }
+
+  /* ---- Pill Tabs 横向滚动 ---- */
+  .md-pills {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    flex-shrink: 0;
+  }
+
+  /* ---- 页面头部换行 ---- */
+  .page-header {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .explore-header-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* ============================================================
+   手机端适配（≤767px）
+   ============================================================ */
+
+@media (max-width: 767px) {
+
+  /* ---- 基础布局 ---- */
+  body {
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  html, body {
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ---- 侧边栏隐藏 ---- */
+  .sidebar {
+    display: none;
+  }
+
+  /* ---- 底部 Tab 栏显示 ---- */
+  .bottom-tab-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: var(--md-surface-container-lowest);
+    border-top: 1px solid var(--md-outline-variant);
+    z-index: 900;
+    padding: 0 var(--space-2);
+    align-items: center;
+    justify-content: space-around;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+  }
+
+  .bottom-tab-bar .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 0;
+    min-width: 56px;
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    color: var(--md-on-surface-variant);
+    position: relative;
+  }
+
+  .bottom-tab-bar .nav-item .mi {
+    font-size: 22px;
+    transform: none;
+  }
+
+  .bottom-tab-bar .nav-item.active {
+    color: var(--md-primary);
+    background: var(--md-primary-container);
+    font-weight: 600;
+  }
+
+  .bottom-tab-bar .nav-item.active .mi {
+    transform: none;
+  }
+
+  .bottom-tab-bar .notif-badge {
+    position: absolute;
+    top: 2px;
+    right: 8px;
+    margin-left: 0;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+    border-radius: 8px;
+  }
+
+  /* ---- 主内容区 ---- */
+  .main-content {
+    padding: var(--space-4);
+    padding-bottom: 72px;
+    flex: 1;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  /* ---- 通用排版 ---- */
+  .page-title {
+    font-size: var(--text-lg);
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .explore-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .explore-header-actions .btn {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  /* ---- 卡片 ---- */
+  .card {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .card-title {
+    font-size: var(--text-base);
+  }
+
+  /* ---- 按钮 ---- */
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
+    height: 48px;
+    border-radius: var(--radius-md);
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 10px 20px;
+  }
+
+  .btn-compact {
+    padding: 8px 16px;
+    height: 44px;
+  }
+
+  /* ---- 输入框（防 iOS 缩放） ---- */
+  .md-input,
+  .md-input-group textarea.md-input,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="number"],
+  textarea {
+    font-size: 16px !important;
+    height: 48px;
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+
+  .md-input-group textarea.md-input {
+    height: auto;
+    min-height: 80px;
+  }
+
+  /* ---- Pill Tabs 横向滚动 ---- */
+  .md-pills {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    width: 100%;
+    flex-shrink: 0;
+    scrollbar-width: none;
+  }
+
+  .md-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .md-pill-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 8px 16px;
+    min-height: 44px;
+  }
+
+  /* ---- Tab 标签栏 ---- */
+  .md-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: var(--space-4);
+    scrollbar-width: none;
+  }
+
+  .md-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .md-tab-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 44px;
+  }
+
+  /* ---- 模态框 → 底部抽屉 ---- */
+  .modal-overlay {
+    align-items: flex-end;
+    justify-content: stretch;
+  }
+
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 85vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    transform: translateY(100%);
+    opacity: 1;
+  }
+
+  .modal-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-header {
+    padding: var(--space-4) var(--space-4) var(--space-3);
+  }
+
+  .modal-title {
+    font-size: var(--text-base);
+  }
+
+  .modal-body {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+
+  /* ---- 下拉选择器 → 底部全屏 ---- */
+  .md-select-container.open .md-select-menu {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    max-height: 60vh;
+    overflow-y: auto;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    z-index: 1100;
+    box-shadow: var(--shadow-3);
+    background: var(--md-surface-container-lowest);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .md-select-option {
+    min-height: 48px;
+    padding: 14px var(--space-4);
+  }
+
+  /* ---- 课表表格 → 垂直卡片布局 ---- */
+  .schedule-table,
+  .schedule-table thead,
+  .schedule-table tbody,
+  .schedule-table tr,
+  .schedule-table th,
+  .schedule-table td {
+    display: block;
+  }
+
+  .schedule-table thead {
+    display: none;
+  }
+
+  .schedule-table tr {
+    margin-bottom: var(--space-4);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .schedule-table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--md-outline-variant);
+    text-align: left;
+  }
+
+  .schedule-table td:last-child {
+    border-bottom: none;
+  }
+
+  .schedule-table td:first-child {
+    font-weight: 600;
+    color: var(--md-primary);
+    background: var(--md-primary-container);
+    font-size: var(--text-sm);
+  }
+
+  /* ---- Toast 底部居中 ---- */
+  .toast {
+    bottom: 72px;
+    left: 50%;
+    right: auto;
+    width: 90%;
+    max-width: 90%;
+    text-align: center;
+    padding: 12px var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  /* ---- 帖子图片网格 ---- */
+  .post-image-grid,
+  .forum-image-grid {
+    max-width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .post-image-grid.count-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* ---- 评论缩进减小 ---- */
+  .comment-body,
+  .forum-reply-body {
+    padding-left: var(--space-4);
+  }
+
+  .comment-reply-list,
+  .forum-replies-list {
+    padding-left: var(--space-3);
+  }
+
+  /* ---- 发布页 ---- */
+  .post-form-container,
+  .create-post-page {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  /* ---- 个人中心（增强已有规则） ---- */
+  .profile-page {
+    padding: var(--space-4) var(--space-2);
+  }
+
+  .profile-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--space-3);
+  }
+
+  .profile-avatar {
+    width: 72px;
+    height: 72px;
+  }
+
+  .profile-avatar-letter {
+    font-size: 28px;
+  }
+
+  .profile-name {
+    font-size: var(--text-lg);
+  }
+
+  .profile-data-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-field-label {
+    width: 56px;
+  }
+
+  .profile-mbti-dropdown {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* ---- 通知徽章 ---- */
+  .notif-badge {
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+  }
+
+  /* ---- 搜索页 ---- */
+  #search-page-input,
+  #plaza-search {
+    width: 100%;
+  }
+
+  /* ---- 表单按钮组 ---- */
+  .page-header .btn,
+  .page-header > div:last-child {
+    width: 100%;
+  }
+
+  .page-header > div:last-child {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .page-header > div:last-child .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* ---- 资料卡片操作按钮 ---- */
+  .material-card .btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
+  /* ---- 邀约/广场卡片 ---- */
+  .square-post-card,
+  .invite-card,
+  .my-post-card {
+    padding: var(--space-4);
+  }
+
+  /* ---- 通知列表 ---- */
+  .notification-card {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  /* ---- 横向 flex 行自适应 ---- */
+  [style*="display:flex"][style*="gap:12px"],
+  [style*="display:flex"][style*="gap:8px"] {
+    flex-wrap: wrap;
+  }
+
+  /* ---- 确保所有可点击元素 ≥44px ---- */
+  .btn,
+  .nav-item,
+  .md-pill-btn,
+  .md-tab-btn,
+  .md-select-trigger,
+  .modal-close {
+    min-height: 44px;
+  }
+
+  /* ---- 安全区域适配 ---- */
+  .bottom-tab-bar {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
