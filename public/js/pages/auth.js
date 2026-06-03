@@ -513,7 +513,7 @@ registerPage('search', async (container, data) => {
     <div class="page-header">
       <h1 class="page-title"><span class="mi" style="vertical-align:-4px;margin-right:4px">search</span>${q ? '搜索结果' : '搜索'}</h1>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px">
+    <div class="search-bar-row" style="display:flex;gap:8px;margin-bottom:16px">
       ${createMdInput({
         id: 'search-page-input',
         label: '搜索课程、资料、帖子、广场...',
