@@ -6,7 +6,7 @@
 
 import { apiGet, apiPost } from '../../core/api.js';
 import { navigateTo, animIn, bindRipples } from '../../core/router.js';
-import { showToast, createMdInput, createMdTextarea, createMdSelect, escHtml, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
+import { showToast, createMdInput, createMdTextarea, createMdSelect, escHtml, renderLoginPrompt, bindLoginPrompt, openModal, closeModal } from '../../components/ui.js';
 import { renderAuth } from '../auth.js';
 
 /* =============================================
@@ -36,7 +36,7 @@ export async function renderPosts(container) {
   container.innerHTML = `
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
+        <button class="btn-icon" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
         <h1 class="page-title" style="margin:0"><span class="mi" style="vertical-align:-4px;margin-right:4px">post_add</span>发布</h1>
       </div>
     </div>
@@ -174,9 +174,44 @@ function bindSquareForm() {
   }
 
   addBtn.addEventListener('click', () => {
-    addBtn.style.display = 'none';
-    chipInput.style.display = 'block';
-    chipInput.focus();
+    if (window.innerWidth <= 767) {
+      // 手机端：弹窗输入
+      openModal('添加标签', `
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          ${createMdInput({ id: 'tag-modal-input', label: '输入标签', placeholder: ' ' })}
+          <button class="btn btn-primary" id="tag-modal-confirm" style="flex-shrink:0;height:56px;padding:0 24px">
+            <span class="mi">check</span> 确认
+          </button>
+        </div>
+      `);
+      const confirmBtn = document.getElementById('tag-modal-confirm');
+      const modalInput = document.getElementById('tag-modal-input');
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+          const val = modalInput?.value.trim();
+          if (val && !tags.includes(val) && tags.length < 8) {
+            tags.push(val);
+            renderChips();
+          }
+          closeModal();
+        });
+      }
+      // Enter 键也能提交
+      if (modalInput) {
+        modalInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            confirmBtn?.click();
+          }
+        });
+        setTimeout(() => modalInput.focus(), 300);
+      }
+    } else {
+      // 桌面端：保持原有行为
+      addBtn.style.display = 'none';
+      chipInput.style.display = 'block';
+      chipInput.focus();
+    }
   });
 
   chipInput.addEventListener('keydown', (e) => {
@@ -298,14 +333,14 @@ async function renderInviteForm(formEl) {
         ${createMdSelect({ id: 'invite-course', label: '关联课程', options: courseOptions })}
       </div>
       ${createMdInput({ id: 'invite-location', label: '自习地点', placeholder: ' ' })}
-      <div style="display:flex;gap:12px">
-        <div style="flex:1">
+      <div class="inline-selects" style="display:flex;gap:12px">
+        <div style="flex:1;min-width:0">
           ${createMdSelect({ id: 'invite-date', label: '日期', options: dateOptions, selected: today })}
         </div>
-        <div style="flex:1">
+        <div style="flex:1;min-width:0">
           ${createMdSelect({ id: 'invite-start', label: '开始时间', options: startTimeSlots, selected: '14:00' })}
         </div>
-        <div style="flex:1">
+        <div style="flex:1;min-width:0">
           ${createMdSelect({ id: 'invite-end', label: '结束时间', options: endTimeSlots, selected: '17:00' })}
         </div>
       </div>

@@ -81,7 +81,7 @@ async function renderMyPostPage(container, initialTab) {
   container.innerHTML = `
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('my_post')"><span class="mi">arrow_back</span></button>
+        <button class="btn-icon" onclick="navigateTo('my_post')"><span class="mi">arrow_back</span></button>
         <h1 class="page-title" style="margin:0">我的发布</h1>
       </div>
     </div>

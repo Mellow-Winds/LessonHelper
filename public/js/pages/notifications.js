@@ -236,7 +236,7 @@ async function showExchangeDetailModal(requestId) {
   let actionsHtml = '';
   if (isPending && isRecipient) {
     actionsHtml = `
-      <div style="display:flex;gap:var(--space-3);justify-content:flex-end;margin-top:var(--space-4)">
+      <div class="inline-btn-group" style="display:flex;gap:var(--space-3);justify-content:flex-end;margin-top:var(--space-4)">
         <button class="btn btn-secondary" id="exchange-reject-btn">
           <span class="mi">close</span> 拒绝
         </button>
