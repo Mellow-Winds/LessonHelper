@@ -103,15 +103,15 @@ registerPage('mycourse', async (container) => {
         </button>
       </div>
     </div>
-    <div id="my-semester-filter-wrap" class="form-row" style="margin-bottom:var(--space-4);width:auto">
-      <div style="min-width:120px">
+    <div id="my-semester-filter-wrap" class="form-row inline-selects" style="margin-bottom:var(--space-4);width:auto">
+      <div>
         ${createMdSelect({
           id: 'my-year-filter',
           options: [{ text: '全部年份', value: 'all' }],
           selected: 'all',
         })}
       </div>
-      <div style="min-width:120px">
+      <div>
         ${createMdSelect({
           id: 'my-sem-filter',
           options: SEMESTER_TYPES,
@@ -140,10 +140,10 @@ registerPage('mycourse', async (container) => {
       console.log('[学期] wrap 元素:', wrap);
       if (wrap) {
         wrap.innerHTML = `
-          <div style="min-width:120px">
+          <div>
             ${createMdSelect({ id: 'my-year-filter', options: yearOptions, selected: years.includes(initYear) ? initYear : 'all' })}
           </div>
-          <div style="min-width:120px">
+          <div>
             ${createMdSelect({ id: 'my-sem-filter', options: SEMESTER_TYPES, selected: initType || 'all' })}
           </div>
         `;
@@ -205,12 +205,12 @@ async function loadMyCourseList(semester) {
             <span style="font-size:var(--text-sm);color:var(--md-primary);font-weight:600;white-space:nowrap">
               <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> ${c.enrollment_count || 0} 人
             </span>
-            <div style="display:flex;gap:6px">
+            <div class="inline-btn-group" style="display:flex;gap:6px">
               <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();openMoveSemesterModal(${c.id}, '${escHtml(c.title)}')">
-                <span class="mi" style="font-size:14px">swap_horiz</span> 移动学期
+                <span class="mi" style="font-size:14px">swap_horiz</span><span class="btn-text"> 移动学期</span>
               </button>
               <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();handleLeaveCourse(${c.id})">
-                <span class="mi" style="font-size:14px">logout</span> 退出课程
+                <span class="mi" style="font-size:14px">logout</span><span class="btn-text"> 退出课程</span>
               </button>
             </div>
           </div>
@@ -378,7 +378,7 @@ export async function openImportModal() {
         <p class="text-secondary">加载中...</p>
       </div>
     </div>
-    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:var(--space-4)">
+    <div class="inline-btn-group" style="display:flex;gap:12px;justify-content:flex-end;margin-top:var(--space-4)">
       <button class="btn btn-secondary" onclick="closeModal()">不同意</button>
       <button class="btn btn-primary" onclick="handleAgreeAndImport()">我已同意并知晓</button>
     </div>
@@ -502,7 +502,7 @@ export async function openMoveSemesterModal(courseId, courseTitle) {
           })}
         </div>
       </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
+      <div class="inline-btn-group" style="display:flex;gap:8px;justify-content:flex-end">
         <button class="btn btn-secondary" onclick="closeModal()">取消</button>
         <button class="btn btn-primary" onclick="handleMoveSemester(${courseId})">确认移动</button>
       </div>

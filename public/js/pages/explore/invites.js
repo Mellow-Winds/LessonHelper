@@ -175,11 +175,11 @@ export async function renderMyInvites(container) {
   container.innerHTML = `
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
+        <button class="btn-icon" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
         <h1 class="page-title"><span class="mi" style="vertical-align:-4px;margin-right:4px">event_available</span>我的邀约</h1>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px">
+    <div class="inline-btn-group" style="display:flex;gap:8px;margin-bottom:16px">
       <button class="btn btn-primary tab-btn active" id="my-tab-created" onclick="switchMyTab('created')">我发起的</button>
       <button class="btn btn-secondary tab-btn" id="my-tab-joined" onclick="switchMyTab('joined')">我参与的</button>
     </div>

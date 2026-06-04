@@ -127,7 +127,7 @@ export async function renderSquarePost(container, postId) {
 
     container.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-        <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
+        <button class="btn-icon" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
         <h1 class="page-title" style="margin:0">${escHtml(data.title)}</h1>
       </div>
       <div class="card" style="margin-bottom:16px">
@@ -206,7 +206,7 @@ function renderSquareCreatorPanel(data) {
             <button class="user-profile-link" onclick="navigateTo('profile-user', ${p.user_id})">${escHtml(p.nickname)}</button>
             ${(p.major || p.grade) ? `<div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml([p.major, p.grade].filter(Boolean).join(' · '))}</div>` : ''}
           </div>
-          <div style="display:flex;gap:6px">
+          <div class="inline-btn-group" style="display:flex;gap:6px">
             <button class="btn btn-primary" style="font-size:12px;padding:4px 12px" onclick="handleSquareInterest(${p.interest_id}, 'accept')">接受</button>
             <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="handleSquareInterest(${p.interest_id}, 'reject')">拒绝</button>
           </div>
@@ -463,7 +463,7 @@ function bindSqForumEvents(root, postId) {
       case 'sq-delete':
         openModal('确认删除', `
           <p style="margin-bottom:24px">确定要删除这条回复吗？删除后无法恢复</p>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
+          <div class="inline-btn-group" style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn btn-secondary" onclick="closeModal()">取消</button>
             <button class="btn btn-primary" id="confirm-sq-delete" style="background:var(--md-error,#e53935)">删除</button>
           </div>
@@ -664,11 +664,11 @@ export async function renderSquareMy(container) {
   container.innerHTML = `
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-secondary" style="padding:6px 8px" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
+        <button class="btn-icon" onclick="navigateTo('explore')"><span class="mi">arrow_back</span></button>
         <h1 class="page-title"><span class="mi" style="vertical-align:-4px;margin-right:4px">people</span>我的广场</h1>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px">
+    <div class="inline-btn-group" style="display:flex;gap:8px;margin-bottom:16px">
       <button class="btn btn-primary tab-btn active" id="square-tab-created" onclick="switchSquareMyTab('created')">我发起的</button>
       <button class="btn btn-secondary tab-btn" id="square-tab-interested" onclick="switchSquareMyTab('interested')">我感兴趣的</button>
     </div>

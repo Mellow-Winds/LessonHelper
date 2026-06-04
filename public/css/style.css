@@ -4405,19 +4405,19 @@ input, textarea, select, button,
     min-height: 44px;
   }
 
-  /* ---- 模态框 → 底部抽屉 ---- */
+  /* ---- 模态框 → 居中弹窗（覆盖底部抽屉） ---- */
   .modal-overlay {
-    align-items: flex-end;
-    justify-content: stretch;
+    align-items: center;
+    justify-content: center;
   }
 
   .modal {
-    width: 100%;
-    max-width: 100%;
-    max-height: 85vh;
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    transform: translateY(100%);
-    opacity: 1;
+    width: 90vw;
+    max-width: 90vw;
+    max-height: 80vh;
+    border-radius: var(--radius-2xl);
+    transform: scale(0.85) translateY(24px);
+    opacity: 0;
   }
 
   .modal-body {
@@ -4437,20 +4437,25 @@ input, textarea, select, button,
     padding: 0 var(--space-4) var(--space-4);
   }
 
-  /* ---- 下拉选择器 → 底部全屏 ---- */
+  /* ---- 下拉选择器 → 原位向下展开（覆盖底部全屏） ---- */
   .md-select-container.open .md-select-menu {
-    position: fixed;
-    bottom: 0;
+    position: absolute;
+    top: calc(100% + 4px);
+    bottom: auto;
     left: 0;
-    right: 0;
-    top: auto;
-    max-height: 60vh;
+    right: auto;
+    width: 100%;
+    max-height: 240px;
     overflow-y: auto;
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-radius: 12px;
     z-index: 1100;
-    box-shadow: var(--shadow-3);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     background: var(--md-surface-container-lowest);
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: 0;
+  }
+
+  .md-select-container {
+    overflow: visible !important;
   }
 
   .md-select-option {
@@ -4799,5 +4804,92 @@ input, textarea, select, button,
   /* ---- 安全区域适配 ---- */
   .bottom-tab-bar {
     padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* ============================================================
+     移动端显示优化（2026-06-04）
+     ============================================================ */
+
+  /* ---- 问题2：课表筛选行内选择框填满 ---- */
+  .form-row.inline-selects {
+    width: 100% !important;
+  }
+  .form-row.inline-selects > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ---- 问题3/4：资料筛选栏按钮顺序 + 搜索按钮大小 ---- */
+  .material-filter-bar > .btn:first-of-type {
+    flex: 0 0 48px;
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+    height: 48px;
+    padding: 0;
+    justify-content: center;
+    order: 4;
+  }
+  .material-filter-bar > .btn:last-of-type {
+    flex: 1;
+    order: 5;
+  }
+
+  /* ---- 问题5：按钮组填满行 ---- */
+  .inline-btn-group {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  .inline-btn-group .btn {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ---- 手机端：隐藏特定按钮文字，只显示图标 ---- */
+  .btn-text {
+    display: none;
+  }
+
+  /* ---- 问题6：收藏按钮紧凑 + 课程信息行不换行 ---- */
+  .page-header .favorite-btn {
+    width: auto !important;
+    height: 32px !important;
+    padding: 2px 10px !important;
+    font-size: 12px !important;
+    border-radius: 16px !important;
+    flex-shrink: 0;
+    min-height: 32px !important;
+  }
+  .course-info-row {
+    flex-wrap: nowrap !important;
+  }
+  .course-info-row > p {
+    white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  /* ---- 问题8：搜索栏输入框和按钮一致性 ---- */
+  .search-bar-row .md-input-group .md-input {
+    height: 48px !important;
+    border-radius: 12px !important;
+  }
+  .search-bar-row .md-input-group .md-border {
+    top: 0 !important;
+    border: 1px solid var(--md-outline) !important;
+    border-radius: 12px !important;
+  }
+  .search-bar-row > .btn {
+    border-width: 1px !important;
+  }
+
+  /* ---- 问题9：并列选择框换行支持 ---- */
+  .inline-selects {
+    flex-wrap: wrap;
+  }
+  .inline-selects > .md-select-container {
+    flex: 1 1 0%;
+    min-width: 0;
   }
 }

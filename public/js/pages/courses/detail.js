@@ -80,7 +80,7 @@ registerPage('course-detail', async (container, courseId) => {
       <div class="page-header">
         <div style="flex:1;min-width:0">
           <h1 class="page-title" style="margin-bottom:4px">${escHtml(cleanName)}</h1>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div class="course-info-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
             <p class="text-secondary" style="margin:0">
               ${course.enrollment_count || 0} 人选课
               ${enrolled ? '' : ' · <span style="color:var(--md-outline)">只读模式</span>'}
@@ -266,7 +266,7 @@ function bindForumEvents(root, courseId, enrolled) {
       case 'delete-comment':
         openModal('确认删除', `
           <p style="margin-bottom:24px">确定要删除这条回复吗？删除后无法恢复</p>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
+          <div class="inline-btn-group" style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn btn-secondary" onclick="closeModal()">取消</button>
             <button class="btn btn-primary" id="confirm-forum-delete" style="background:var(--md-error,#e53935)">删除</button>
           </div>
@@ -842,7 +842,7 @@ export async function submitForumReply(postId, parentCommentId, ctxKey) {
     await refreshForumComments(postId);
 
     // 启动 30 秒冷却
-    startForumCooldown(postId);
+    startForumCooldown(postId, ctxKey);
 
   } catch {
     showToast('网络错误，请重试');
@@ -850,14 +850,21 @@ export async function submitForumReply(postId, parentCommentId, ctxKey) {
   }
 }
 
-function startForumCooldown(postId) {
+function startForumCooldown(postId, ctxKey) {
   _forumCooldownTimers[postId] = 30;
+  const btn = document.getElementById(`forum-send-${ctxKey}`);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span style="font-size:11px">重新发送(30s)</span>';
+  }
   const tick = () => {
     _forumCooldownTimers[postId]--;
     if (_forumCooldownTimers[postId] <= 0) {
       delete _forumCooldownTimers[postId];
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="mi">send</span>'; }
       return;
     }
+    if (btn) btn.innerHTML = `<span style="font-size:11px">重新发送(${_forumCooldownTimers[postId]}s)</span>`;
     setTimeout(tick, 1000);
   };
   setTimeout(tick, 1000);
