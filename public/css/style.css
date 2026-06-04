@@ -957,10 +957,9 @@ select::-ms-expand {
 }
 
 .form-error {
-  background: var(--md-error-container);
+  background: transparent;
   color: var(--md-error);
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
+  padding: 0 4px;
   font-size: var(--text-sm);
   font-weight: 500;
 }
@@ -4892,6 +4891,11 @@ input, textarea, select, button,
     display: none;
   }
 
+  /* 登录/注册界面的按钮文字不隐藏 */
+  .auth-buttons .btn-text {
+    display: inline;
+  }
+
   /* 发布按钮显示文字 */
   #explore-publish-btn .btn-text {
     display: inline;
@@ -4946,5 +4950,351 @@ input, textarea, select, button,
   .inline-selects > .md-select-container {
     flex: 1 1 0%;
     min-width: 0;
+  }
+}
+
+/* ============================================================
+   登录/注册页面样式（仿 Google 极简扁平风）
+   ============================================================ */
+
+.auth-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 120px);
+  padding: 48px 16px;
+}
+
+.auth-logo {
+  margin-bottom: 16px;
+}
+
+.auth-logo svg {
+  width: 48px;
+  height: 48px;
+}
+
+.auth-title {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--md-on-surface);
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--md-surface-container-lowest);
+  border-radius: var(--radius-md);
+  padding: 32px;
+  box-shadow: var(--shadow-2);
+}
+
+/* 学号输入框行（输入框 + 后缀） */
+.auth-input-row {
+  margin-bottom: 16px;
+}
+
+.auth-input-group {
+  position: relative;
+}
+
+.auth-student-input {
+  padding-right: 160px !important;
+}
+
+.auth-email-suffix {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--md-on-surface-variant);
+  font-size: var(--text-sm);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* 密码输入框（带眼睛按钮） */
+.md-input-group {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.auth-password-input {
+  padding-right: 48px !important;
+}
+
+.auth-eye-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+
+/* 隐藏浏览器原生密码显示按钮 */
+.auth-password-input::-ms-reveal,
+.auth-password-input::-webkit-credentials-auto-fill-button {
+  display: none !important;
+}
+
+.auth-eye-btn:hover {
+  background-color: var(--md-surface-container);
+}
+
+/* 验证码输入框 */
+.auth-code-input {
+  text-align: center;
+  font-size: var(--text-xl);
+  letter-spacing: 8px;
+}
+
+/* 验证码行（输入框 + 获取验证码按钮） */
+.auth-code-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.auth-code-row .md-input-group {
+  margin-bottom: 0;
+}
+
+.auth-send-btn {
+  height: 56px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Turnstile 包装器 */
+.auth-turnstile-wrapper {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--md-surface-container-low);
+  border-radius: var(--radius-sm);
+}
+
+/* 错误提示 */
+.form-error {
+  color: var(--md-error);
+  font-size: var(--text-sm);
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+/* 按钮区域 */
+.auth-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn-text {
+  color: var(--md-on-surface-variant);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+
+.btn-text:hover {
+  background-color: var(--md-surface-container);
+}
+
+.btn-text:disabled {
+  color: var(--md-outline);
+  cursor: not-allowed;
+}
+
+.auth-next-btn {
+  min-width: 80px;
+  justify-content: center;
+}
+
+/* 隐私声明 */
+.auth-privacy-text {
+  margin-top: 24px;
+  font-size: var(--text-xs);
+  color: var(--md-outline);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.auth-privacy-text a {
+  color: var(--md-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.auth-privacy-text a:hover {
+  opacity: 0.8;
+}
+
+/* 验证码页面信息 */
+.auth-verify-info {
+  text-align: center;
+  color: var(--md-on-surface-variant);
+  font-size: var(--text-sm);
+  margin-bottom: 24px;
+  padding: 12px;
+  background: var(--md-surface-container-low);
+  border-radius: var(--radius-sm);
+}
+
+/* Turnstile 容器 */
+.auth-turnstile-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+/* 错误提示（登录/注册页面专用） */
+#login-error,
+#register-error,
+#verify-error {
+  background: transparent;
+  color: var(--md-error);
+  padding: 0 4px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+/* 隐私协议弹窗 */
+.auth-privacy-modal {
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-privacy-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.auth-privacy-modal .modal-header h3 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.auth-privacy-modal .modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+
+.auth-privacy-modal .modal-close:hover {
+  background-color: var(--md-surface-container);
+}
+
+.auth-privacy-modal .modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Markdown 渲染样式 */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.markdown-body h1 { font-size: var(--text-xl); }
+.markdown-body h2 { font-size: var(--text-lg); }
+.markdown-body h3 { font-size: var(--text-base); }
+
+.markdown-body p {
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin-bottom: 12px;
+  padding-left: 24px;
+}
+
+.markdown-body li {
+  margin-bottom: 4px;
+}
+
+.markdown-body a {
+  color: var(--md-primary);
+  text-decoration: underline;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal-content {
+  background: var(--md-surface-container-lowest);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3);
+  width: 100%;
+  max-width: 480px;
+}
+
+/* 移动端适配 */
+@media (max-width: 767px) {
+  .auth-wrapper {
+    padding: 32px 16px;
+    min-height: calc(100vh - 80px);
+  }
+
+  .auth-card {
+    padding: 24px;
+  }
+
+  .auth-student-input {
+    padding-right: 140px !important;
+  }
+
+  .auth-email-suffix {
+    font-size: var(--text-xs);
+    right: 12px;
   }
 }
