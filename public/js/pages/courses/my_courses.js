@@ -195,13 +195,13 @@ async function loadMyCourseList(semester) {
       const descLine = [c.description || '', semText].filter(Boolean).join(' · ');
       return `
       <div class="card mb-4 clickable" onclick="navigateTo('course-detail', ${c.big_course_id || c.id})">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="course-card-row">
           <div style="flex:1;min-width:0">
             <h3 class="card-title">${escHtml(c.title)}</h3>
-            <p class="text-secondary" style="margin-top:4px">${escHtml(c.teacher || '')}</p>
+            <p class="text-secondary" style="margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.teacher || '')}</p>
             <p class="text-secondary" style="margin-top:2px;font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(descLine || '暂无描述')}</p>
           </div>
-          <div style="flex-shrink:0;margin-left:16px;display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+          <div class="course-card-right">
             <span style="font-size:var(--text-sm);color:var(--md-primary);font-weight:600;white-space:nowrap">
               <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> ${c.enrollment_count || 0} 人
             </span>
