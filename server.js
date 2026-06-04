@@ -357,6 +357,15 @@ async function start() {
     FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
+  // New table: email_verifications (邮箱验证码临时表)
+  db.run(`CREATE TABLE IF NOT EXISTS email_verifications (
+    email TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL
+  )`);
+
   // --- 大课体系数据迁移：为现有小课创建大课记录，迁移内容归属 ---
   {
     function cleanBigCourseName(title) {
@@ -431,6 +440,7 @@ async function start() {
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
   app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+  app.use('/data', express.static(path.join(__dirname, 'data')));
 
   // --- API Routes ---
   const coursesRouter = require('./routes/courses')(db);

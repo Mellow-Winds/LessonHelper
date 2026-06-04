@@ -85,7 +85,7 @@ import { showToast } from './components/ui.js';
    ============================================= */
 
 import {
-  switchAuthTab, handleLogin, handleRegister, handleVerify, resendCode,
+  switchAuthView, handleLogin, handleRegister, handleSendCode, handleResendCode,
   refreshNotifBadge,
   handleSearchPageKey, executeSearch, switchSearchTab, navigateToCourseResult,
 } from './pages/auth.js';
@@ -199,11 +199,11 @@ window.showToast = showToast;
 
 Object.assign(window, {
   // auth
-  switchAuthTab,
+  switchAuthView,
   handleLogin,
   handleRegister,
-  handleVerify,
-  resendCode,
+  handleSendCode,
+  handleResendCode,
   // notifications
   refreshNotifBadge,
   // search
@@ -217,6 +217,10 @@ Object.assign(window, {
   openEditProfileModal,
   handleEditProfile,
   handlePrivacyChange,
+  handleCheckin,
+  handleSaveProfile,
+  handlePrivacyToggle,
+  showFeedbackModal,
   // my courses (list only)
   handleLeaveCourse,
   openCourseSearchModal,
@@ -234,6 +238,7 @@ Object.assign(window, {
   showPublishBlockedToast,
   switchDetailTab,
   toggleComments,
+  handleAddComment,
   refreshMyMaterials,
   rateMyMaterial,
   deleteMyMaterial,
