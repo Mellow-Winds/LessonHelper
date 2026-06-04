@@ -198,8 +198,13 @@ module.exports = function (db) {
     const params = [userId];
 
     if (semester && semester !== 'all') {
-      sql += ' AND uc.semester_key = ?';
-      params.push(semester);
+      if (semester.includes('-')) {
+        sql += ' AND uc.semester_key = ?';
+        params.push(semester);
+      } else {
+        sql += ' AND uc.semester_key LIKE ?';
+        params.push(`%-${semester}`);
+      }
     } else if (year && year !== 'all') {
       sql += ' AND uc.semester_key LIKE ?';
       params.push(`${year}-%`);

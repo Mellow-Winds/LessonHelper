@@ -143,6 +143,11 @@ export function createMdSelect(config) {
 /* ---- Global Event Delegation for Custom Select ---- */
 
 document.addEventListener('click', (e) => {
+  // 调试：记录所有点击目标
+  if (e.target.closest('.md-select-container')) {
+    console.log('[select-debug] click on:', e.target.tagName, e.target.className, 'closest-option:', !!e.target.closest('.md-select-option'), 'closest-trigger:', !!e.target.closest('.md-select-trigger'));
+  }
+
   const trigger = e.target.closest('.md-select-trigger');
   if (trigger) {
     const container = trigger.closest('.md-select-container');
@@ -151,6 +156,7 @@ document.addEventListener('click', (e) => {
         if (c !== container) c.classList.remove('open');
       });
       container.classList.toggle('open');
+      console.log('[select] trigger click, open=', container.classList.contains('open'), container.id);
       e.stopPropagation();
     }
     return;
@@ -158,6 +164,7 @@ document.addEventListener('click', (e) => {
 
   const option = e.target.closest('.md-select-option');
   if (option) {
+    console.log('[select] option click:', option.getAttribute('data-value'), option.textContent);
     const container = option.closest('.md-select-container');
     if (container) {
       const value = option.getAttribute('data-value');
