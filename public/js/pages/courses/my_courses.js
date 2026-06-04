@@ -88,6 +88,21 @@ registerPage('mycourse', async (container) => {
     return;
   }
 
+  // 先获取学期数据，再一次性渲染完整页面（避免 innerHTML 替换导致事件丢失）
+  let yearOptions = [{ text: '全部年份', value: 'all' }];
+  let initYear = 'all', initType = 'all';
+  try {
+    const semesters = await apiGet('/api/courses/semesters');
+    if (semesters.length > 0) {
+      const allKeys = new Set([_myCurrentSemester, ...semesters]);
+      const years = [...new Set(Array.from(allKeys).map(k => parseSemesterKey(k).year))].filter(Boolean).sort().reverse();
+      const parsed = parseSemesterKey(_myCurrentSemester);
+      initYear = years.includes(parsed.year) ? parsed.year : 'all';
+      initType = parsed.type || 'all';
+      yearOptions = [{ text: '全部年份', value: 'all' }, ...years.map(y => ({ text: `${y} 年`, value: y }))];
+    }
+  } catch {}
+
   container.innerHTML = `
     <div class="page-header">
       <div>
@@ -105,18 +120,10 @@ registerPage('mycourse', async (container) => {
     </div>
     <div id="my-semester-filter-wrap" class="form-row inline-selects" style="margin-bottom:var(--space-4);width:auto">
       <div>
-        ${createMdSelect({
-          id: 'my-year-filter',
-          options: [{ text: '全部年份', value: 'all' }],
-          selected: 'all',
-        })}
+        ${createMdSelect({ id: 'my-year-filter', options: yearOptions, selected: initYear })}
       </div>
       <div>
-        ${createMdSelect({
-          id: 'my-sem-filter',
-          options: SEMESTER_TYPES,
-          selected: 'all',
-        })}
+        ${createMdSelect({ id: 'my-sem-filter', options: SEMESTER_TYPES, selected: initType })}
       </div>
     </div>
     <div id="my-course-list">
@@ -127,31 +134,13 @@ registerPage('mycourse', async (container) => {
   bindRipples(container);
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
-  try {
-    const semesters = await apiGet('/api/courses/semesters');
-    console.log('[学期] semesters API 返回:', semesters);
-    if (semesters.length > 0) {
-      const allKeys = new Set([_myCurrentSemester, ...semesters]);
-      const years = [...new Set(Array.from(allKeys).map(k => parseSemesterKey(k).year))].filter(Boolean).sort().reverse();
-
-      const { year: initYear, type: initType } = parseSemesterKey(_myCurrentSemester);
-      const yearOptions = [{ text: '全部年份', value: 'all' }, ...years.map(y => ({ text: `${y} 年`, value: y }))];
-      const wrap = document.getElementById('my-semester-filter-wrap');
-      console.log('[学期] wrap 元素:', wrap);
-      if (wrap) {
-        wrap.innerHTML = `
-          <div>
-            ${createMdSelect({ id: 'my-year-filter', options: yearOptions, selected: years.includes(initYear) ? initYear : 'all' })}
-          </div>
-          <div>
-            ${createMdSelect({ id: 'my-sem-filter', options: SEMESTER_TYPES, selected: initType || 'all' })}
-          </div>
-        `;
-      }
-    }
-  } catch (err) {
-    console.error('[学期] semesters API 失败:', err);
-  }
+  // 绑定学期筛选事件
+  document.getElementById('my-semester-filter-wrap')?.addEventListener('md-select-change', () => {
+    const year = document.getElementById('my-year-filter')?.value || 'all';
+    const type = document.getElementById('my-sem-filter')?.value || 'all';
+    _myCurrentSemester = combineYearSemester(year, type);
+    loadMyCourseList(_myCurrentSemester);
+  });
 
   await loadMyCourseList(_myCurrentSemester);
 });

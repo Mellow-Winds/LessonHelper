@@ -1180,6 +1180,30 @@ select::-ms-expand {
   flex-shrink: 0;
 }
 
+/* ---- Search Bar: input & button height sync ---- */
+.search-bar-row .md-input-group .md-input,
+.search-bar-row .md-input-group .md-border,
+.search-bar-row > .btn,
+.search-bar-row > button {
+  height: 48px !important;
+  border-radius: 12px !important;
+}
+.search-bar-row .md-input-group .md-border {
+  top: 0 !important;
+}
+.search-bar-row .md-input-group .md-input {
+  padding: 0 16px !important;
+  line-height: 48px !important;
+}
+.search-bar-row .md-input-group {
+  margin-bottom: 0 !important;
+}
+.search-bar-row > .btn,
+.search-bar-row > button {
+  padding: 0 24px !important;
+  flex-shrink: 0;
+}
+
 /* ---- Material Filter Bar ---- */
 .material-filter-bar {
   display: flex;
@@ -4866,6 +4890,11 @@ input, textarea, select, button,
   /* ---- 手机端：隐藏特定按钮文字，只显示图标 ---- */
   .btn-text {
     display: none;
+  }
+
+  /* 发布按钮显示文字 */
+  #explore-publish-btn .btn-text {
+    display: inline;
   }
 
   /* ---- 课程卡片：右侧区域缩小间距 ---- */
