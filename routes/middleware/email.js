@@ -22,7 +22,7 @@ async function sendVerificationCode(toEmail, code) {
   }
 
   // 正式版配置（域名已验证）
-  const fromAddress = '课搭子 <noreply@kedazi.app>';
+  const fromAddress = '课搭子 <noreply@kedazi.top>';
   const finalToEmail = toEmail;
 
   try {
