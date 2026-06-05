@@ -21,7 +21,7 @@ const SVG_EYE_OFF = `<svg viewBox="0 0 24 24" width="20" height="20" fill="curre
    Auth State
    ============================================= */
 
-let authView = 'login'; // 'login' | 'register' | 'verify'
+let authView = 'login'; // 'login' | 'register' | 'forgot'
 let authStudentId = '';
 let authPassword = '';
 let resendCooldown = 0;
@@ -36,11 +36,11 @@ export function renderAuth(container) {
   container.innerHTML = `
     <div class="auth-wrapper">
       <div class="auth-logo">${SVG_LOGO}</div>
-      <h1 class="auth-title">${authView === 'register' ? '注册' : '登录'}</h1>
+      <h1 class="auth-title">${authView === 'register' ? '注册' : authView === 'forgot' ? '找回密码' : '登录'}</h1>
 
       <div class="auth-card" id="auth-card">
         ${authView === 'login' ? renderLoginForm() :
-          renderRegisterForm()}
+          authView === 'forgot' ? renderForgotForm() : renderRegisterForm()}
       </div>
     </div>
   `;
@@ -85,7 +85,48 @@ function renderLoginForm() {
 
       <div class="auth-buttons">
         <button type="button" class="btn btn-text" onclick="switchAuthView('register')">注册</button>
+        <button type="button" class="btn btn-text" onclick="switchAuthView('forgot')">忘记密码</button>
         <button type="submit" class="btn btn-primary auth-next-btn">下一步</button>
+      </div>
+    </form>
+  `;
+}
+
+function renderForgotForm() {
+  return `
+    <form id="forgot-form" onsubmit="handleResetPassword(event)">
+      <div class="auth-input-row">
+        <div class="md-input-group auth-input-group">
+          <input class="md-input auth-student-input" type="text" name="studentId" placeholder=" " required autocomplete="username" maxlength="12">
+          <label class="md-label">学号</label>
+          <fieldset class="md-border"><legend><span>学号</span></legend></fieldset>
+          <span class="auth-email-suffix">@smail.nju.edu.cn</span>
+        </div>
+      </div>
+      <div class="auth-code-row">
+        <div class="md-input-group" style="flex:1">
+          <input class="md-input auth-code-input" type="text" name="code" placeholder=" " maxlength="6" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*">
+          <label class="md-label">验证码</label>
+          <fieldset class="md-border"><legend><span>验证码</span></legend></fieldset>
+        </div>
+        <button type="button" class="btn btn-outline auth-send-btn" onclick="handleForgotSendCode(event)">获取验证码</button>
+      </div>
+      <div class="md-input-group">
+        <input class="md-input auth-password-input" type="password" name="password" placeholder=" " required autocomplete="new-password" maxlength="30">
+        <label class="md-label">新密码</label>
+        <fieldset class="md-border"><legend><span>新密码</span></legend></fieldset>
+        <button type="button" class="auth-eye-btn">${SVG_EYE_OFF}</button>
+      </div>
+      <div class="md-input-group">
+        <input class="md-input auth-password-input" type="password" name="confirmPassword" placeholder=" " required autocomplete="new-password" maxlength="30">
+        <label class="md-label">确认新密码</label>
+        <fieldset class="md-border"><legend><span>确认新密码</span></legend></fieldset>
+        <button type="button" class="auth-eye-btn">${SVG_EYE_OFF}</button>
+      </div>
+      <div class="form-error" id="forgot-error" style="display:none"></div>
+      <div class="auth-buttons">
+        <button type="button" class="btn btn-text" onclick="switchAuthView('login')">返回登录</button>
+        <button type="submit" class="btn btn-primary auth-next-btn">重置密码</button>
       </div>
     </form>
   `;
@@ -170,13 +211,13 @@ export function switchAuthView(view) {
   const title = container.querySelector('.auth-title');
 
   if (title) {
-    title.textContent = view === 'register' ? '注册' : '登录';
+    title.textContent = view === 'register' ? '注册' : view === 'forgot' ? '找回密码' : '登录';
   }
 
   if (card) {
     animOut(card, { dur: 150 }).onfinish = () => {
       card.innerHTML = view === 'login' ? renderLoginForm() :
-                       renderRegisterForm();
+                       view === 'forgot' ? renderForgotForm() : renderRegisterForm();
       animIn(card, { y: 12, dur: 250 });
       bindPasswordToggles();
     };
@@ -189,12 +230,21 @@ export function switchAuthView(view) {
 
 function bindPasswordToggles() {
   document.querySelectorAll('.auth-eye-btn').forEach(btn => {
-    btn.onclick = () => togglePasswordVisibility(btn);
+    btn.onclick = null;
   });
 }
 
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.auth-eye-btn');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  togglePasswordVisibility(btn);
+}, true);
+
 window.togglePasswordVisibility = function(btn) {
-  const input = btn.parentElement.querySelector('input');
+  const group = btn.closest('.md-input-group');
+  const input = group?.querySelector('input[type="password"], input[type="text"].auth-password-input');
   if (!input) return;
 
   if (input.type === 'password') {
@@ -323,6 +373,78 @@ export async function handleLogin(e) {
     btn.disabled = false;
     btn.textContent = '下一步';
   }
+}
+
+export async function handleForgotSendCode(e) {
+  const form = e.target.closest('form');
+  const studentId = form?.studentId?.value?.trim() || '';
+  const errEl = document.getElementById('forgot-error');
+  if (errEl) errEl.style.display = 'none';
+
+  if (!validateStudentId(studentId)) {
+    if (errEl) {
+      errEl.textContent = '学号格式不正确';
+      errEl.style.display = 'block';
+    }
+    return;
+  }
+
+  const btn = e.target;
+  btn.disabled = true;
+  btn.textContent = '发送中...';
+  const result = await apiPost('/api/auth/forgot-password', { studentId });
+  if (result.error) {
+    if (errEl) {
+      errEl.textContent = result.error;
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.textContent = '获取验证码';
+    return;
+  }
+  showToast(result.message || '验证码已发送');
+  btn.textContent = '已发送';
+}
+
+export async function handleResetPassword(e) {
+  e.preventDefault();
+  const form = e.target;
+  const studentId = form.studentId.value.trim();
+  const code = form.code.value.trim();
+  const password = form.password.value;
+  const confirmPassword = form.confirmPassword.value;
+  const errEl = document.getElementById('forgot-error');
+  if (errEl) errEl.style.display = 'none';
+
+  if (!validateStudentId(studentId)) {
+    if (errEl) { errEl.textContent = '学号格式不正确'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!code || code.length !== 6) {
+    if (errEl) { errEl.textContent = '请输入6位验证码'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!validatePassword(password)) {
+    if (errEl) { errEl.textContent = '密码须为8-30位，且包含大小写字母和数字'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (password !== confirmPassword) {
+    if (errEl) { errEl.textContent = '两次输入的密码不一致'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  const btn = form.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = '重置中...';
+  const result = await apiPost('/api/auth/reset-password', { studentId, code, password, confirmPassword });
+  if (result.error) {
+    if (errEl) { errEl.textContent = result.error; errEl.style.display = 'block'; }
+    btn.disabled = false;
+    btn.textContent = '重置密码';
+    return;
+  }
+  showToast(result.message || '密码已重置');
+  switchAuthView('login');
 }
 
 // 注册（验证验证码并完成注册）
@@ -861,6 +983,8 @@ window.handleLogin = handleLogin;
 window.handleRegister = handleRegister;
 window.handleSendCode = handleSendCode;
 window.handleResendCode = handleResendCode;
+window.handleForgotSendCode = handleForgotSendCode;
+window.handleResetPassword = handleResetPassword;
 window.handleSearchPageKey = handleSearchPageKey;
 window.executeSearch = executeSearch;
 window.navigateToCourseResult = navigateToCourseResult;
