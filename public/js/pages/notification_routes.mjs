@@ -4,7 +4,7 @@ export function resolveNotificationTarget(relatedType, relatedId, courseId) {
   }
 
   if (relatedType === 'invite') {
-    return { page: 'explore' };
+    return { page: 'explore', data: { tab: 'invites', inviteId: relatedId || 0 } };
   }
 
   if (relatedType === 'square_post' && relatedId) {

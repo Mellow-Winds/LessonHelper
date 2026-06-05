@@ -13,6 +13,7 @@ test('course post notifications navigate to the course detail page', () => {
 test('invite notifications navigate to explore', () => {
   assert.deepEqual(resolveNotificationTarget('invite', 31, 0), {
     page: 'explore',
+    data: { tab: 'invites', inviteId: 31 },
   });
 });
 

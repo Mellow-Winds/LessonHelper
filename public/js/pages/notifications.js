@@ -32,10 +32,10 @@ registerPage('notifications', async (container) => {
       </button>
     </div>
     <div class="md-pills" id="notification-pills">
-      <button class="md-pill-btn${activeTab === 'messages' ? ' active' : ''}" data-tab="messages">
+      <button class="md-pill-btn${activeTab === 'messages' ? ' active' : ''}" data-tab="messages" data-notification-tab="messages">
         <span class="mi" style="font-size:16px;vertical-align:-3px">notifications</span> 消息通知
       </button>
-      <button class="md-pill-btn${activeTab === 'following' ? ' active' : ''}" data-tab="following">
+      <button class="md-pill-btn${activeTab === 'following' ? ' active' : ''}" data-tab="following" data-notification-tab="following">
         <span class="mi" style="font-size:16px;vertical-align:-3px">rss_feed</span> 关注动态
       </button>
     </div>
@@ -209,6 +209,7 @@ async function showExchangeDetailModal(requestId) {
   const isRecipient = String(result.toUserId) === String(window._currentUser?.id);
   const isPending = result.status === 'pending';
   const isAccepted = result.status === 'accepted';
+  const displayUser = result.otherUser || result.fromUser || {};
 
   let statusHtml = '';
   if (result.status === 'pending') {
@@ -251,14 +252,14 @@ async function showExchangeDetailModal(requestId) {
     <div style="display:flex;flex-direction:column;gap:var(--space-4);">
       <div style="display:flex;align-items:center;gap:var(--space-3)">
         <div style="width:48px;height:48px;border-radius:50%;background:var(--md-primary-container);display:flex;align-items:center;justify-content:center">
-          ${result.fromUser?.avatar_url
-            ? `<img src="${escHtml(result.fromUser.avatar_url)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover">`
+          ${displayUser.avatar_url
+            ? `<img src="${escHtml(displayUser.avatar_url)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover">`
             : `<span class="mi" style="font-size:24px;color:var(--md-primary)">person</span>`
           }
         </div>
         <div>
-          <div style="font-weight:600;color:var(--md-on-surface)">${escHtml(result.fromUser?.nickname || '未知用户')}</div>
-          <div style="font-size:var(--text-sm);color:var(--md-on-surface-variant)">${escHtml(result.fromUser?.major || '')} ${escHtml(result.fromUser?.grade || '')}</div>
+          <div style="font-weight:600;color:var(--md-on-surface)">${escHtml(displayUser.nickname || '未知用户')}</div>
+          <div style="font-size:var(--text-sm);color:var(--md-on-surface-variant)">${escHtml(displayUser.major || '')} ${escHtml(displayUser.grade || '')}</div>
         </div>
         <div style="margin-left:auto">${statusHtml}</div>
       </div>

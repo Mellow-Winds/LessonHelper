@@ -101,6 +101,28 @@ test('private profile cannot be unlocked with a forged viewer_id query', () => {
   assert.equal(result.body.qq, undefined);
 });
 
+test('profile public preview applies non-self privacy filtering to the owner', () => {
+  const router = createUserRouter(createDb(SQL));
+  const result = call(router, 'get', '/:id/profile', {
+    params: { id: '2' },
+    query: { preview: 'public' },
+    userId: 2,
+  });
+  assert.equal(result.body.privacyHidden, true);
+  assert.equal(result.body.qq, undefined);
+});
+
+test('profile public preview does not include self common courses', () => {
+  const router = createUserRouter(createDb(SQL));
+  const result = call(router, 'get', '/:id/profile', {
+    params: { id: '3' },
+    query: { preview: 'public' },
+    userId: 3,
+  });
+  assert.deepEqual(result.body.commonCourses, []);
+  assert.equal(result.body.isFollowing, false);
+});
+
 test('public profile returns shared courses for an authenticated viewer', () => {
   const router = createUserRouter(createDb(SQL));
   const result = call(router, 'get', '/:id/profile', { params: { id: '3' }, userId: 1 });

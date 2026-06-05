@@ -217,6 +217,7 @@ async function start() {
     FOREIGN KEY (creator_id) REFERENCES users(id),
     FOREIGN KEY (course_id) REFERENCES courses(id)
   )`);
+  migrateTable('study_invites', 'approval_required', "INTEGER DEFAULT 0");
 
   // New table: study_invite_responses (邀约响应)
   db.run(`CREATE TABLE IF NOT EXISTS study_invite_responses (

@@ -88,6 +88,7 @@ module.exports = function (db) {
   router.get('/:id/profile', optionalAuthMiddleware, (req, res) => {
     const userId = Number(req.params.id);
     const viewerId = req.user?.userId || null;
+    const forcePublicPreview = req.query?.preview === 'public';
 
     const user = db.get(
       'SELECT id, nickname, major, grade, avatar_url, avatar_desc, mbti, gender, qq, wechat, douyin, privacy_show_profile, privacy_show_following, privacy_show_followers, created_at FROM users WHERE id = ?',
@@ -95,7 +96,7 @@ module.exports = function (db) {
     );
     if (!user) return res.status(404).json({ error: '用户不存在' });
 
-    const isSelf = viewerId === userId;
+    const isSelf = !forcePublicPreview && viewerId === userId;
 
     // 获取关注/粉丝数（受隐私控制）
     const showFollowing = isSelf || user.privacy_show_following !== 0;
@@ -133,7 +134,7 @@ module.exports = function (db) {
       });
     }
 
-    const commonCourses = viewerId && !isSelf
+    const commonCourses = viewerId && !isSelf && viewerId !== userId
       ? db.all(`
           SELECT c.id, c.title, c.teacher
           FROM courses c
@@ -280,6 +281,23 @@ module.exports = function (db) {
     if (!target) return res.status(404).json({ error: '用户不存在' });
 
     // 检查是否已有待处理的请求（双向检查）
+    const accepted = db.get(
+      `SELECT id FROM contact_exchange_requests
+       WHERE status = 'accepted'
+       AND ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))
+       ORDER BY resolved_at DESC, created_at DESC
+       LIMIT 1`,
+      [myId, targetId, targetId, myId]
+    );
+    if (accepted) {
+      return res.json({
+        success: true,
+        alreadyAccepted: true,
+        status: 'accepted',
+        requestId: accepted.id
+      });
+    }
+
     const existing = db.get(
       `SELECT id FROM contact_exchange_requests
        WHERE status = 'pending'
@@ -290,7 +308,7 @@ module.exports = function (db) {
       return res.status(409).json({ error: '已存在待处理的交换请求' });
     }
 
-    db.run(
+    const insertResult = db.run(
       'INSERT INTO contact_exchange_requests (from_user_id, to_user_id, message) VALUES (?, ?, ?)',
       [myId, targetId, message || '']
     );
@@ -302,11 +320,11 @@ module.exports = function (db) {
       title: '交换联系方式请求',
       message: `${sender?.nickname || '一位同学'} 请求与你交换联系方式`,
       relatedType: 'contact_exchange',
-      relatedId: myId
+      relatedId: insertResult.lastInsertRowid
     });
     db.save();
 
-    res.json({ success: true });
+    res.json({ success: true, status: 'pending', requestId: insertResult.lastInsertRowid });
   });
 
   // GET /api/user/contact-exchange/:id — 获取交换请求详情
@@ -330,9 +348,18 @@ module.exports = function (db) {
     }
 
     // 如果已同意，双方都能看到对方的联系方式
+    const toUser = db.get(
+      'SELECT id, nickname, avatar_url, major, grade FROM users WHERE id = ?',
+      [request.to_user_id]
+    );
+    const otherUserId = request.from_user_id === userId ? request.to_user_id : request.from_user_id;
+    const otherUser = db.get(
+      'SELECT id, nickname, avatar_url, major, grade FROM users WHERE id = ?',
+      [otherUserId]
+    );
+
     let contactInfo = null;
     if (request.status === 'accepted') {
-      const otherUserId = request.from_user_id === userId ? request.to_user_id : request.from_user_id;
       const other = db.get('SELECT nickname, qq, wechat, douyin FROM users WHERE id = ?', [otherUserId]);
       contactInfo = other;
     }
@@ -352,6 +379,8 @@ module.exports = function (db) {
         major: request.major,
         grade: request.grade
       },
+      toUser,
+      otherUser,
       contactInfo
     });
   });
