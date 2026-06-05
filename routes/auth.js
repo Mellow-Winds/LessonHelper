@@ -43,6 +43,15 @@ module.exports = function (db) {
     return String(Math.floor(100000 + Math.random() * 900000));
   }
 
+  function isExpiredDate(value) {
+    if (!value) return true;
+    const text = String(value);
+    const normalized = text.includes('T') ? text : `${text.replace(' ', 'T')}Z`;
+    const timestamp = Date.parse(normalized);
+    if (Number.isNaN(timestamp)) return true;
+    return timestamp < Date.now();
+  }
+
   // 生成默认昵称
   function generateNickname(studentId) {
     if (/^\d{9,12}$/.test(studentId)) {
@@ -354,6 +363,96 @@ module.exports = function (db) {
   });
 
   // POST /api/auth/resend-code — 重新发送验证码
+  router.post('/forgot-password', async (req, res) => {
+    try {
+      const { studentId } = req.body;
+      if (!studentId) return res.status(400).json({ error: '请填写学号' });
+      if (!validateStudentId(studentId)) return res.status(400).json({ error: '学号格式不正确' });
+
+      const email = `${studentId}@smail.nju.edu.cn`;
+      const user = db.get('SELECT id FROM users WHERE email = ?', [email]);
+      if (!user) return res.status(404).json({ error: '该学号尚未注册' });
+
+      const rateLimitResult = checkRateLimit(email);
+      if (!rateLimitResult.ok) return res.status(429).json({ error: rateLimitResult.error });
+
+      const code = generateCode();
+      const expiresAt = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
+      db.run(
+        `INSERT INTO email_verifications (email, code, attempts, expires_at)
+         VALUES (?, ?, 0, ?)
+         ON CONFLICT(email) DO UPDATE SET code = ?, attempts = 0, expires_at = ?, created_at = CURRENT_TIMESTAMP`,
+        [email, code, expiresAt, code, expiresAt]
+      );
+      db.save();
+      updateRateLimit(email);
+      cleanExpiredVerifications();
+
+      if (process.env.NODE_ENV !== 'test') {
+        const sendResult = await sendVerificationCode(email, code);
+        if (!sendResult.success) {
+          return res.status(500).json({ error: '系统出现未知错误，请在看到此消息后及时反馈' });
+        }
+      }
+
+      res.json({ message: '验证码已发送至你的学号邮箱' });
+    } catch (e) {
+      console.error('[Auth] forgot password failed:', e);
+      res.status(500).json({ error: '系统出现未知错误，请在看到此消息后及时反馈' });
+    }
+  });
+
+  router.post('/reset-password', async (req, res) => {
+    try {
+      const { studentId, code, password, confirmPassword } = req.body;
+      if (!studentId || !code || !password || !confirmPassword) {
+        return res.status(400).json({ error: '请填写完整信息' });
+      }
+      if (!validateStudentId(studentId)) return res.status(400).json({ error: '学号格式不正确' });
+      if (!validatePassword(password)) {
+        return res.status(400).json({ error: '密码须为8-30位，且包含大小写字母和数字' });
+      }
+      if (password !== confirmPassword) return res.status(400).json({ error: '两次输入的密码不一致' });
+
+      const email = `${studentId}@smail.nju.edu.cn`;
+      const user = db.get('SELECT id FROM users WHERE email = ?', [email]);
+      if (!user) return res.status(404).json({ error: '该学号尚未注册' });
+
+      const record = db.get('SELECT * FROM email_verifications WHERE email = ?', [email]);
+      if (!record) return res.status(400).json({ error: '验证码已过期，请重新获取' });
+      if (isExpiredDate(record.expires_at)) {
+        db.run('DELETE FROM email_verifications WHERE email = ?', [email]);
+        db.save();
+        return res.status(400).json({ error: '验证码已过期，请重新获取' });
+      }
+      if (record.attempts >= MAX_VERIFY_ATTEMPTS) {
+        db.run('DELETE FROM email_verifications WHERE email = ?', [email]);
+        db.save();
+        return res.status(400).json({ error: '验证码输入错误次数过多，请重新获取' });
+      }
+      if (record.code !== code) {
+        db.run('UPDATE email_verifications SET attempts = attempts + 1 WHERE email = ?', [email]);
+        db.save();
+        const remaining = MAX_VERIFY_ATTEMPTS - record.attempts - 1;
+        if (remaining <= 0) {
+          db.run('DELETE FROM email_verifications WHERE email = ?', [email]);
+          db.save();
+          return res.status(400).json({ error: '验证码输入错误次数过多，请重新获取' });
+        }
+        return res.status(400).json({ error: `验证码错误，还可尝试${remaining}次` });
+      }
+
+      const passwordHash = bcrypt.hashSync(password, SALT_ROUNDS);
+      db.run('UPDATE users SET password_hash = ? WHERE email = ?', [passwordHash, email]);
+      db.run('DELETE FROM email_verifications WHERE email = ?', [email]);
+      db.save();
+      res.json({ message: '密码已重置，请使用新密码登录' });
+    } catch (e) {
+      console.error('[Auth] reset password failed:', e);
+      res.status(500).json({ error: '系统出现未知错误，请在看到此消息后及时反馈' });
+    }
+  });
+
   router.post('/resend-code', async (req, res) => {
     try {
       const { studentId } = req.body;

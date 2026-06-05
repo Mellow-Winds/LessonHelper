@@ -49,8 +49,10 @@ const TABS = [
    renderExplore — 渲染主面板（页面 + 选项卡 + 内容）
    ============================================= */
 
-async function renderExplore(container, initialTab) {
+async function renderExplore(container, data) {
   _exploreContainer = container;
+  const initialTab = typeof data === 'string' ? data : data?.tab;
+  window._pendingInviteHighlightId = data?.inviteId || null;
   const tab = initialTab || _activeTab || 'invites';
   _activeTab = tab;
 
@@ -122,6 +124,16 @@ async function loadTabContent(tabName) {
       const mod = await loadInvitesModule();
       await mod.renderInvites(contentEl);
       mod.bindInvitesEvents(contentEl);
+      const highlightId = window._pendingInviteHighlightId;
+      if (highlightId) {
+        const card = contentEl.querySelector(`[data-invite-card-id="${highlightId}"]`);
+        if (card) {
+          card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          card.style.outline = '2px solid var(--md-primary)';
+          card.style.outlineOffset = '3px';
+        }
+        window._pendingInviteHighlightId = null;
+      }
     } else if (tabName === 'square') {
       const mod = await loadSquareModule();
       await mod.renderSquare(contentEl);

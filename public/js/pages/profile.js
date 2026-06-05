@@ -5,7 +5,7 @@
 
 import { apiGet, apiPut, apiPost, apiDelete } from '../core/api.js';
 import { navigateTo, animIn, animStagger } from '../core/router.js';
-import { showToast, openModal, closeModal, escHtml, createMdInput, createMdSelect, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
+import { showToast, openModal, closeModal, escHtml, createMdInput, createMdSelect, createMdTextarea, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
 import { renderAuth } from './auth.js';
 
 /* =============================================
@@ -46,6 +46,7 @@ const PROFILE_SUB_PAGES = {
    ============================================= */
 
 let previewMode = false;
+let profileInteractionController = null;
 
 const CHECKIN_KEY = 'kedazi_checkin';
 
@@ -108,12 +109,9 @@ async function fetchProfileData() {
 async function fetchPreviewData() {
   const user = window._currentUser;
   if (!user) return null;
-  if (user.privacy_show_profile === 0) {
-    return { id: user.id, nickname: user.nickname, avatar_url: user.avatar_url, privacyHidden: true };
-  }
-  const stats = await apiGet(`/api/user/${user.id}/profile`);
+  const stats = await apiGet(`/api/user/${user.id}/profile?preview=public`);
   if (stats.error) return null;
-  return { ...user, ...stats };
+  return stats;
 }
 
 async function fetchPublicUserData(userId) {
@@ -137,12 +135,30 @@ async function renderProfilePage(container) {
     return;
   }
 
-  const mode = previewMode ? 'preview' : 'owner';
-  const data = previewMode
-    ? (await fetchPreviewData().catch(() => null)) || window._currentUser
-    : (await fetchProfileData().catch(() => null)) || window._currentUser;
-  container.innerHTML = renderProfileCard(data, mode);
-  if (previewMode) container.innerHTML += renderPreviewBanner();
+  if (previewMode) {
+    const data = (await fetchPreviewData().catch(() => null)) || {
+      id: window._currentUser.id,
+      nickname: window._currentUser.nickname,
+      avatar_url: window._currentUser.avatar_url,
+      privacyHidden: true
+    };
+    container.innerHTML = data.privacyHidden
+      ? renderPrivacyLocked(data, { preview: true })
+      : `
+        <div class="profile-page">
+          ${renderBackButton()}
+          ${renderPublicProfileCard(data, { preview: true })}
+        </div>
+      `;
+    container.innerHTML += renderPreviewBanner();
+    animateProfile(container);
+    bindProfileInteractions(container);
+    bindModeSwitch(container);
+    return;
+  }
+
+  const data = (await fetchProfileData().catch(() => null)) || window._currentUser;
+  container.innerHTML = renderProfileCard(data, 'owner');
   animateProfile(container);
   bindProfileInteractions(container);
   bindModeSwitch(container);
@@ -439,10 +455,14 @@ function renderListItem(item) {
    ============================================= */
 
 function bindProfileInteractions(container) {
+  if (profileInteractionController) profileInteractionController.abort();
+  profileInteractionController = new AbortController();
+  const { signal } = profileInteractionController;
+
   // 签到
   const checkinBtn = container.querySelector('#profile-checkin-btn');
   if (checkinBtn) {
-    checkinBtn.addEventListener('click', handleCheckin);
+    checkinBtn.addEventListener('click', handleCheckin, { signal });
   }
 
   // 设置列表点击
@@ -459,7 +479,7 @@ function bindProfileInteractions(container) {
         navigateTo(page);
       }
     }
-  });
+  }, { signal });
 
   // 关注/取关
   container.addEventListener('click', (e) => {
@@ -467,7 +487,7 @@ function bindProfileInteractions(container) {
     if (btn) handleFollow(btn);
     const unfollowBtn = e.target.closest('.profile-unfollow-btn');
     if (unfollowBtn) handleUnfollow(unfollowBtn);
-  });
+  }, { signal });
 
   // 交换联系方式
   container.addEventListener('click', (e) => {
@@ -476,7 +496,7 @@ function bindProfileInteractions(container) {
       const userId = exchangeBtn.dataset.userId;
       showExchangeModal(userId);
     }
-  });
+  }, { signal });
 
   // 统计点击（粉丝/关注列表）
   container.addEventListener('click', (e) => {
@@ -486,7 +506,7 @@ function bindProfileInteractions(container) {
       const userId = statBtn.dataset.userId;
       showFollowList(container, userId, type);
     }
-  });
+  }, { signal });
 
 }
 
@@ -824,7 +844,7 @@ async function showExchangeModal(userId) {
       return;
     }
 
-    showToast('请求已发送');
+    showToast(result.alreadyAccepted ? '你们已交换过联系方式，可在通知中心查看' : '请求已发送');
     closeModal();
   });
 }
@@ -928,7 +948,8 @@ async function renderPublicUserPage(container, userId) {
   }
 }
 
-function renderPublicProfileCard(data) {
+function renderPublicProfileCard(data, options = {}) {
+  const isPreview = options.preview === true;
   const avatar = data.avatar_url
     ? `<img class="profile-avatar-img" src="${escHtml(data.avatar_url)}" alt="">`
     : `<span class="profile-avatar-letter">${(data.nickname || '?')[0]}</span>`;
@@ -941,10 +962,21 @@ function renderPublicProfileCard(data) {
         <span class="mi">person_add</span> 关注
       </button>`;
 
-  const exchangeBtn = window._currentUser
+  const exchangeBtn = window._currentUser && !isPreview
     ? `<button class="btn btn-secondary btn-compact profile-exchange-btn" data-user-id="${data.id}">
         <span class="mi">swap_horiz</span> 交换联系方式
       </button>`
+    : '';
+
+  const previewActions = isPreview && window._currentUser
+    ? `
+      <button class="btn btn-primary btn-compact" disabled>
+        <span class="mi">person_add</span> 关注
+      </button>
+      <button class="btn btn-secondary btn-compact" disabled>
+        <span class="mi">swap_horiz</span> 交换联系方式
+      </button>
+    `
     : '';
 
   const genderText = data.gender === 'male' ? '男' : data.gender === 'female' ? '女' : '';
@@ -981,7 +1013,7 @@ function renderPublicProfileCard(data) {
         <div class="profile-identity">
           <div class="profile-name">${escHtml(data.nickname || '未设置昵称')}</div>
           <div class="profile-action-btns">
-            ${window._currentUser ? followBtn : ''}
+            ${isPreview ? previewActions : (window._currentUser ? followBtn : '')}
             ${exchangeBtn}
           </div>
         </div>
@@ -1009,7 +1041,8 @@ function renderCommonCourses(courses = []) {
   `;
 }
 
-function renderPrivacyLocked(data) {
+function renderPrivacyLocked(data, options = {}) {
+  const isPreview = options.preview === true;
   const followBtn = data.isFollowing
     ? `<button class="btn btn-secondary btn-compact profile-unfollow-btn" data-user-id="${data.id}">
         <span class="mi">person_remove</span> 取消关注
@@ -1018,10 +1051,21 @@ function renderPrivacyLocked(data) {
         <span class="mi">person_add</span> 关注
       </button>`;
 
-  const exchangeBtn = window._currentUser
+  const exchangeBtn = window._currentUser && !isPreview
     ? `<button class="btn btn-secondary btn-compact profile-exchange-btn" data-user-id="${data.id}">
         <span class="mi">swap_horiz</span> 交换联系方式
       </button>`
+    : '';
+
+  const previewActions = isPreview && window._currentUser
+    ? `
+      <button class="btn btn-primary btn-compact" disabled>
+        <span class="mi">person_add</span> 关注
+      </button>
+      <button class="btn btn-secondary btn-compact" disabled>
+        <span class="mi">swap_horiz</span> 交换联系方式
+      </button>
+    `
     : '';
 
   return `
@@ -1032,7 +1076,7 @@ function renderPrivacyLocked(data) {
         <h2 class="profile-empty-title">该用户已设置隐私</h2>
         <p class="profile-empty-desc">${escHtml(data.nickname || '该用户')} 暂未公开个人资料</p>
         <div class="profile-action-btns">
-          ${window._currentUser ? followBtn : ''}
+          ${isPreview ? previewActions : (window._currentUser ? followBtn : '')}
           ${exchangeBtn}
         </div>
       </div>

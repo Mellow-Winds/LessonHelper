@@ -4,9 +4,9 @@
  * 由 explore.js 动态调用，不注册全局路由
  */
 
-import { apiGet, apiPost, apiDelete } from '../../core/api.js';
+import { apiGet, apiPost, apiPut, apiDelete } from '../../core/api.js';
 import { navigateTo, animStagger } from '../../core/router.js';
-import { showToast, createMdSelect, escHtml, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
+import { showToast, createMdSelect, escHtml, renderLoginPrompt, bindLoginPrompt, openModal, closeModal } from '../../components/ui.js';
 import { renderAuth } from '../auth.js';
 
 /* =============================================
@@ -70,6 +70,9 @@ export function bindInvitesEvents(container) {
     if (action === 'join' && id)            respondInvite(id, 'join');
     if (action === 'cancel-respond' && id)  respondInvite(id, 'cancel');
     if (action === 'cancel-invite' && id)   cancelInvite(id);
+    if (action === 'review-invite' && id)   showInviteRequests(id);
+    if (action === 'approve-response' && id) reviewInviteResponse(Number(btn.dataset.inviteId), id, 'accept');
+    if (action === 'reject-response' && id)  reviewInviteResponse(Number(btn.dataset.inviteId), id, 'reject');
   });
 
   container._invitesBound = true;
@@ -115,16 +118,19 @@ function renderInvitesList(invites) {
     const statusMap = { open: '招募中', full: '已满', closed: '已关闭', expired: '已过期' };
     const statusClass = { open: 'status-open', full: 'status-full', closed: 'status-closed', expired: 'status-closed' };
     const isCreator = inv.creator_id === window._currentUser?.id;
+    const isPending = inv.my_status === 'pending';
     const isJoined = inv.my_status === 'accepted' || isCreator;
     const isFull = inv.participant_count >= inv.max_participants;
 
     return `
-      <div class="card invite-card">
+      <div class="card invite-card" data-invite-card-id="${inv.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
           <div style="flex:1;min-width:0">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <h3 style="font-size:var(--text-lg);font-weight:600">${escHtml(inv.title)}</h3>
               <span class="status-badge ${statusClass[inv.status] || ''}">${statusMap[inv.status] || inv.status}</span>
+              ${inv.approval_required ? '<span class="status-badge">需批准</span>' : ''}
+              ${isPending ? '<span class="status-badge">待批准</span>' : ''}
             </div>
             <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap;font-size:14px;color:var(--md-on-surface-variant)">
               <span><span class="mi" style="font-size:16px;vertical-align:-3px">event</span> ${escHtml(inv.study_date)}</span>
@@ -137,7 +143,8 @@ function renderInvitesList(invites) {
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
             ${!isCreator && !isJoined && inv.status === 'open' && !isFull ? `<button class="btn btn-primary" style="font-size:12px;padding:6px 16px" data-action="join" data-id="${inv.id}">加入</button>` : ''}
-            ${isJoined && !isCreator ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 16px" data-action="cancel-respond" data-id="${inv.id}">取消参与</button>` : ''}
+            ${(isJoined || isPending) && !isCreator ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 16px" data-action="cancel-respond" data-id="${inv.id}">取消${isPending ? '申请' : '参与'}</button>` : ''}
+            ${isCreator && Number(inv.pending_count || 0) > 0 ? `<button class="btn btn-primary" style="font-size:12px;padding:6px 16px" data-action="review-invite" data-id="${inv.id}">处理申请(${inv.pending_count})</button>` : ''}
             ${isCreator ? `<button class="btn btn-secondary" style="font-size:12px;padding:6px 16px" data-action="cancel-invite" data-id="${inv.id}">取消邀约</button>` : ''}
           </div>
         </div>
@@ -159,6 +166,44 @@ export async function cancelInvite(inviteId) {
   if (result.error) { showToast(result.error); return; }
   showToast('已取消');
   await refreshInvites();
+}
+
+export async function showInviteRequests(inviteId) {
+  const detail = await apiGet(`/api/invites/${inviteId}`);
+  if (detail.error) { showToast(detail.error); return; }
+  const pending = detail.pending || [];
+  const bodyHtml = pending.length === 0
+    ? '<p class="text-secondary">暂无待处理申请</p>'
+    : `
+      <div style="display:flex;flex-direction:column;gap:12px">
+        ${pending.map(item => `
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--md-outline-variant);border-radius:8px">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600">${escHtml(item.nickname || '同学')}</div>
+              <div style="font-size:12px;color:var(--md-on-surface-variant)">${escHtml(item.major || '')} ${escHtml(item.grade || '')}</div>
+            </div>
+            <button class="btn btn-secondary" data-action="reject-response" data-invite-id="${inviteId}" data-id="${item.response_id}">拒绝</button>
+            <button class="btn btn-primary" data-action="approve-response" data-invite-id="${inviteId}" data-id="${item.response_id}">同意</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  openModal('处理自习申请', bodyHtml);
+  document.querySelectorAll('.modal-overlay [data-action="approve-response"], .modal-overlay [data-action="reject-response"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      reviewInviteResponse(Number(btn.dataset.inviteId), Number(btn.dataset.id), btn.dataset.action === 'approve-response' ? 'accept' : 'reject');
+    });
+  });
+}
+
+export async function reviewInviteResponse(inviteId, responseId, action) {
+  const result = await apiPut(`/api/invites/${inviteId}/responses/${responseId}`, { action });
+  if (result.error) { showToast(result.error); return; }
+  showToast(result.message);
+  closeModal();
+  await refreshInvites();
+  const listEl = document.getElementById('my-invites-list');
+  if (listEl) await loadMyInvites('created');
 }
 
 /* =============================================
