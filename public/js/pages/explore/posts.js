@@ -344,6 +344,13 @@ async function renderInviteForm(formEl) {
           ${createMdSelect({ id: 'invite-end', label: '结束时间', options: endTimeSlots, selected: '17:00' })}
         </div>
       </div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        ${createMdInput({ id: 'invite-max-participants', label: '人数上限', type: 'number', value: '4', placeholder: ' ', attrs: 'min="2" max="50" inputmode="numeric"', style: 'width:160px;margin-bottom:0' })}
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--md-on-surface);cursor:pointer">
+          <input type="checkbox" id="invite-approval-required">
+          <span>加入需要发起人批准</span>
+        </label>
+      </div>
       ${createMdTextarea({ id: 'invite-requirements', label: '详细搭子要求', rows: 3 })}
       <div class="form-error" id="post-invite-error" style="display:none"></div>
       <button type="submit" class="btn btn-primary btn-full">发布邀约</button>
@@ -366,7 +373,8 @@ async function handleInviteSubmit(e) {
     start_time: document.getElementById('invite-start')?.value || '',
     end_time: document.getElementById('invite-end')?.value || '',
     location: document.getElementById('invite-location')?.value?.trim() || '',
-    max_participants: 4,
+    max_participants: Number(document.getElementById('invite-max-participants')?.value) || 4,
+    approval_required: !!document.getElementById('invite-approval-required')?.checked,
     ...(courseId ? { course_id: Number(courseId) } : {}),
   };
 

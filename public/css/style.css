@@ -5041,6 +5041,8 @@ input, textarea, select, button,
   justify-content: center;
   border-radius: 50%;
   transition: background-color var(--dur-fast) var(--ease-standard);
+  z-index: 10;
+  pointer-events: auto;
 }
 
 /* 隐藏浏览器原生密码显示按钮 */
