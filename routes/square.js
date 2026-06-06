@@ -406,7 +406,7 @@ module.exports = function (db) {
     });
   });
 
-  // DELETE /api/square/posts/:id/comments/:commentId — 删除自己的回复
+  // DELETE /api/square/posts/:id/comments/:commentId — 删除自己的回复（硬删除）
   router.delete('/posts/:id/comments/:commentId', authMiddleware, (req, res) => {
     const commentId = Number(req.params.commentId);
     const postId = Number(req.params.id);
@@ -422,8 +422,8 @@ module.exports = function (db) {
       if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
     }
 
-    // 软删除：标记为已删除，保留楼层号
-    db.run("UPDATE square_comments SET content = '[已删除]', image_url = '' WHERE id = ?", [commentId]);
+    // 硬删除：直接删除评论
+    db.run('DELETE FROM square_comments WHERE id = ?', [commentId]);
     db.save();
 
     res.json({ message: '已删除' });

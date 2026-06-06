@@ -330,18 +330,14 @@ function renderSqForumComment(c, postId, childMap) {
             <span class="forum-reply-time">${formatTime(c.created_at)}</span>
           </div>
         </div>
-        ${c.content === '[已删除]' ? `<p class="forum-reply-text" style="color:var(--md-on-surface-variant);font-style:italic">已删除</p>` : `
-          <p class="forum-reply-text">${escHtml(c.content || '')}</p>
-        `}
+        <p class="forum-reply-text">${escHtml(c.content || '')}</p>
         ${renderSqCommentImages(c.image_url)}
-        ${c.content !== '[已删除]' ? `
-          <div class="forum-reply-actions">
-            <button class="forum-action-btn" data-action="sq-reply-comment" data-post-id="${postId}" data-comment-id="${c.id}">
-              <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
-            </button>
-            ${window._currentUser && c.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="sq-delete" data-post-id="${postId}" data-comment-id="${c.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
-          </div>
-        ` : ''}
+        <div class="forum-reply-actions">
+          <button class="forum-action-btn" data-action="sq-reply-comment" data-post-id="${postId}" data-comment-id="${c.id}">
+            <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
+          </button>
+          ${window._currentUser && c.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="sq-delete" data-post-id="${postId}" data-comment-id="${c.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
+        </div>
         <div id="sq-inline-comment-${c.id}"></div>
         ${children.length > 0 ? `
           ${isExpanded ? `
@@ -396,18 +392,14 @@ function renderSqNestedReply(child, parentAuthorName, parentAuthorId, postId, ch
             <span class="forum-reply-time">${formatTime(child.created_at)}</span>
           </div>
         </div>
-        ${child.content === '[已删除]' ? `<p class="forum-reply-text" style="color:var(--md-on-surface-variant);font-style:italic">已删除</p>` : `
-          <p class="forum-reply-text">${escHtml(child.content || '')}</p>
-        `}
+        <p class="forum-reply-text">${escHtml(child.content || '')}</p>
         ${renderSqCommentImages(child.image_url)}
-        ${child.content !== '[已删除]' ? `
-          <div class="forum-reply-actions">
-            <button class="forum-action-btn" data-action="sq-reply-nested" data-post-id="${postId}" data-comment-id="${child.id}">
-              <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
-            </button>
-            ${window._currentUser && child.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="sq-delete" data-post-id="${postId}" data-comment-id="${child.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
-          </div>
-        ` : ''}
+        <div class="forum-reply-actions">
+          <button class="forum-action-btn" data-action="sq-reply-nested" data-post-id="${postId}" data-comment-id="${child.id}">
+            <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
+          </button>
+          ${window._currentUser && child.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="sq-delete" data-post-id="${postId}" data-comment-id="${child.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
+        </div>
         <div id="sq-inline-comment-${child.id}"></div>
         ${children.length > 0 ? `
           ${isExpanded ? `

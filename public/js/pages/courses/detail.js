@@ -279,6 +279,24 @@ function bindForumEvents(root, courseId, enrolled) {
           showToast('已删除');
         });
         break;
+      case 'delete-post':
+        openModal('确认删除', `
+          <p style="margin-bottom:24px">确定要删除这篇帖子吗？所有回复也将一并删除，且无法恢复</p>
+          <div class="inline-btn-group" style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" id="confirm-forum-post-delete" style="background:var(--md-error,#e53935)">删除</button>
+          </div>
+        `);
+        document.getElementById('confirm-forum-post-delete')?.addEventListener('click', async () => {
+          const result = await apiDelete(`/api/courses/posts/${postId}`);
+          if (result.error) { showToast(result.error); return; }
+          closeModal();
+          // 从 DOM 中移除帖子
+          const postEl = document.getElementById(`forum-post-${postId}`);
+          if (postEl) postEl.remove();
+          showToast('已删除');
+        });
+        break;
     }
   });
 }
@@ -342,6 +360,7 @@ function renderForumPostRow(p, enrolled, favoritePostIds) {
               <span class="mi" style="font-size:16px">forum</span> ${p.comment_count || 0} 回复
             </button>
             ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
+            ${window._currentUser && p.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="delete-post" data-post-id="${p.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
           </div>
         ` : `
           <div class="forum-actions">
@@ -463,9 +482,7 @@ function renderForumComment(c, postId, childMap) {
             <span class="forum-like-count" style="font-size:11px">${like.count}</span>
           </div>
         </div>
-        ${c.content === '[已删除]' ? `<p class="forum-reply-text" style="color:var(--md-on-surface-variant);font-style:italic">已删除</p>` : `
-          <p class="forum-reply-text">${escHtml(c.content || '')}</p>
-        `}
+        <p class="forum-reply-text">${escHtml(c.content || '')}</p>
         ${renderCommentImages(c.image_url)}
         <div class="forum-reply-actions">
           <button class="forum-action-btn" data-action="reply-comment" data-post-id="${postId}" data-comment-id="${c.id}">
@@ -535,9 +552,7 @@ function renderNestedReply(child, parentAuthorName, parentAuthorId, postId, chil
             <span class="forum-like-count" style="font-size:11px">${like.count}</span>
           </div>
         </div>
-        ${child.content === '[已删除]' ? `<p class="forum-reply-text" style="color:var(--md-on-surface-variant);font-style:italic">已删除</p>` : `
-          <p class="forum-reply-text">${escHtml(child.content || '')}</p>
-        `}
+        <p class="forum-reply-text">${escHtml(child.content || '')}</p>
         ${renderCommentImages(child.image_url)}
         <div class="forum-reply-actions">
           <button class="forum-action-btn" data-action="reply-nested" data-post-id="${postId}" data-comment-id="${child.id}">
