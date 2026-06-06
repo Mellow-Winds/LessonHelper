@@ -61,7 +61,7 @@ async function renderExplore(container, data) {
       <h1 class="page-title" style="margin:0"><span class="mi" style="vertical-align:-4px;margin-right:4px">explore</span>发现</h1>
       <div class="explore-header-actions inline-btn-group">
         <button class="btn btn-secondary btn-compact" id="explore-publish-btn">
-          <span class="mi">add</span><span class="btn-text">发布</span>
+          <span class="mi">add</span> 发布
         </button>
         <button class="btn btn-secondary btn-compact" onclick="navigateTo('my_post')">
           <span class="mi">edit_note</span> 我的发布

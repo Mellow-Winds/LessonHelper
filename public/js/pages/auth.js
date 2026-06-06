@@ -105,12 +105,18 @@ function renderForgotForm() {
       </div>
       <div class="auth-code-row">
         <div class="md-input-group" style="flex:1">
-          <input class="md-input auth-code-input" type="text" name="code" placeholder=" " maxlength="6" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*">
+          <input class="md-input auth-code-input" type="text" name="code" placeholder=" " maxlength="6" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" id="forgot-code-input">
           <label class="md-label">验证码</label>
           <fieldset class="md-border"><legend><span>验证码</span></legend></fieldset>
         </div>
-        <button type="button" class="btn btn-outline auth-send-btn" onclick="handleForgotSendCode(event)">获取验证码</button>
+        <button type="button" class="btn btn-outline auth-send-btn" id="forgot-send-code-btn" onclick="handleForgotSendCode(event)">获取验证码</button>
       </div>
+
+      <!-- Turnstile 容器（初始隐藏，点击获取验证码后显示） -->
+      <div class="auth-turnstile-wrapper" id="forgot-turnstile-wrapper" style="display:none">
+        <div class="auth-turnstile-container" id="forgot-turnstile-container"></div>
+      </div>
+
       <div class="md-input-group">
         <input class="md-input auth-password-input" type="password" name="password" placeholder=" " required autocomplete="new-password" maxlength="30">
         <label class="md-label">新密码</label>
@@ -389,21 +395,116 @@ export async function handleForgotSendCode(e) {
     return;
   }
 
-  const btn = e.target;
-  btn.disabled = true;
-  btn.textContent = '发送中...';
-  const result = await apiPost('/api/auth/forgot-password', { studentId });
-  if (result.error) {
-    if (errEl) {
-      errEl.textContent = result.error;
-      errEl.style.display = 'block';
-    }
-    btn.disabled = false;
-    btn.textContent = '获取验证码';
+  // 保存学号到状态
+  authStudentId = studentId;
+
+  // 显示 Turnstile 验证框
+  const turnstileWrapper = document.getElementById('forgot-turnstile-wrapper');
+  if (turnstileWrapper) {
+    turnstileWrapper.style.display = 'block';
+    loadForgotTurnstile();
+  }
+}
+
+// 加载 Turnstile（忘记密码专用）
+function loadForgotTurnstile() {
+  if (!window.turnstile) {
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => renderForgotTurnstile();
+    script.onerror = () => {
+      showToast('系统出现未知错误，请在看到此消息后及时反馈');
+    };
+    document.head.appendChild(script);
+  } else {
+    renderForgotTurnstile();
+  }
+}
+
+function renderForgotTurnstile() {
+  const container = document.getElementById('forgot-turnstile-container');
+  if (!container || !window.turnstile) return;
+
+  if (!TURNSTILE_SITE_KEY || TURNSTILE_SITE_KEY === '>>>在此处填写site key<<<') {
+    console.error('[Turnstile] Site Key 未配置');
+    showToast('系统出现未知错误，请在看到此消息后及时反馈');
     return;
   }
-  showToast(result.message || '验证码已发送');
-  btn.textContent = '已发送';
+
+  container.innerHTML = '';
+
+  try {
+    window.turnstile.render(container, {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: (token) => {
+        onForgotTurnstileSuccess(token);
+      },
+      'error-callback': () => {
+        showToast('系统出现未知错误，请在看到此消息后及时反馈');
+      },
+      'expired-callback': () => {},
+      'timeout-callback': () => {
+        showToast('系统出现未知错误，请在看到此消息后及时反馈');
+      },
+    });
+  } catch (e) {
+    console.error('[Turnstile] 渲染失败:', e);
+    showToast('系统出现未知错误，请在看到此消息后及时反馈');
+  }
+}
+
+// Turnstile 验证成功后的回调（忘记密码）
+async function onForgotTurnstileSuccess(token) {
+  const btn = document.getElementById('forgot-send-code-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '发送中...';
+  }
+
+  try {
+    const result = await apiPost('/api/auth/forgot-password', {
+      studentId: authStudentId,
+      turnstileToken: token,
+    });
+
+    if (result.error) {
+      const errEl = document.getElementById('forgot-error');
+      if (errEl) {
+        errEl.textContent = result.error;
+        errEl.style.display = 'block';
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '获取验证码';
+      }
+      return;
+    }
+
+    showToast(result.message || '验证码已发送');
+    if (btn) btn.textContent = '已发送';
+
+    // 隐藏 Turnstile 验证框
+    const turnstileWrapper = document.getElementById('forgot-turnstile-wrapper');
+    if (turnstileWrapper) {
+      turnstileWrapper.style.display = 'none';
+    }
+
+    // 聚焦验证码输入框
+    const codeInput = document.getElementById('forgot-code-input');
+    if (codeInput) codeInput.focus();
+  } catch (e) {
+    const errEl = document.getElementById('forgot-error');
+    if (errEl) {
+      errEl.textContent = '系统出现未知错误，请在看到此消息后及时反馈';
+      errEl.style.display = 'block';
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '获取验证码';
+    }
+  }
 }
 
 export async function handleResetPassword(e) {
