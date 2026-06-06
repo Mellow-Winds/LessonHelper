@@ -365,13 +365,24 @@ module.exports = function (db) {
   // POST /api/auth/resend-code — 重新发送验证码
   router.post('/forgot-password', async (req, res) => {
     try {
-      const { studentId } = req.body;
+      const { studentId, turnstileToken } = req.body;
       if (!studentId) return res.status(400).json({ error: '请填写学号' });
       if (!validateStudentId(studentId)) return res.status(400).json({ error: '学号格式不正确' });
 
       const email = `${studentId}@smail.nju.edu.cn`;
       const user = db.get('SELECT id FROM users WHERE email = ?', [email]);
       if (!user) return res.status(404).json({ error: '该学号尚未注册' });
+
+      // Turnstile 验证
+      if (!turnstileToken) {
+        return res.status(400).json({ error: '系统出现未知错误，请在看到此消息后及时反馈' });
+      }
+
+      const clientIp = getClientIp(req);
+      const turnstileResult = await verifyTurnstile(turnstileToken, clientIp);
+      if (!turnstileResult.ok) {
+        return res.status(403).json({ error: turnstileResult.error });
+      }
 
       const rateLimitResult = checkRateLimit(email);
       if (!rateLimitResult.ok) return res.status(429).json({ error: rateLimitResult.error });
