@@ -9,6 +9,7 @@ import { navigateTo, animIn, bindRipples } from '../../core/router.js';
 import { showToast, createMdInput, createMdTextarea, createMdSelect, escHtml, renderLoginPrompt, bindLoginPrompt, openModal, closeModal } from '../../components/ui.js';
 import { renderAuth } from '../auth.js';
 
+
 /* =============================================
    Constants
    ============================================= */
@@ -119,6 +120,16 @@ function buildSquareForm() {
           <input type="text" class="post-chip-input" id="post-chip-input" placeholder=" " style="display:none">
         </div>
         <input type="hidden" id="post-tags" name="tags" value="[]">
+      </div>
+
+      <div class="post-field-group">
+        <label class="post-field-label">需求人数</label>
+        <div class="post-stepper-row">
+          <button type="button" class="post-stepper-btn" data-action="decrease"><span class="mi">remove</span></button>
+          <span class="post-stepper-value" id="post-max-people-value">2</span>
+          <button type="button" class="post-stepper-btn" data-action="increase"><span class="mi">add</span></button>
+        </div>
+        <input type="hidden" id="post-max-people" value="2">
       </div>
 
       <div class="post-field-group">
@@ -250,8 +261,34 @@ function bindSquareForm() {
     }
   });
 
+  // 需求人数 Stepper（事件委托）
+  bindStepperEvents(form);
+
   // 表单提交
   form.addEventListener('submit', handleSquareSubmit);
+}
+
+/* ---- 步进按钮事件绑定（委托） ---- */
+function bindStepperEvents(root) {
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('.post-stepper-btn');
+    if (!btn) return;
+    const row = btn.closest('.post-stepper-row');
+    const valueEl = row.querySelector('.post-stepper-value');
+    const hiddenInput = row.parentElement.querySelector('input[type="hidden"]');
+    if (!valueEl || !hiddenInput) return;
+
+    const min = 1, max = 10;
+    let val = parseInt(hiddenInput.value, 10) || 2;
+
+    if (btn.dataset.action === 'increase') {
+      val = Math.min(val + 1, max);
+    } else {
+      val = Math.max(val - 1, min);
+    }
+    hiddenInput.value = val;
+    valueEl.textContent = val;
+  });
 }
 
 async function handleSquareSubmit(e) {
@@ -264,7 +301,7 @@ async function handleSquareSubmit(e) {
     title: document.getElementById('post-title')?.value?.trim() || '',
     category: document.getElementById('post-category')?.value || '',
     description: document.getElementById('post-description')?.value?.trim() || '',
-    max_people: 2,
+    max_people: Math.max(1, Math.min(10, parseInt(document.getElementById('post-max-people')?.value, 10) || 2)),
     tags,
     show_profile: document.getElementById('post-show-profile')?.checked ?? true,
     contact_visibility: document.querySelector('input[name="contact-visibility"]:checked')?.value || 'public',
@@ -344,9 +381,17 @@ async function renderInviteForm(formEl) {
           ${createMdSelect({ id: 'invite-end', label: '结束时间', options: endTimeSlots, selected: '17:00' })}
         </div>
       </div>
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        ${createMdInput({ id: 'invite-max-participants', label: '人数上限', type: 'number', value: '4', placeholder: ' ', attrs: 'min="2" max="50" inputmode="numeric"', style: 'width:160px;margin-bottom:0' })}
-        <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--md-on-surface);cursor:pointer">
+      <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+        <div class="post-field-group" style="margin-bottom:0">
+          <label class="post-field-label">人数上限</label>
+          <div class="post-stepper-row">
+            <button type="button" class="post-stepper-btn" data-action="decrease"><span class="mi">remove</span></button>
+            <span class="post-stepper-value" id="invite-max-value">4</span>
+            <button type="button" class="post-stepper-btn" data-action="increase"><span class="mi">add</span></button>
+          </div>
+          <input type="hidden" id="invite-max-participants" value="4">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--md-on-surface);cursor:pointer;padding-bottom:4px">
           <input type="checkbox" id="invite-approval-required">
           <span>加入需要发起人批准</span>
         </label>
@@ -358,7 +403,10 @@ async function renderInviteForm(formEl) {
   `;
 
   const form = document.getElementById('post-invite-form');
-  if (form) form.addEventListener('submit', handleInviteSubmit);
+  if (form) {
+    form.addEventListener('submit', handleInviteSubmit);
+    bindStepperEvents(form);
+  }
 }
 
 async function handleInviteSubmit(e) {
@@ -373,7 +421,7 @@ async function handleInviteSubmit(e) {
     start_time: document.getElementById('invite-start')?.value || '',
     end_time: document.getElementById('invite-end')?.value || '',
     location: document.getElementById('invite-location')?.value?.trim() || '',
-    max_participants: Number(document.getElementById('invite-max-participants')?.value) || 4,
+    max_participants: Math.max(1, Math.min(10, parseInt(document.getElementById('invite-max-participants')?.value, 10) || 4)),
     approval_required: !!document.getElementById('invite-approval-required')?.checked,
     ...(courseId ? { course_id: Number(courseId) } : {}),
   };

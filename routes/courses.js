@@ -512,7 +512,44 @@ module.exports = function (db) {
     });
   });
 
-  // DELETE /api/courses/posts/:postId/comments/:commentId — 删除自己的回复
+  // DELETE /api/courses/posts/:postId — 删除帖子（级联删除所有回复）
+  router.delete('/posts/:postId', authMiddleware, (req, res) => {
+    const postId = Number(req.params.postId);
+    const userId = req.user.userId;
+
+    const post = db.get('SELECT * FROM posts WHERE id = ?', [postId]);
+    if (!post) return res.status(404).json({ error: '帖子不存在' });
+    if (post.author_id !== userId) return res.status(403).json({ error: '只能删除自己发布的帖子' });
+
+    // 删除帖子相关的所有图片文件
+    if (post.image_url) {
+      post.image_url.split(';').filter(Boolean).forEach(url => {
+        const imgPath = path.join(__dirname, '..', url);
+        if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+      });
+    }
+
+    // 删除所有回复的图片文件
+    const comments = db.all('SELECT image_url FROM comments WHERE post_id = ?', [postId]);
+    comments.forEach(c => {
+      if (c.image_url) {
+        c.image_url.split(';').filter(Boolean).forEach(url => {
+          const imgPath = path.join(__dirname, '..', url);
+          if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+        });
+      }
+    });
+
+    // 级联删除所有回复
+    db.run('DELETE FROM comments WHERE post_id = ?', [postId]);
+    // 删除帖子
+    db.run('DELETE FROM posts WHERE id = ?', [postId]);
+    db.save();
+
+    res.json({ message: '已删除' });
+  });
+
+  // DELETE /api/courses/posts/:postId/comments/:commentId — 删除自己的回复（硬删除）
   router.delete('/posts/:postId/comments/:commentId', authMiddleware, (req, res) => {
     const commentId = Number(req.params.commentId);
     const postId = Number(req.params.postId);
@@ -530,8 +567,8 @@ module.exports = function (db) {
       });
     }
 
-    // 软删除：标记为已删除，保留楼层号
-    db.run("UPDATE comments SET content = '[已删除]', image_url = '' WHERE id = ?", [commentId]);
+    // 硬删除：直接删除评论
+    db.run('DELETE FROM comments WHERE id = ?', [commentId]);
     db.save();
 
     res.json({ message: '已删除' });
@@ -873,7 +910,7 @@ module.exports = function (db) {
     res.status(201).json({ id: result.lastInsertRowid, post_id: postId, author_id: userId, content: (content || '').trim(), parent_id: parentId, image_url: imageUrl });
   });
 
-  // DELETE /api/courses/:id/square-posts/:postId/comments/:commentId — 删除评论
+  // DELETE /api/courses/:id/square-posts/:postId/comments/:commentId — 删除评论（硬删除）
   router.delete('/:id/square-posts/:postId/comments/:commentId', authMiddleware, (req, res) => {
     const commentId = Number(req.params.commentId);
     const postId = Number(req.params.postId);
@@ -888,7 +925,8 @@ module.exports = function (db) {
       if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
     }
 
-    db.run("UPDATE square_comments SET content = '[已删除]', image_url = '' WHERE id = ?", [commentId]);
+    // 硬删除：直接删除评论
+    db.run('DELETE FROM square_comments WHERE id = ?', [commentId]);
     db.save();
     res.json({ message: '已删除' });
   });

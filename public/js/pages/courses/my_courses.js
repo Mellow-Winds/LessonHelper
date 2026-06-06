@@ -662,7 +662,6 @@ function renderComments(section, postId) {
 
 // 渲染单条评论（递归支持楼中楼）
 function renderSingleComment(comment, floorNum, postId, childMap, depth) {
-  const isDeleted = comment.content === '[已删除]';
   const isOwner = window._currentUser && comment.author_id === window._currentUser.id;
   const children = childMap[comment.id] || [];
   const maxDepth = 3;
@@ -673,32 +672,27 @@ function renderSingleComment(comment, floorNum, postId, childMap, depth) {
         ${depth === 0 ? `<span class="comment-floor">${floorNum} 楼</span>` : ''}
         ${comment.author_avatar_url
           ? `<img class="comment-avatar" src="${escHtml(comment.author_avatar_url)}" alt="">`
-          : `<div class="comment-avatar-letter">${isDeleted ? '?' : escHtml((comment.author_name || '?')[0])}</div>`
+          : `<div class="comment-avatar-letter">${escHtml((comment.author_name || '?')[0])}</div>`
         }
         <div class="comment-meta">
-          <button class="user-profile-link" ${isDeleted ? 'disabled' : `onclick="navigateTo('profile-user', ${comment.author_id})"`}>
-            ${isDeleted ? '已注销用户' : escHtml(comment.author_name)}
+          <button class="user-profile-link" onclick="navigateTo('profile-user', ${comment.author_id})">
+            ${escHtml(comment.author_name)}
           </button>
           <span class="comment-time">${formatRelativeTime(comment.created_at)}</span>
         </div>
       </div>
       ${comment.parent_id && depth > 0 ? (() => {
         const parent = (loadedComments[postId]?.comments || []).find(c => c.id === comment.parent_id);
-        return parent ? `<div class="comment-reply-ref">回复 @${escHtml(parent.author_name || '已注销用户')}</div>` : '';
+        return parent ? `<div class="comment-reply-ref">回复 @${escHtml(parent.author_name || '')}</div>` : '';
       })() : ''}
       <div class="comment-body">
-        ${isDeleted
-          ? '<p class="comment-deleted">该回复已被删除</p>'
-          : `<p class="comment-content">${escHtml(comment.content)}</p>`
-        }
+        <p class="comment-content">${escHtml(comment.content)}</p>
         ${comment.image_url ? `<div class="comment-image-wrap"><img src="${escHtml(comment.image_url)}" alt="评论图片" class="comment-image" loading="lazy" onclick="window.open('${escHtml(comment.image_url)}', '_blank')"></div>` : ''}
       </div>
-      ${!isDeleted ? `
-        <div class="comment-actions">
-          ${isLoggedIn() ? `<button class="comment-action-btn comment-reply-btn" data-comment-id="${comment.id}" data-author="${escHtml(comment.author_name)}"><span class="mi" style="font-size:14px">reply</span> 回复</button>` : ''}
-          ${isOwner ? `<button class="comment-action-btn comment-delete-btn" data-comment-id="${comment.id}" data-post-id="${postId}"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
-        </div>
-      ` : ''}
+      <div class="comment-actions">
+        ${isLoggedIn() ? `<button class="comment-action-btn comment-reply-btn" data-comment-id="${comment.id}" data-author="${escHtml(comment.author_name)}"><span class="mi" style="font-size:14px">reply</span> 回复</button>` : ''}
+        ${isOwner ? `<button class="comment-action-btn comment-delete-btn" data-comment-id="${comment.id}" data-post-id="${postId}"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
+      </div>
       ${children.length > 0 && depth < maxDepth
         ? children.map(c => renderSingleComment(c, 0, postId, childMap, depth + 1)).join('')
         : ''
