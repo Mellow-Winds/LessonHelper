@@ -367,6 +367,210 @@ async function start() {
     expires_at DATETIME NOT NULL
   )`);
 
+  // ========== 探索模块：组件化卡片系统 ==========
+
+  // New table: explore_cards (卡片 — components 存 JSON，后端不解析)
+  db.run(`CREATE TABLE IF NOT EXISTS explore_cards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    template_id TEXT,
+    components TEXT NOT NULL DEFAULT '[]',
+    max_participants INTEGER DEFAULT 0,
+    current_count INTEGER DEFAULT 0,
+    approval_required INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'open',
+    course_id INTEGER,
+    expires_at TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_id) REFERENCES users(id),
+    FOREIGN KEY (course_id) REFERENCES courses(id)
+  )`);
+
+  // New table: explore_posts (帖子 — 卡片的容器)
+  db.run(`CREATE TABLE IF NOT EXISTS explore_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT DEFAULT 'general',
+    content TEXT DEFAULT '',
+    status TEXT DEFAULT 'published',
+    course_id INTEGER,
+    expires_at TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_id) REFERENCES users(id),
+    FOREIGN KEY (course_id) REFERENCES courses(id)
+  )`);
+
+  // New table: explore_post_cards (帖子-卡片关联)
+  db.run(`CREATE TABLE IF NOT EXISTS explore_post_cards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    card_id INTEGER NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (post_id) REFERENCES explore_posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (card_id) REFERENCES explore_cards(id) ON DELETE CASCADE,
+    UNIQUE(post_id, card_id)
+  )`);
+
+  // New table: card_participants (参与者/报名)
+  db.run(`CREATE TABLE IF NOT EXISTS card_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'accepted',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (card_id) REFERENCES explore_cards(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(card_id, user_id)
+  )`);
+
+  // New table: card_vote_records (投票去重)
+  db.run(`CREATE TABLE IF NOT EXISTS card_vote_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id INTEGER NOT NULL,
+    module_index INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    option_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (card_id) REFERENCES explore_cards(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(card_id, module_index, user_id, option_id)
+  )`);
+
+  // New table: explore_comments (帖子评论)
+  db.run(`CREATE TABLE IF NOT EXISTS explore_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    author_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    parent_id INTEGER,
+    image_url TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES explore_posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (author_id) REFERENCES users(id)
+  )`);
+
+  // New table: card_templates (卡片模板)
+  db.run(`CREATE TABLE IF NOT EXISTS card_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    icon TEXT,
+    category TEXT DEFAULT 'general',
+    components_schema TEXT NOT NULL,
+    is_official INTEGER DEFAULT 1,
+    creator_id INTEGER,
+    usage_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_id) REFERENCES users(id)
+  )`);
+
+  // 预置官方模板数据
+  const templates = [
+    {
+      id: 'book_sale',
+      name: '二手书',
+      description: '出二手教材/书籍',
+      icon: 'ri-book-2-line',
+      category: 'trade',
+      components_schema: JSON.stringify([
+        { type: 'input', icon: 'ri-book-2-line', label: '书名', value: '' },
+        { type: 'price', icon: 'ri-money-cny-circle-line', label: '价格', value: '' },
+        { type: 'contact', icon: 'ri-wechat-line', label: '联系方式', value: '' },
+        { type: 'link', icon: 'ri-links-line', label: '链接', value: '' },
+        { type: 'input', icon: 'ri-chat-check-line', label: '可议价', value: '' }
+      ])
+    },
+    {
+      id: 'study_invite',
+      name: '自习邀约',
+      description: '组队自习',
+      icon: 'ri-book-open-line',
+      category: 'study',
+      components_schema: JSON.stringify([
+        { type: 'input', icon: 'ri-calendar-line', label: '时间', value: '' },
+        { type: 'input', icon: 'ri-map-pin-line', label: '地点', value: '' },
+        { type: 'input', icon: 'ri-file-text-line', label: '要求', value: '' },
+        { type: 'days_matter', icon: 'ri-calendar-event-line', label: '倒数日', value: '' }
+      ])
+    },
+    {
+      id: 'social_buddy',
+      name: '找搭子',
+      description: '通用交友/搭伴',
+      icon: 'ri-team-line',
+      category: 'social',
+      components_schema: JSON.stringify([
+        { type: 'input', icon: 'ri-user-line', label: '简介', value: '' },
+        { type: 'input', icon: 'ri-focus-3-line', label: '目标', value: '' },
+        { type: 'contact', icon: 'ri-wechat-line', label: '联系方式', value: '' }
+      ])
+    },
+    {
+      id: 'project_team',
+      name: '项目组队',
+      description: '课程项目/竞赛组队',
+      icon: 'ri-group-line',
+      category: 'project',
+      components_schema: JSON.stringify([
+        { type: 'input', icon: 'ri-lightbulb-line', label: '项目描述', value: '' },
+        { type: 'input', icon: 'ri-user-add-line', label: '需要人数', value: '' },
+        { type: 'input', icon: 'ri-tools-line', label: '技能要求', value: '' },
+        { type: 'days_matter', icon: 'ri-calendar-event-line', label: '截止日期', value: '' }
+      ])
+    },
+    {
+      id: 'event_buddy',
+      name: '活动搭子',
+      description: '演唱会/运动/聚餐等',
+      icon: 'ri-calendar-event-line',
+      category: 'social',
+      components_schema: JSON.stringify([
+        { type: 'input', icon: 'ri-music-line', label: '活动', value: '' },
+        { type: 'input', icon: 'ri-calendar-line', label: '时间', value: '' },
+        { type: 'input', icon: 'ri-map-pin-line', label: '地点', value: '' },
+        { type: 'price', icon: 'ri-money-cny-circle-line', label: '费用', value: '' }
+      ])
+    },
+    {
+      id: 'skill_exchange',
+      name: '技能交换',
+      description: '互教互学',
+      icon: 'ri-exchange-line',
+      category: 'study',
+      components_schema: JSON.stringify([
+        { type: 'input', icon: 'ri-book-2-line', label: '我会的', value: '' },
+        { type: 'input', icon: 'ri-focus-3-line', label: '想学的', value: '' },
+        { type: 'contact', icon: 'ri-wechat-line', label: '联系方式', value: '' }
+      ])
+    },
+    {
+      id: 'study_group',
+      name: '学习小组',
+      description: '长期学习小组',
+      icon: 'ri-book-open-line',
+      category: 'study',
+      components_schema: JSON.stringify([
+        { type: 'input', icon: 'ri-book-2-line', label: '学习内容', value: '' },
+        { type: 'input', icon: 'ri-calendar-line', label: '计划时间', value: '' },
+        { type: 'input', icon: 'ri-map-pin-line', label: '地点', value: '' },
+        { type: 'input', icon: 'ri-file-text-line', label: '要求', value: '' }
+      ])
+    }
+  ];
+
+  for (const t of templates) {
+    db.run(
+      `INSERT OR IGNORE INTO card_templates (id, name, description, icon, category, components_schema, is_official)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [t.id, t.name, t.description, t.icon, t.category, t.components_schema]
+    );
+  }
+  console.log('  ✓ 探索模块表 + 模板数据初始化完成');
+
   // --- 大课体系数据迁移：为现有小课创建大课记录，迁移内容归属 ---
   {
     function cleanBigCourseName(title) {
@@ -455,6 +659,10 @@ async function start() {
   const squareRouter = require('./routes/square')(db);
   const myPostsRouter = require('./routes/my_posts')(db);
   const favoritesRouter = require('./routes/favorites')(db);
+  const explorePostsRouter = require('./routes/explore_posts')(db);
+  const exploreCardsRouter = require('./routes/explore_cards')(db);
+  const cardTemplatesRouter = require('./routes/card_templates')(db);
+  const exploreCommentsRouter = require('./routes/explore_comments')(db);
 
   app.use('/api/courses', coursesRouter);
   app.use('/api/materials', materialsRouter);
@@ -467,6 +675,10 @@ async function start() {
   app.use('/api/auth', authRouter);
   app.use('/api/my-posts', myPostsRouter);
   app.use('/api/favorites', favoritesRouter);
+  app.use('/api/explore/posts', explorePostsRouter);
+  app.use('/api/explore/cards', exploreCardsRouter);
+  app.use('/api/card-templates', cardTemplatesRouter);
+  app.use('/api/explore/posts', exploreCommentsRouter); // comments nested under posts
 
   // --- SPA Fallback ---
   app.get('*', (req, res) => {

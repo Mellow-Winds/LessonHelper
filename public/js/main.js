@@ -128,7 +128,8 @@ import {
   onPublishFileSelected,
 } from './pages/courses/publish.js';
 
-import { switchExploreTab } from './pages/explore.js';
+import './pages/explore.js';
+import './pages/post-editor.js';
 import {
   refreshInvites, respondInvite, cancelInvite,
   switchMyTab,
@@ -263,8 +264,7 @@ Object.assign(window, {
   onPublishFileSelected,
   // my course detail extras
   handlePortalToPlaza,
-  // explore
-  switchExploreTab,
+  // explore (new card system — no exported functions needed)
   // invites
   refreshInvites,
   respondInvite,
