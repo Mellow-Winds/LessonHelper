@@ -195,10 +195,10 @@ async function loadMyCourseList(semester) {
               <span class="mi" style="font-size:16px;vertical-align:-3px">people</span> ${c.enrollment_count || 0} 人
             </span>
             <div class="inline-btn-group" style="display:flex;gap:6px">
-              <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();openMoveSemesterModal(${c.id}, '${escHtml(c.title)}')">
+              <button class="btn btn-secondary" title="移动学期" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();openMoveSemesterModal(${c.id}, '${escHtml(c.title)}')">
                 <span class="mi" style="font-size:14px">swap_horiz</span><span class="btn-text"> 移动学期</span>
               </button>
-              <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();handleLeaveCourse(${c.id})">
+              <button class="btn btn-secondary" title="退出课程" style="padding:4px 12px;font-size:12px" onclick="event.stopPropagation();handleLeaveCourse(${c.id})">
                 <span class="mi" style="font-size:14px">logout</span><span class="btn-text"> 退出课程</span>
               </button>
             </div>
