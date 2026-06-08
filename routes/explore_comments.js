@@ -1,6 +1,45 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { authMiddleware, optionalAuthMiddleware } = require('./middleware/auth');
 const { createNotification } = require('./notifications');
+
+const COMMENT_IMAGE_DIR = path.join(__dirname, '..', 'uploads', 'comment-images');
+const COMMENT_IMAGE_MAX = 1 * 1024 * 1024;
+const COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png']);
+
+const commentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(COMMENT_IMAGE_DIR, { recursive: true });
+      cb(null, COMMENT_IMAGE_DIR);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `ec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+    }
+  }),
+  limits: { fileSize: COMMENT_IMAGE_MAX, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, COMMENT_IMAGE_EXT.has(ext));
+  }
+});
+
+function parseCommentImage(req, res, next) {
+  if (!req.is('multipart/form-data')) return next();
+  commentUpload.single('image')(req, res, (error) => {
+    if (!error) return next();
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    const message = error.code === 'LIMIT_FILE_SIZE'
+      ? '图片不能超过 1MB'
+      : error.code === 'LIMIT_FILE_COUNT'
+        ? '只能上传一张图片'
+        : '仅支持 jpg/jpeg/png 格式';
+    return res.status(400).json({ error: message });
+  });
+}
 
 module.exports = function (db) {
   const router = express.Router();
@@ -26,13 +65,8 @@ module.exports = function (db) {
       [postId, limit, offset]
     );
 
-    // 为每个评论查回复（最多显示2条，展开查全部）
+    // 为每个评论查回复
     for (const c of comments) {
-      const replyCount = db.get(
-        'SELECT COUNT(*) AS cnt FROM explore_comments WHERE parent_id = ?',
-        [c.id]
-      )?.cnt || 0;
-
       const replies = db.all(
         `SELECT ec.*,
           u.username AS author_name,
@@ -44,9 +78,8 @@ module.exports = function (db) {
          ORDER BY ec.created_at ASC`,
         [c.id]
       );
-
       c.replies = replies;
-      c.reply_count = replyCount;
+      c.reply_count = replies.length;
     }
 
     const total = db.get(
@@ -57,28 +90,47 @@ module.exports = function (db) {
     res.json({ items: comments, total, page: parseInt(page), pageSize: limit });
   });
 
-  // POST /api/explore/posts/:postId/comments — 发表评论 [Auth]
-  router.post('/:postId/comments', authMiddleware, (req, res) => {
+  // POST /api/explore/posts/:postId/comments — 发表评论 [Auth]（支持图片 + 楼中楼）
+  router.post('/:postId/comments', authMiddleware, parseCommentImage, (req, res) => {
     const postId = parseInt(req.params.postId);
     const userId = req.user.userId;
     const { content, parent_id } = req.body;
+    const imageFile = req.file;
 
-    if (!content || !content.trim()) {
-      return res.status(400).json({ error: '评论内容不能为空' });
+    // 至少需要文字或图片
+    if ((!content || !content.trim()) && !imageFile) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: '请输入内容或上传图片' });
+    }
+
+    // 字数限制
+    if (content && content.length > 500) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: '评论内容不能超过 500 字' });
     }
 
     const post = db.get('SELECT id, creator_id, title FROM explore_posts WHERE id = ?', [postId]);
-    if (!post) return res.status(404).json({ error: '帖子不存在' });
-
-    // 如果是回复，验证父评论
-    if (parent_id) {
-      const parent = db.get('SELECT id, author_id FROM explore_comments WHERE id = ? AND post_id = ?', [parent_id, postId]);
-      if (!parent) return res.status(400).json({ error: '被回复的评论不存在' });
+    if (!post) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(404).json({ error: '帖子不存在' });
     }
 
+    // 楼中楼：校验 parent_id
+    let parentId = null;
+    if (parent_id) {
+      parentId = Number(parent_id);
+      const parentComment = db.get('SELECT id, author_id FROM explore_comments WHERE id = ? AND post_id = ?', [parentId, postId]);
+      if (!parentComment) {
+        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+        return res.status(400).json({ error: '被回复的评论不存在' });
+      }
+    }
+
+    const imageUrl = imageFile ? `/uploads/comment-images/${imageFile.filename}` : '';
+
     const result = db.run(
-      'INSERT INTO explore_comments (post_id, author_id, content, parent_id) VALUES (?, ?, ?, ?)',
-      [postId, userId, content.trim(), parent_id || null]
+      'INSERT INTO explore_comments (post_id, author_id, content, parent_id, image_url) VALUES (?, ?, ?, ?, ?)',
+      [postId, userId, (content || '').trim(), parentId, imageUrl]
     );
     const commentId = result.lastInsertRowid;
 
@@ -86,12 +138,11 @@ module.exports = function (db) {
     const user = db.get('SELECT nickname, username FROM users WHERE id = ?', [userId]);
     const userName = user?.nickname || user?.username || '某用户';
 
-    if (parent_id) {
-      // 回复评论 → 通知被回复者
-      const parent = db.get('SELECT author_id FROM explore_comments WHERE id = ?', [parent_id]);
-      if (parent && parent.author_id !== userId) {
+    if (parentId) {
+      const parentComment = db.get('SELECT author_id FROM explore_comments WHERE id = ?', [parentId]);
+      if (parentComment && parentComment.author_id !== userId) {
         createNotification(db, {
-          userId: parent.author_id,
+          userId: parentComment.author_id,
           type: 'comment_reply',
           title: '评论回复',
           message: `${userName} 回复了你在「${post.title}」下的评论`,
@@ -100,7 +151,6 @@ module.exports = function (db) {
         });
       }
     } else {
-      // 新评论 → 通知帖子作者
       if (post.creator_id !== userId) {
         createNotification(db, {
           userId: post.creator_id,
@@ -129,19 +179,40 @@ module.exports = function (db) {
     res.status(201).json(comment);
   });
 
-  // DELETE /api/explore/posts/:postId/comments/:commentId — 删除评论 [Auth, 仅作者]
+  // DELETE /api/explore/posts/:postId/comments/:commentId — 删除评论 [Auth, 仅作者]（硬删除）
   router.delete('/:postId/comments/:commentId', authMiddleware, (req, res) => {
     const commentId = parseInt(req.params.commentId);
     const userId = req.user.userId;
 
-    const comment = db.get('SELECT author_id FROM explore_comments WHERE id = ?', [commentId]);
+    const comment = db.get('SELECT * FROM explore_comments WHERE id = ?', [commentId]);
     if (!comment) return res.status(404).json({ error: '评论不存在' });
-    if (comment.author_id !== userId) return res.status(403).json({ error: '无权删除' });
+    if (comment.author_id !== userId) return res.status(403).json({ error: '只能删除自己的评论' });
 
-    // 软删除
-    db.run("UPDATE explore_comments SET content = '[已删除]' WHERE id = ?", [commentId]);
+    // 删除图片文件
+    if (comment.image_url) {
+      const imgPath = path.join(__dirname, '..', comment.image_url);
+      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+    }
+
+    // 硬删除
+    db.run('DELETE FROM explore_comments WHERE id = ?', [commentId]);
     db.save();
+
     res.json({ message: '已删除' });
+  });
+
+  // GET /api/explore/posts/:postId/comments/:commentId/replies — 获取楼中楼回复
+  router.get('/:postId/comments/:commentId/replies', (req, res) => {
+    const commentId = parseInt(req.params.commentId);
+    const replies = db.all(
+      `SELECT ec.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
+       FROM explore_comments ec
+       JOIN users u ON ec.author_id = u.id
+       WHERE ec.parent_id = ?
+       ORDER BY ec.created_at ASC`,
+      [commentId]
+    );
+    res.json(replies);
   });
 
   return router;

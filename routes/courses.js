@@ -748,6 +748,41 @@ module.exports = function (db) {
     res.json({ message: '已删除' });
   });
 
+  // PUT /api/courses/:id/square-posts/:postId — 编辑帖子 [Auth, 仅创建者]
+  router.put('/:id/square-posts/:postId', authMiddleware, (req, res) => {
+    const bigCourseId = Number(req.params.id);
+    const postId = Number(req.params.postId);
+    const userId = req.user.userId;
+    const { title, category, description, max_people } = req.body;
+
+    const post = db.get('SELECT * FROM square_posts WHERE id = ? AND course_id = ?', [postId, bigCourseId]);
+    if (!post) return res.status(404).json({ error: '帖子不存在' });
+    if (post.creator_id !== userId) return res.status(403).json({ error: '只能编辑自己发布的帖子' });
+
+    // 校验 category
+    if (category && !COURSE_SQUARE_CATEGORIES.includes(category)) {
+      return res.status(400).json({ error: '无效的需求类型' });
+    }
+
+    db.run(
+      `UPDATE square_posts SET
+        title = COALESCE(?, title),
+        category = COALESCE(?, category),
+        description = COALESCE(?, description),
+        max_people = COALESCE(?, max_people)
+       WHERE id = ?`,
+      [
+        title?.trim() || null,
+        category || null,
+        description !== undefined ? description.trim() : null,
+        max_people !== undefined ? Number(max_people) : null,
+        postId
+      ]
+    );
+    db.save();
+    res.json({ message: '已更新' });
+  });
+
   // POST /api/courses/:id/square-posts/:postId/interest — 表示感兴趣 [Auth + 选课]（:id 为大课 ID）
   router.post('/:id/square-posts/:postId/interest', authMiddleware, (req, res) => {
     const bigCourseId = Number(req.params.id);

@@ -1809,6 +1809,29 @@ select::-ms-expand {
   color: var(--md-on-primary-container);
 }
 
+.profile-avatar-upload {
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-avatar-upload:hover .profile-avatar-overlay {
+  opacity: 1;
+}
+
+.profile-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
 .profile-identity {
   display: flex;
   flex-direction: column;
