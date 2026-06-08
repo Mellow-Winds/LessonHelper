@@ -3,7 +3,7 @@
  * 纯 ES6 Module，零全局污染
  */
 
-import { apiGet, apiPut, apiPost, apiDelete } from '../core/api.js';
+import { apiGet, apiPut, apiPost, apiDelete, getToken } from '../core/api.js';
 import { navigateTo, animIn, animStagger } from '../core/router.js';
 import { showToast, openModal, closeModal, escHtml, createMdInput, createMdSelect, createMdTextarea, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
 import { renderAuth } from './auth.js';
@@ -208,9 +208,17 @@ function renderProfileCard(data, mode) {
   const isPublic = mode === 'public';
   const readonly = isPreview || isPublic;
 
-  const avatar = data.avatar_url
+  const avatarImg = data.avatar_url
     ? `<img class="profile-avatar-img" src="${escHtml(data.avatar_url)}" alt="">`
     : `<span class="profile-avatar-letter">${(data.nickname || data.username || '?')[0]}</span>`;
+
+  const avatar = isOwner
+    ? `<label class="profile-avatar profile-avatar-upload" title="点击更换头像">
+         ${avatarImg}
+         <input type="file" accept="image/*" style="display:none" id="avatar-upload-input" onchange="window._handleAvatarUpload(event)">
+         <span class="profile-avatar-overlay"><span class="mi" style="font-size:20px;color:#fff">photo_camera</span></span>
+       </label>`
+    : `<div class="profile-avatar">${avatarImg}</div>`;
 
   const streak = data.checkin_streak || 0;
   const checkedInToday = data.last_checkin_date === getTodayShanghai();
@@ -242,7 +250,7 @@ function renderProfileCard(data, mode) {
     <div class="profile-page">
       <div class="profile-card profile-main-card">
         <div class="profile-header">
-          <div class="profile-avatar">${avatar}</div>
+          ${avatar}
           <div class="profile-identity">
             <div class="profile-name">${escHtml(data.nickname || data.username || '未设置昵称')}</div>
             ${streakBadge}
@@ -1423,6 +1431,55 @@ function handleExportData() {
 
 // 反馈通过设置列表的 page='profile-feedback' 触发
 // 在 bindProfileInteractions 中处理
+
+/* =============================================
+   头像上传
+   ============================================= */
+
+window._handleAvatarUpload = async function(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('头像不能超过 2MB');
+    return;
+  }
+  if (!file.type.startsWith('image/')) {
+    showToast('请选择图片文件');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('avatar', file);
+
+  try {
+    const token = getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch('/api/auth/avatar', {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+    const result = await res.json();
+
+    if (result.error) {
+      showToast(result.error);
+      return;
+    }
+
+    // 更新当前用户头像
+    if (window._currentUser) {
+      window._currentUser.avatar_url = result.avatar_url;
+    }
+    showToast('头像已更新');
+    // 刷新页面以更新头像显示
+    navigateTo('profile');
+  } catch {
+    showToast('上传失败，请重试');
+  }
+};
 
 export async function showFeedbackModal() {
   const html = `

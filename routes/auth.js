@@ -1,7 +1,32 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { authMiddleware, generateToken } = require('./middleware/auth');
 const { sendVerificationCode } = require('./middleware/email');
+
+const AVATAR_DIR = path.join(__dirname, '..', 'uploads', 'avatars');
+const AVATAR_MAX = 2 * 1024 * 1024;
+const AVATAR_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(AVATAR_DIR, { recursive: true });
+      cb(null, AVATAR_DIR);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `av_${req.user.userId}_${Date.now()}${ext}`);
+    }
+  }),
+  limits: { fileSize: AVATAR_MAX, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, AVATAR_EXT.has(ext));
+  }
+});
 
 const SALT_ROUNDS = 10;
 const CODE_EXPIRY_MINUTES = 5;
@@ -643,6 +668,36 @@ module.exports = function (db) {
     db.save();
 
     res.json({ streak, alreadyCheckedIn: false });
+  });
+
+  // POST /api/auth/avatar — 上传头像 [Auth]
+  router.post('/avatar', authMiddleware, (req, res) => {
+    avatarUpload.single('avatar')(req, res, (error) => {
+      if (error) {
+        const message = error.code === 'LIMIT_FILE_SIZE'
+          ? '头像不能超过 2MB'
+          : '仅支持 jpg/jpeg/png/gif/webp 格式';
+        return res.status(400).json({ error: message });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: '请选择图片文件' });
+      }
+
+      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+      // 删除旧头像文件（如果有的话）
+      const user = db.get('SELECT avatar_url FROM users WHERE id = ?', [req.user.userId]);
+      if (user?.avatar_url && user.avatar_url.startsWith('/uploads/avatars/')) {
+        const oldPath = path.join(__dirname, '..', user.avatar_url);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+
+      db.run('UPDATE users SET avatar_url = ? WHERE id = ?', [avatarUrl, req.user.userId]);
+      db.save();
+
+      res.json({ avatar_url: avatarUrl, message: '头像已更新' });
+    });
   });
 
   return router;
