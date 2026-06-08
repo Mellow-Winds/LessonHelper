@@ -548,9 +548,16 @@ function renderExploreForumComment(c, postId, childMap) {
   `;
 }
 
-function renderExploreNestedReply(child, parentAuthorName, parentAuthorId, postId, childMap) {
+function renderExploreNestedReply(child, parentAuthorName, parentAuthorId, postId, childMap, depth = 1) {
   const avatarLetter = (child.author_name || '?')[0].toUpperCase();
   const timeStr = child.created_at ? new Date(child.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  const grandchildren = childMap[child.id] || [];
+  const maxDepth = 3;
+  const childrenHtml = (grandchildren.length > 0 && depth < maxDepth)
+    ? `<div class="forum-nested-replies">${grandchildren.map(c =>
+        renderExploreNestedReply(c, child.author_name, child.author_id, postId, childMap, depth + 1)
+      ).join('')}</div>`
+    : '';
 
   return `
     <div class="forum-nested-reply">
@@ -577,12 +584,15 @@ function renderExploreNestedReply(child, parentAuthorName, parentAuthorId, postI
           ${window._currentUser && child.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="explore-delete-comment" data-post-id="${postId}" data-comment-id="${child.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
         </div>
         <div id="explore-inline-comment-${child.id}"></div>
+        ${childrenHtml}
       </div>
     </div>
   `;
 }
 
 function bindExploreForumEvents(root, postId) {
+  if (root._forumBound) return;
+  root._forumBound = true;
   root.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
