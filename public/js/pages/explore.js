@@ -228,11 +228,21 @@ registerPage('explore-post-detail', async (container, postId) => {
       return;
     }
 
-    // 帖子作者可见删除按钮
+    // 帖子作者可见编辑 + 删除按钮
     if (post.creator_id && window._currentUser?.id === post.creator_id) {
       const placeholder = container.querySelector('#detail-delete-btn-placeholder');
       if (placeholder) {
-        placeholder.innerHTML = `<button class="btn btn-secondary btn-compact" id="detail-delete-btn" style="color:var(--md-error);margin-left:auto"><i class="ri-delete-bin-line"></i> 删除</button>`;
+        placeholder.style.cssText = 'display:flex;gap:6px;margin-left:auto';
+        placeholder.innerHTML = `
+          <button class="btn btn-secondary btn-compact" id="detail-edit-btn">
+            <i class="ri-edit-line"></i> 编辑
+          </button>
+          <button class="btn btn-secondary btn-compact" id="detail-delete-btn" style="color:var(--md-error)">
+            <i class="ri-delete-bin-line"></i> 删除
+          </button>`;
+        placeholder.querySelector('#detail-edit-btn')?.addEventListener('click', () => {
+          navigateTo('explore-post-editor', post.id);
+        });
         placeholder.querySelector('#detail-delete-btn')?.addEventListener('click', () => {
           openModal('确认删除', `
             <p style="margin-bottom:24px">确定要删除这篇帖子吗？删除后无法恢复。</p>
@@ -737,23 +747,32 @@ window._submitExploreForumReply = async function(postId, parentCommentId, ctxKey
   if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<span class="mi">hourglass_empty</span>'; }
 
   try {
-    const formData = new FormData();
-    formData.append('content', content);
-    if (parentCommentId) formData.append('parent_id', String(parentCommentId));
+    let result;
+
     if (hasImage) {
+      // 有图片 → FormData（multer 解析）
+      const formData = new FormData();
+      formData.append('content', content);
+      if (parentCommentId) formData.append('parent_id', String(parentCommentId));
       imgs.files.forEach(file => formData.append('image', file));
+
+      const token = getToken();
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`/api/explore/posts/${postId}/comments`, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+      result = await res.json();
+    } else {
+      // 无图片 → JSON 请求（避免 multer 解析问题）
+      result = await apiPost(`/api/explore/posts/${postId}/comments`, {
+        content,
+        parent_id: parentCommentId || undefined
+      });
     }
-
-    const token = getToken();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const res = await fetch(`/api/explore/posts/${postId}/comments`, {
-      method: 'POST',
-      headers,
-      body: formData
-    });
-    const result = await res.json();
 
     if (result.error) {
       showToast(result.error);
