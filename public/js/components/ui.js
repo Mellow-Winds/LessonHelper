@@ -95,12 +95,12 @@ export function createMdInput(config) {
  * @returns {string} HTML string
  */
 export function createMdTextarea(config) {
-  const { id = '', label, rows = 5, required = false, attrs = '' } = config;
+  const { id = '', label, rows = 5, required = false, attrs = '', value = '' } = config;
   const idAttr = id ? `id="${id}"` : '';
   const reqAttr = required ? 'required' : '';
   return `
     <div class="md-input-group">
-      <textarea class="md-input" ${idAttr} placeholder=" " rows="${rows}" ${reqAttr} style="resize:none" ${attrs}></textarea>
+      <textarea class="md-input" ${idAttr} placeholder=" " rows="${rows}" ${reqAttr} style="resize:none" ${attrs}>${escHtml(String(value))}</textarea>
       <label class="md-label">${escHtml(label)}</label>
       <fieldset class="md-border" aria-hidden="true"><legend><span>${escHtml(label)}</span></legend></fieldset>
     </div>

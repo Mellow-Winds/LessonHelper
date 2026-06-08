@@ -333,3 +333,29 @@
 - [x] 更新 6 个测试文件以匹配新页面名和文件结构
 
 **验证**：`npm test` 执行 37 个测试全部通过；`node --check` 检查所有修改文件通过；本地服务返回 `HTTP 200`。
+
+---
+
+## 第19轮：探索模块重构 ✅
+
+**目标**：组件化卡片系统 + 左右分栏流式编辑器 + 发现页统一帖子流
+
+- [x] `server.js`：新增 `explore_posts`、`explore_cards`、`explore_comments`、`card_participants`、`card_vote_records`、`card_templates` 表
+- [x] `routes/explore_posts.js`（新建）：帖子 CRUD（含内容 blocks JSON 解析）
+- [x] `routes/explore_cards.js`（新建）：卡片加入/审批/投票
+- [x] `routes/explore_comments.js`（新建）：帖子评论（楼中楼 + 图片上传）
+- [x] `public/js/components/card-renderer.js`（新建）：卡片渲染引擎（8 种原子类型）
+- [x] `public/js/pages/explore.js`（新建）：发现页（统一帖子流 + 搜索 + 详情 + 论坛式评论）
+- [x] `public/js/pages/post-editor.js`（新建）：左右分栏流式编辑器（拖拽卡片 + Markdown）
+
+## 维护记录：探索模块七项优化 ✅
+
+**目标**：完善发现页功能闭环
+
+- [x] 页面标题「探索」→「发现」
+- [x] 帖子详情页添加删除按钮（仅作者可见）
+- [x] 空状态居中对齐（桌面端）
+- [x] 卡片支持发布后编辑（复用 post-editor 编辑弹窗）
+- [x] 评论区升级为论坛风格（内联编辑器 + 图片上传 + 楼中楼 + 删除评论）
+- [x] 课程交友贴支持编辑（新增 PUT 端点 + 编辑弹窗）
+- [x] 文档同步更新

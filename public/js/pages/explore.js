@@ -1,10 +1,10 @@
 /**
- * pages/explore.js — 探索页（组件化卡片系统）
+ * pages/explore.js — 发现页（组件化卡片系统）
  * 统一帖子流 + 搜索筛选
  */
 
 import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkdown } from '../core/router.js';
-import { apiGet, apiPost, isLoggedIn } from '../core/api.js';
+import { apiGet, apiPost, apiDelete, isLoggedIn, getToken } from '../core/api.js';
 import { showToast, openModal, closeModal, renderLoginPrompt, createMdInput } from '../components/ui.js';
 import { renderCard, renderPostCard, renderModule, startTimers, bindCardActions } from '../components/card-renderer.js';
 
@@ -30,7 +30,7 @@ async function renderExplore(container) {
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title" style="margin:0">
-        <i class="ri-compass-3-line" style="vertical-align:-3px;margin-right:4px"></i> 探索
+        <i class="ri-compass-3-line" style="vertical-align:-3px;margin-right:4px"></i> 发现
       </h1>
       <div class="explore-header-actions">
         <button class="btn btn-secondary btn-compact" id="explore-my-btn">
@@ -149,14 +149,21 @@ async function loadPosts(container) {
     _total = data.total || 0;
 
     if (newItems.length === 0 && _page === 1) {
+      // 不使用 explore-posts-grid 的 columns 布局，独立渲染居中卡片
+      listEl.style.display = 'block';
+      listEl.style.columns = 'none';
       listEl.innerHTML = `
-        <div class="explore-empty">
-          <div class="explore-empty-icon"><i class="ri-inbox-line"></i></div>
-          <div class="explore-empty-text">还没有帖子</div>
-          <div class="explore-empty-hint">点击右上角「发布」创建第一条内容</div>
+        <div class="card" style="text-align:center;padding:48px">
+          <span class="mi" style="font-size:48px;color:var(--md-outline-variant);display:block;margin-bottom:12px">inbox</span>
+          <p class="text-secondary" style="margin-top:12px">还没有帖子</p>
+          <p class="text-secondary" style="font-size:12px;color:var(--md-outline);margin-top:4px">点击右下角「发布」创建第一条内容</p>
         </div>`;
       loadMoreEl.innerHTML = '';
       return;
+    } else {
+      // 恢复网格布局
+      listEl.style.display = '';
+      listEl.style.columns = '';
     }
 
     _posts.push(...newItems);
@@ -207,6 +214,7 @@ registerPage('explore-post-detail', async (container, postId) => {
       <button class="btn btn-secondary btn-compact" id="detail-back-btn">
         <i class="ri-arrow-left-line"></i> 返回
       </button>
+      <span id="detail-delete-btn-placeholder"></span>
     </div>
     <div id="detail-content"><div class="card"><p class="text-secondary" style="text-align:center">加载中...</p></div></div>
   `;
@@ -220,6 +228,30 @@ registerPage('explore-post-detail', async (container, postId) => {
       return;
     }
 
+    // 帖子作者可见删除按钮
+    if (post.creator_id && window._currentUser?.id === post.creator_id) {
+      const placeholder = container.querySelector('#detail-delete-btn-placeholder');
+      if (placeholder) {
+        placeholder.innerHTML = `<button class="btn btn-secondary btn-compact" id="detail-delete-btn" style="color:var(--md-error);margin-left:auto"><i class="ri-delete-bin-line"></i> 删除</button>`;
+        placeholder.querySelector('#detail-delete-btn')?.addEventListener('click', () => {
+          openModal('确认删除', `
+            <p style="margin-bottom:24px">确定要删除这篇帖子吗？删除后无法恢复。</p>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+              <button class="btn btn-primary" id="confirm-delete-post" style="background:var(--md-error,#e53935)">删除</button>
+            </div>
+          `);
+          document.getElementById('confirm-delete-post')?.addEventListener('click', async () => {
+            const res = await apiDelete(`/api/explore/posts/${post.id}`);
+            if (res.error) { showToast(res.error); closeModal(); return; }
+            closeModal();
+            showToast('已删除');
+            navigateTo('explore');
+          });
+        });
+      }
+    }
+
     renderPostDetail(container.querySelector('#detail-content'), post);
   } catch (e) {
     container.querySelector('#detail-content').innerHTML = `<div class="card"><p class="text-secondary">加载失败</p></div>`;
@@ -229,6 +261,7 @@ registerPage('explore-post-detail', async (container, postId) => {
 function renderPostDetail(el, post) {
   const nickname = post.creator_nickname || post.creator_name || '匿名';
   const timeStr = new Date(post.created_at).toLocaleString('zh-CN');
+  const isOwner = post.creator_id && window._currentUser?.id === post.creator_id;
 
   // 从 blocks 渲染混合内容（文字 + 卡片交替）
   // 兼容新旧格式：新格式用 post.blocks，旧格式用 post.content + post.cards
@@ -247,11 +280,14 @@ function renderPostDetail(el, post) {
   let contentHtml = '';
 
   if (blocks.length > 0) {
-    for (const block of blocks) {
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
       if (block.type === 'text' && block.data) {
         contentHtml += `<div class="post-text-block">${renderMarkdown(block.data)}</div>`;
       } else if (block.type === 'card' && block.card) {
-        contentHtml += renderCard(block.card, { compact: false, showActions: true });
+        contentHtml += `<div class="explore-card-wrapper" data-block-index="${i}">`;
+        contentHtml += renderCard(block.card, { compact: false, showActions: true, isOwner });
+        contentHtml += `</div>`;
       }
     }
   } else {
@@ -260,7 +296,7 @@ function renderPostDetail(el, post) {
       contentHtml += `<div class="post-text-block">${renderMarkdown(post.content)}</div>`;
     }
     if (post.cards && post.cards.length > 0) {
-      contentHtml += post.cards.map(card => renderCard(card, { compact: false, showActions: true })).join('');
+      contentHtml += post.cards.map(card => renderCard(card, { compact: false, showActions: true, isOwner })).join('');
     }
   }
 
@@ -277,14 +313,8 @@ function renderPostDetail(el, post) {
       <div class="explore-detail-content">${contentHtml}</div>
 
       <div class="explore-detail-comments">
-        <h3 style="font-size:var(--text-base);font-weight:600;margin-bottom:12px">评论 (${post.comment_count || 0})</h3>
-        <div id="detail-comments-list"><p class="text-secondary" style="text-align:center;padding:16px">暂无评论</p></div>
-        ${isLoggedIn() ? `
-          <div class="comment-editor" style="margin-top:12px">
-            <textarea class="md-textarea" id="detail-comment-input" rows="2" placeholder=" " style="resize:none;width:100%;min-height:60px"></textarea>
-            <button class="btn btn-primary btn-compact" id="detail-comment-submit" style="margin-top:8px">发表评论</button>
-          </div>
-        ` : '<p class="text-secondary" style="margin-top:12px"><a href="#" onclick="navigateTo(\'auth\');return false">登录</a>后可评论</p>'}
+        <h3 style="font-size:var(--text-base);font-weight:600;margin-bottom:12px"><span class="mi" style="font-size:16px;vertical-align:-3px">chat</span> 评论 (${post.comment_count || 0})</h3>
+        <div id="explore-comments-${post.id}"></div>
       </div>
     </div>
   `;
@@ -292,70 +322,453 @@ function renderPostDetail(el, post) {
   // 启动倒计时
   _timerInterval = startTimers(el);
 
-  // 绑定卡片交互（复制功能）
+  // 绑定卡片交互（复制 + 编辑）
   bindCardActions(el, {
-    onCopy: () => showToast('已复制')
+    onCopy: () => showToast('已复制'),
+    onEdit: (cardId, btn) => {
+      const wrapper = btn.closest('.explore-card-wrapper');
+      const blockIndex = wrapper ? parseInt(wrapper.dataset.blockIndex) : -1;
+      if (blockIndex >= 0 && blocks[blockIndex]?.card) {
+        openCardEditModal(post, blocks, blockIndex, el);
+      }
+    }
   });
 
-  // 加载评论
-  loadComments(post.id, el.querySelector('#detail-comments-list'));
+  // 加载评论（论坛风格）
+  toggleExploreComments(post.id);
+}
 
-  // 评论提交
-  el.querySelector('#detail-comment-submit')?.addEventListener('click', async () => {
-    const input = el.querySelector('#detail-comment-input');
-    const content = input?.value?.trim();
-    if (!content) return;
-    const res = await apiPost(`/api/explore/posts/${post.id}/comments`, { content });
-    if (res.error) { showToast(res.error); return; }
-    input.value = '';
-    showToast('评论成功');
-    loadComments(post.id, el.querySelector('#detail-comments-list'));
+/**
+ * 卡片编辑弹窗
+ */
+function openCardEditModal(post, blocks, blockIndex, detailEl) {
+  const card = blocks[blockIndex].card;
+  if (!card) return;
+
+  const components = card.components || [];
+  let fieldsHtml = '';
+
+  // 卡片标题
+  fieldsHtml += createMdInput({
+    id: 'card-edit-title',
+    label: '卡片标题',
+    placeholder: ' ',
+    value: card.title || ''
+  });
+
+  // 每个组件渲染为可编辑字段
+  for (let i = 0; i < components.length; i++) {
+    const comp = components[i];
+    const fieldId = `card-edit-field-${i}`;
+    fieldsHtml += createMdInput({
+      id: fieldId,
+      label: comp.label || `字段 ${i + 1}`,
+      placeholder: ' ',
+      value: comp.value || ''
+    });
+  }
+
+  openModal('编辑卡片', `
+    <div style="display:flex;flex-direction:column;gap:16px;max-height:60vh;overflow-y:auto;padding-right:4px">
+      ${fieldsHtml}
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" id="confirm-card-edit">保存</button>
+    </div>
+  `);
+
+  document.getElementById('confirm-card-edit')?.addEventListener('click', async () => {
+    // 更新卡片标题
+    const newTitle = document.getElementById('card-edit-title')?.value?.trim() || '';
+    card.title = newTitle;
+
+    // 更新各组件值
+    for (let i = 0; i < components.length; i++) {
+      const fieldEl = document.getElementById(`card-edit-field-${i}`);
+      if (fieldEl) {
+        components[i].value = fieldEl.value || '';
+      }
+    }
+
+    // 更新 blocks
+    blocks[blockIndex].card = card;
+
+    // 保存到后端
+    const res = await apiPost(`/api/explore/posts/${post.id}`, {
+      _method: 'PUT',
+      content: JSON.stringify(blocks)
+    });
+    // apiPost doesn't support PUT directly, use fetch
+    const token = getToken && getToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const fetchRes = await fetch(`/api/explore/posts/${post.id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ content: JSON.stringify(blocks) })
+    });
+    const result = await fetchRes.json();
+
+    if (result.error) { showToast(result.error); return; }
+    closeModal();
+    showToast('已更新');
+    // 刷新详情
+    if (detailEl) {
+      const updatedPost = { ...post, blocks, content: JSON.stringify(blocks) };
+      renderPostDetail(detailEl, updatedPost);
+    }
   });
 }
 
-async function loadComments(postId, listEl) {
-  if (!listEl) return;
+/* =============================================
+   论坛风格评论系统（复用 square.js 模式）
+   ============================================= */
+
+const _exploreExpandedReplies = {};
+const _exploreReplyImages = {};
+
+function renderExploreCommentImages(imageUrlStr) {
+  if (!imageUrlStr) return '';
+  const urls = imageUrlStr.split(';').filter(Boolean);
+  if (urls.length === 0) return '';
+  if (urls.length === 1) {
+    return `<a href="${urls[0]}" target="_blank" rel="noopener"><img class="forum-reply-image" src="${urls[0]}" alt="评论图片" loading="lazy"></a>`;
+  }
+  return `<div class="forum-image-grid">${urls.map(url => `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="评论图片" loading="lazy"></a>`).join('')}</div>`;
+}
+
+async function toggleExploreComments(postId) {
+  const section = document.getElementById(`explore-comments-${postId}`);
+  if (!section) return;
+
+  section.innerHTML = '<p style="font-size:12px;color:var(--md-on-surface-variant);padding:8px 0">加载中...</p>';
+
   try {
     const data = await apiGet(`/api/explore/posts/${postId}/comments`);
-    const comments = data.items || [];
-    if (comments.length === 0) {
-      listEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:16px">暂无评论</p>';
+    const comments = Array.isArray(data) ? data : (data.items || []);
+
+    const topComments = comments.filter(c => !c.parent_id);
+    const childMap = {};
+    comments.forEach(c => {
+      if (c.parent_id) {
+        if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
+        childMap[c.parent_id].push(c);
+      }
+    });
+
+    if (topComments.length === 0) {
+      section.innerHTML = `
+        <div class="forum-reply-section">
+          <p style="font-size:12px;color:var(--md-on-surface-variant);padding:8px 0">暂无回复</p>
+          <div id="explore-inline-post-${postId}"></div>
+          ${isLoggedIn() ? `<button class="forum-action-btn" data-action="explore-reply-post" data-post-id="${postId}" style="margin-top:4px"><span class="mi" style="font-size:14px">chat_bubble_outline</span> 写回复</button>` : '<p class="text-secondary" style="font-size:12px"><a href="#" onclick="navigateTo(\'profile\')" style="color:var(--md-primary)">登录</a> 后参与讨论</p>'}
+        </div>
+      `;
+    } else {
+      section.innerHTML = `
+        <div class="forum-reply-section">
+          ${topComments.map(c => renderExploreForumComment(c, postId, childMap)).join('')}
+          <div id="explore-inline-post-${postId}"></div>
+          ${isLoggedIn() ? `<button class="forum-action-btn" data-action="explore-reply-post" data-post-id="${postId}" style="margin-top:4px"><span class="mi" style="font-size:14px">chat_bubble_outline</span> 写回复</button>` : ''}
+        </div>
+      `;
+    }
+
+    bindExploreForumEvents(section, postId);
+  } catch {
+    section.innerHTML = '<p style="font-size:12px;color:var(--md-error);padding:8px 0">加载失败，点击重试</p>';
+    section.style.cursor = 'pointer';
+    section.onclick = () => { section.onclick = null; toggleExploreComments(postId); };
+  }
+}
+
+function renderExploreForumComment(c, postId, childMap) {
+  const avatarLetter = (c.author_name || '?')[0].toUpperCase();
+  const children = childMap[c.id] || [];
+  const previewChildren = children.slice(-2);
+  const hiddenCount = children.length - previewChildren.length;
+  const isExpanded = _exploreExpandedReplies[c.id];
+  const timeStr = c.created_at ? new Date(c.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+  return `
+    <div class="forum-reply-row" id="explore-comment-${c.id}">
+      <div>
+        ${c.author_avatar
+          ? `<img class="forum-reply-avatar" src="${c.author_avatar}" alt="" data-action="explore-navigate-profile" data-user-id="${c.author_id}" style="cursor:pointer">`
+          : `<div class="forum-reply-avatar-letter" data-action="explore-navigate-profile" data-user-id="${c.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
+        }
+      </div>
+      <div class="forum-reply-content">
+        <div class="forum-reply-header">
+          <div class="forum-reply-meta">
+            <button class="forum-reply-name" data-action="explore-navigate-profile" data-user-id="${c.author_id}">${escHtml(c.author_name)}</button>
+            <span class="forum-reply-time">${escHtml(timeStr)}</span>
+          </div>
+        </div>
+        <p class="forum-reply-text">${escHtml(c.content || '')}</p>
+        ${renderExploreCommentImages(c.image_url)}
+        <div class="forum-reply-actions">
+          <button class="forum-action-btn" data-action="explore-reply-comment" data-post-id="${postId}" data-comment-id="${c.id}">
+            <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
+          </button>
+          ${window._currentUser && c.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="explore-delete-comment" data-post-id="${postId}" data-comment-id="${c.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
+        </div>
+        <div id="explore-inline-comment-${c.id}"></div>
+        ${children.length > 0 ? `
+          ${isExpanded ? `
+            <div class="forum-nested-replies">
+              ${children.map(child => renderExploreNestedReply(child, c.author_name, c.author_id, postId, childMap)).join('')}
+            </div>
+            <button class="forum-view-replies" data-action="explore-toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">── 收起回复 🔼</button>
+          ` : `
+            ${previewChildren.length > 0 ? `
+              <div class="forum-nested-replies">
+                ${previewChildren.map(child => renderExploreNestedReply(child, c.author_name, c.author_id, postId, childMap)).join('')}
+              </div>
+            ` : ''}
+            ${hiddenCount > 0 ? `
+              <button class="forum-view-replies" data-action="explore-toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">── 查看更多 ${hiddenCount} 条回复 🔽</button>
+            ` : ''}
+          `}
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderExploreNestedReply(child, parentAuthorName, parentAuthorId, postId, childMap) {
+  const avatarLetter = (child.author_name || '?')[0].toUpperCase();
+  const timeStr = child.created_at ? new Date(child.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+  return `
+    <div class="forum-nested-reply">
+      <div>
+        ${child.author_avatar
+          ? `<img class="forum-reply-avatar" src="${child.author_avatar}" alt="" data-action="explore-navigate-profile" data-user-id="${child.author_id}" style="cursor:pointer">`
+          : `<div class="forum-reply-avatar-letter" data-action="explore-navigate-profile" data-user-id="${child.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
+        }
+      </div>
+      <div class="forum-reply-content">
+        <div class="forum-reply-header">
+          <div class="forum-reply-meta">
+            <button class="forum-reply-name" data-action="explore-navigate-profile" data-user-id="${child.author_id}">${escHtml(child.author_name)}</button>
+            <span class="forum-reply-to">回复 <button class="forum-reply-link" data-action="explore-navigate-profile" data-user-id="${parentAuthorId}">${escHtml(parentAuthorName || '')}</button></span>
+            <span class="forum-reply-time">${escHtml(timeStr)}</span>
+          </div>
+        </div>
+        <p class="forum-reply-text">${escHtml(child.content || '')}</p>
+        ${renderExploreCommentImages(child.image_url)}
+        <div class="forum-reply-actions">
+          <button class="forum-action-btn" data-action="explore-reply-nested" data-post-id="${postId}" data-comment-id="${child.id}">
+            <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
+          </button>
+          ${window._currentUser && child.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="explore-delete-comment" data-post-id="${postId}" data-comment-id="${child.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
+        </div>
+        <div id="explore-inline-comment-${child.id}"></div>
+      </div>
+    </div>
+  `;
+}
+
+function bindExploreForumEvents(root, postId) {
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const pId = Number(btn.dataset.postId) || postId;
+    const commentId = Number(btn.dataset.commentId);
+
+    switch (action) {
+      case 'explore-reply-post':
+        openExploreInlineEditor(postId, null, `post-${postId}`);
+        break;
+      case 'explore-reply-comment':
+        openExploreInlineEditor(postId, commentId, `comment-${commentId}`);
+        break;
+      case 'explore-reply-nested':
+        openExploreInlineEditor(postId, commentId, `nested-${commentId}`);
+        break;
+      case 'explore-toggle-replies':
+        _exploreExpandedReplies[commentId] = !_exploreExpandedReplies[commentId];
+        toggleExploreComments(postId);
+        break;
+      case 'explore-delete-comment':
+        openModal('确认删除', `
+          <p style="margin-bottom:24px">确定要删除这条回复吗？删除后无法恢复</p>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" id="confirm-explore-delete" style="background:var(--md-error,#e53935)">删除</button>
+          </div>
+        `);
+        document.getElementById('confirm-explore-delete')?.addEventListener('click', async () => {
+          const result = await apiDelete(`/api/explore/posts/${pId}/comments/${commentId}`);
+          if (result.error) { showToast(result.error); closeModal(); return; }
+          closeModal();
+          toggleExploreComments(postId);
+          showToast('已删除');
+        });
+        break;
+      case 'explore-navigate-profile':
+        navigateTo('profile-user', Number(btn.dataset.userId));
+        break;
+    }
+  });
+}
+
+function openExploreInlineEditor(postId, parentCommentId, ctxKey) {
+  const containerId = parentCommentId
+    ? `explore-inline-comment-${parentCommentId}`
+    : `explore-inline-post-${postId}`;
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (container.innerHTML.trim() !== '') {
+    closeExploreInlineEditor(ctxKey);
+    return;
+  }
+
+  // 关闭其他已打开的编辑器
+  document.querySelectorAll('[id^="explore-inline-"]').forEach(el => {
+    if (el.id !== containerId && el.innerHTML.trim() !== '') {
+      el.innerHTML = '';
+    }
+  });
+
+  _exploreReplyImages[ctxKey] = { files: [], urls: [] };
+
+  container.innerHTML = `
+    <div class="forum-inline-editor">
+      <div class="forum-editor-row">
+        <textarea class="forum-editor-textarea" id="explore-textarea-${ctxKey}"
+          placeholder=" " rows="1"></textarea>
+        <div class="forum-editor-actions">
+          <input type="file" id="explore-file-${ctxKey}" accept="image/jpeg,image/png"
+            style="display:none" onchange="window._handleExploreReplyImageChange('${ctxKey}', ${postId})">
+          <button class="forum-editor-btn forum-editor-camera" onclick="document.getElementById('explore-file-${ctxKey}').click()" title="添加图片">
+            <span class="mi">photo_camera</span>
+          </button>
+          <button class="forum-editor-btn forum-editor-send" id="explore-send-${ctxKey}"
+            onclick="window._submitExploreForumReply(${postId}, ${parentCommentId || 'null'}, '${ctxKey}')">
+            <span class="mi">send</span>
+          </button>
+        </div>
+      </div>
+      <div class="forum-editor-previews" id="explore-previews-${ctxKey}"></div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    const textarea = document.getElementById(`explore-textarea-${ctxKey}`);
+    if (textarea) textarea.focus();
+  }, 150);
+
+  // 失焦自动关闭
+  setTimeout(() => {
+    const editorDiv = container.querySelector('.forum-inline-editor');
+    if (!editorDiv) return;
+    editorDiv.addEventListener('focusout', () => {
+      setTimeout(() => {
+        if (editorDiv.contains(document.activeElement)) return;
+        const ta = editorDiv.querySelector('textarea');
+        if (ta && ta.value.trim()) return;
+        const imgs = _exploreReplyImages[ctxKey];
+        if (imgs && imgs.files.length > 0) return;
+        closeExploreInlineEditor(ctxKey);
+      }, 300);
+    });
+  }, 200);
+}
+
+function closeExploreInlineEditor(ctxKey) {
+  const textarea = document.getElementById(`explore-textarea-${ctxKey}`);
+  if (!textarea) return;
+  const container = textarea.closest('.forum-inline-editor')?.parentElement;
+  if (container) container.innerHTML = '';
+  delete _exploreReplyImages[ctxKey];
+}
+
+// 全局函数供 inline onclick 调用
+window._handleExploreReplyImageChange = function(ctxKey, postId) {
+  const input = document.getElementById(`explore-file-${ctxKey}`);
+  if (!input) return;
+  const files = Array.from(input.files);
+  if (files.length === 0) return;
+  if (files.some(f => !f.type.startsWith('image/'))) { showToast('仅支持图片文件'); input.value = ''; return; }
+  if (files.some(f => f.size > 1 * 1024 * 1024)) { showToast('图片不能超过 1MB'); input.value = ''; return; }
+
+  _exploreReplyImages[ctxKey] = { files: [files[0]], urls: [URL.createObjectURL(files[0])] };
+  const container = document.getElementById(`explore-previews-${ctxKey}`);
+  if (container) {
+    container.innerHTML = _exploreReplyImages[ctxKey].urls.map((url, i) => `
+      <div class="forum-preview-thumb">
+        <img src="${url}" alt="">
+        <button class="forum-preview-remove" onclick="window._removeExplorePreviewImage('${ctxKey}', ${i})"><span class="mi" style="font-size:14px">close</span></button>
+      </div>
+    `).join('');
+  }
+};
+
+window._removeExplorePreviewImage = function(ctxKey, index) {
+  const imgs = _exploreReplyImages[ctxKey];
+  if (!imgs) return;
+  imgs.files.splice(index, 1);
+  imgs.urls.splice(index, 1);
+  const container = document.getElementById(`explore-previews-${ctxKey}`);
+  if (container) container.innerHTML = '';
+  delete _exploreReplyImages[ctxKey];
+};
+
+window._submitExploreForumReply = async function(postId, parentCommentId, ctxKey) {
+  const textarea = document.getElementById(`explore-textarea-${ctxKey}`);
+  if (!textarea) return;
+
+  const content = textarea.value.trim();
+  const imgs = _exploreReplyImages[ctxKey];
+  const hasImage = imgs && imgs.files.length > 0;
+
+  if (!content && !hasImage) {
+    showToast('请输入内容或上传图片');
+    return;
+  }
+
+  const sendBtn = document.getElementById(`explore-send-${ctxKey}`);
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<span class="mi">hourglass_empty</span>'; }
+
+  try {
+    const formData = new FormData();
+    formData.append('content', content);
+    if (parentCommentId) formData.append('parent_id', String(parentCommentId));
+    if (hasImage) {
+      imgs.files.forEach(file => formData.append('image', file));
+    }
+
+    const token = getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`/api/explore/posts/${postId}/comments`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+    const result = await res.json();
+
+    if (result.error) {
+      showToast(result.error);
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<span class="mi">send</span>'; }
       return;
     }
-    listEl.innerHTML = comments.map(c => renderComment(c)).join('');
-  } catch (e) {
-    listEl.innerHTML = '<p class="text-secondary">加载评论失败</p>';
+
+    closeExploreInlineEditor(ctxKey);
+    showToast('回复成功');
+    toggleExploreComments(postId);
+  } catch {
+    showToast('网络错误，请重试');
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<span class="mi">send</span>'; }
   }
-}
-
-function renderComment(c) {
-  const nickname = c.author_nickname || c.author_name || '匿名';
-  const avatarLetter = (nickname[0] || '?').toUpperCase();
-  const avatarHtml = c.author_avatar
-    ? `<img class="comment-avatar" src="${c.author_avatar}" alt="">`
-    : `<div class="comment-avatar-letter">${avatarLetter}</div>`;
-
-  let repliesHtml = '';
-  if (c.replies && c.replies.length > 0) {
-    repliesHtml = `<div class="comment-nested">${c.replies.map(r => {
-      const rNick = r.author_nickname || r.author_name || '匿名';
-      const rLetter = (rNick[0] || '?').toUpperCase();
-      const rAvatar = r.author_avatar
-        ? `<img class="comment-avatar" src="${r.author_avatar}" alt="">`
-        : `<div class="comment-avatar-letter">${rLetter}</div>`;
-      return `<div class="comment-item">
-        <div class="comment-header">${rAvatar}<span class="comment-author">${escHtml(rNick)}</span><span class="comment-time">${formatTimeAgo(r.created_at)}</span></div>
-        <div class="comment-body"><div class="comment-content">${escHtml(r.content)}</div></div>
-      </div>`;
-    }).join('')}</div>`;
-  }
-
-  return `<div class="comment-item">
-    <div class="comment-header">${avatarHtml}<span class="comment-author">${escHtml(nickname)}</span><span class="comment-time">${formatTimeAgo(c.created_at)}</span></div>
-    <div class="comment-body"><div class="comment-content">${escHtml(c.content)}</div></div>
-    ${repliesHtml}
-  </div>`;
-}
+};
 
 /* =============================================
    我的发布页
@@ -382,9 +795,9 @@ registerPage('explore-my-posts', async (container) => {
 
     if (posts.length === 0) {
       listEl.innerHTML = `
-        <div class="explore-empty">
-          <div class="explore-empty-icon"><i class="ri-file-list-3-line"></i></div>
-          <div class="explore-empty-text">还没有发布过内容</div>
+        <div class="card" style="text-align:center;padding:48px">
+          <span class="mi" style="font-size:48px;color:var(--md-outline-variant);display:block;margin-bottom:12px">post_add</span>
+          <p class="text-secondary">还没有发布过内容</p>
         </div>`;
       return;
     }
