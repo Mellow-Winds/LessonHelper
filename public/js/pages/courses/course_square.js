@@ -168,7 +168,7 @@ export async function viewCourseSquarePost(courseId, postId, prefix) {
           <span><span class="mi" style="font-size:16px;vertical-align:-3px">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${data.creator_id})">${escHtml(data.creator_name)}</button>${data.creator_major ? ' · ' + escHtml(data.creator_major) : ''}${data.creator_grade ? ' · ' + escHtml(data.creator_grade) : ''}</span>
         </div>
         ${!isCreator ? renderCourseSquareAction(data, courseId, prefix) : ''}
-        ${isCreator ? `<div style="margin-top:12px"><button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" id="${prefix}-sq-delete-btn"><span class="mi" style="font-size:14px">delete</span> 删除帖子</button></div>` : ''}
+        ${isCreator ? `<div style="margin-top:12px;display:flex;gap:6px"><button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" id="${prefix}-sq-edit-btn"><span class="mi" style="font-size:14px">edit</span> 编辑</button><button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" id="${prefix}-sq-delete-btn"><span class="mi" style="font-size:14px">delete</span> 删除</button></div>` : ''}
       </div>
 
       ${isCreator ? renderCourseSquareCreatorPanel(data, courseId, prefix) : ''}
@@ -198,6 +198,11 @@ export async function viewCourseSquarePost(courseId, postId, prefix) {
     // 返回按钮
     document.getElementById(`${prefix}-sq-back-btn`)?.addEventListener('click', () => {
       renderCourseSquareTab(tabContent, courseId, prefix);
+    });
+
+    // 编辑按钮
+    document.getElementById(`${prefix}-sq-edit-btn`)?.addEventListener('click', () => {
+      openCourseSquareEditModal(courseId, postId, prefix, data);
     });
 
     // 删除按钮
@@ -357,6 +362,66 @@ export function openCourseSquareCreateModal(courseId, prefix) {
     closeModal();
     showToast('发布成功');
     await refreshCourseSquarePosts(courseId, prefix);
+  });
+}
+
+/**
+ * 编辑搭子帖 Modal — 复用创建表单，预填数据，提交 PUT
+ */
+function openCourseSquareEditModal(courseId, postId, prefix, postData) {
+  openModal('编辑搭子帖', `
+    <div style="display:flex;flex-direction:column;gap:16px">
+      ${createMdInput({ id: `${prefix}-sq-edit-title`, label: '标题', placeholder: ' ', value: postData.title || '' })}
+      ${createMdSelect({
+        id: `${prefix}-sq-edit-category`,
+        label: '类型',
+        options: COURSE_SQUARE_CATEGORIES.map(c => ({ text: c, value: c })),
+        selected: postData.category || ''
+      })}
+      ${createMdTextarea({ id: `${prefix}-sq-edit-desc`, label: '描述', placeholder: '详细描述你的需求...', rows: 4, value: postData.description || '' })}
+      ${createMdInput({ id: `${prefix}-sq-edit-max`, label: '期望人数', type: 'number', value: String(postData.max_people || 2), min: '1', max: '20' })}
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" id="${prefix}-sq-edit-submit-btn">保存</button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById(`${prefix}-sq-edit-submit-btn`)?.addEventListener('click', async () => {
+    const title = document.getElementById(`${prefix}-sq-edit-title`)?.value?.trim();
+    const category = document.getElementById(`${prefix}-sq-edit-category`)?.value;
+    const description = document.getElementById(`${prefix}-sq-edit-desc`)?.value?.trim();
+    const max_people = Number(document.getElementById(`${prefix}-sq-edit-max`)?.value) || 2;
+
+    if (!title) { showToast('请输入标题'); return; }
+    if (!category) { showToast('请选择类型'); return; }
+
+    const btn = document.getElementById(`${prefix}-sq-edit-submit-btn`);
+    btn.disabled = true;
+    btn.textContent = '保存中...';
+
+    const token = getToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`/api/courses/${courseId}/square-posts/${postId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ title, category, description, max_people })
+    });
+    const result = await res.json();
+
+    if (result.error) {
+      showToast(result.error);
+      btn.disabled = false;
+      btn.textContent = '保存';
+      return;
+    }
+
+    closeModal();
+    showToast('已更新');
+    // 刷新帖子详情
+    viewCourseSquarePost(courseId, postId, prefix);
   });
 }
 

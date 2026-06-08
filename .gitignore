@@ -4,3 +4,7 @@ uploads/
 .env
 test-results/
 playwright-report/
+
+# Database files
+db/*.db
+db/*.sqlite

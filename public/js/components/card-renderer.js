@@ -37,14 +37,16 @@ export function renderCard(card, opts = {}) {
     html += `</div>`;
   }
 
+  const isOwner = opts.isOwner || false;
+
   // 参与者信息 + 操作按钮（非 compact 模式）
   if (!compact && showActions && card.max_participants > 0) {
     html += renderParticipantsSection(card);
   }
 
-  // 非 compact 模式下的操作按钮
-  if (!compact && showActions) {
-    html += renderCardActions(card);
+  // 非 compact 模式下的操作按钮（含编辑按钮，仅拥有者可见）
+  if (!compact && (showActions || isOwner)) {
+    html += renderCardActions(card, isOwner);
   }
 
   html += `</div>`;
@@ -217,7 +219,7 @@ function renderParticipantsSection(card) {
   </div>`;
 }
 
-function renderCardActions(card) {
+function renderCardActions(card, isOwner = false) {
   const myStatus = card.my_status;
   let btnHtml = '';
 
@@ -235,7 +237,12 @@ function renderCardActions(card) {
     btnHtml = `<span class="text-secondary" style="font-size:12px">已满员</span>`;
   }
 
-  return btnHtml ? `<div class="explore-card-actions">${btnHtml}</div>` : '';
+  // 卡片拥有者可见编辑按钮
+  if (isOwner) {
+    btnHtml += `<button class="btn btn-sm btn-secondary" data-action="edit" data-card-id="${card.id}" style="margin-left:auto"><i class="ri-edit-line"></i> 编辑</button>`;
+  }
+
+  return btnHtml ? `<div class="explore-card-actions">${btnHtml}</div>` : (isOwner ? `<div class="explore-card-actions"><button class="btn btn-sm btn-secondary" data-action="edit" data-card-id="${card.id}" style="margin-left:auto"><i class="ri-edit-line"></i> 编辑</button></div>` : '');
 }
 
 function getDefaultIcon(type) {
@@ -283,7 +290,7 @@ export function startTimers(container) {
 /**
  * 绑定卡片交互事件（投票、加入、复制）
  */
-export function bindCardActions(container, { onJoin, onCancelJoin, onVote, onCopy }) {
+export function bindCardActions(container, { onJoin, onCancelJoin, onVote, onCopy, onEdit }) {
   container.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn) {
@@ -315,6 +322,8 @@ export function bindCardActions(container, { onJoin, onCancelJoin, onVote, onCop
       onJoin(cardId, btn);
     } else if (action === 'cancel-join' && onCancelJoin) {
       onCancelJoin(cardId, btn);
+    } else if (action === 'edit' && onEdit) {
+      onEdit(cardId, btn);
     }
   });
 

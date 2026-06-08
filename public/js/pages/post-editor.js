@@ -8,7 +8,7 @@
  */
 
 import { registerPage, navigateTo, animIn, bindRipples, renderMarkdown } from '../core/router.js';
-import { apiGet, apiPost, isLoggedIn } from '../core/api.js';
+import { apiGet, apiPost, isLoggedIn, getToken } from '../core/api.js';
 import { showToast, openModal, closeModal, createMdInput } from '../components/ui.js';
 import { renderModule } from '../components/card-renderer.js';
 
@@ -19,6 +19,7 @@ import { renderModule } from '../components/card-renderer.js';
 let _templates = [];
 let _draggedTemplate = null;   // 正在拖拽的模板对象
 let _draggedCardEl = null;     // 正在拖拽的已插入卡片元素
+let _editingPostId = null;     // 编辑模式下的帖子 ID，null = 创建模式
 
 /* =============================================
    使用教程弹窗
@@ -63,8 +64,11 @@ function showEditorTutorial() {
    入口
    ============================================= */
 
-async function renderPostEditor(container) {
+async function renderPostEditor(container, postId) {
   if (!isLoggedIn()) { showToast('请先登录'); navigateTo('explore'); return; }
+
+  _editingPostId = postId || null;
+  const isEdit = !!_editingPostId;
 
   // 加载模板
   try {
@@ -72,16 +76,24 @@ async function renderPostEditor(container) {
     if (_templates.error) _templates = [];
   } catch (e) { _templates = []; }
 
-  // 首次进入弹出使用教程
-  await showEditorTutorial();
+  // 编辑模式：加载已有帖子数据
+  let existingPost = null;
+  if (isEdit) {
+    try {
+      existingPost = await apiGet(`/api/explore/posts/${postId}`);
+    } catch (e) { /* fallback to create mode */ }
+  }
+
+  // 首次进入弹出使用教程（创建模式）
+  if (!isEdit) await showEditorTutorial();
 
   container.innerHTML = `
     <div class="page-header">
       <button class="btn btn-secondary btn-compact" id="editor-back-btn">
         <i class="ri-arrow-left-line"></i> 返回
       </button>
-      <h1 class="page-title" style="margin:0">发布</h1>
-      <button class="btn btn-primary btn-compact" id="editor-submit-btn">发布</button>
+      <h1 class="page-title" style="margin:0">${isEdit ? '编辑帖子' : '发布'}</h1>
+      <button class="btn btn-primary btn-compact" id="editor-submit-btn">${isEdit ? '保存' : '发布'}</button>
     </div>
 
     <div id="editor-title-input"></div>
@@ -109,14 +121,38 @@ async function renderPostEditor(container) {
 
   // 渲染标题输入
   container.querySelector('#editor-title-input').innerHTML = createMdInput({
-    id: 'post-title', label: '帖子标题', placeholder: ' ', required: true
+    id: 'post-title', label: '帖子标题', placeholder: ' ', required: true,
+    value: existingPost?.title || ''
   });
 
   // 渲染模板列表
   renderTemplateList(container.querySelector('#editor-template-list'));
 
+  // 编辑模式：还原已有内容到编辑区
+  if (isEdit && existingPost) {
+    const canvas = container.querySelector('#editor-canvas');
+    restoreBlocksToCanvas(canvas, existingPost.blocks || []);
+  }
+
   // 绑定事件
   bindEditorEvents(container);
+}
+
+/**
+ * 将 blocks 还原到 contentEditable 编辑区
+ */
+function restoreBlocksToCanvas(canvas, blocks) {
+  if (!blocks || blocks.length === 0) return;
+  for (const block of blocks) {
+    if (block.type === 'text' && block.data) {
+      canvas.appendChild(document.createTextNode(block.data));
+      canvas.appendChild(document.createElement('br'));
+    } else if (block.type === 'card' && block.card) {
+      const cardEl = createCardElement(block.card);
+      canvas.appendChild(cardEl);
+      canvas.appendChild(document.createTextNode('\n'));
+    }
+  }
 }
 
 /* =============================================
@@ -276,7 +312,11 @@ function bindEditorEvents(container) {
 
   // 返回
   container.querySelector('#editor-back-btn')?.addEventListener('click', () => {
-    navigateTo('explore');
+    if (_editingPostId) {
+      navigateTo('explore-post-detail', _editingPostId);
+    } else {
+      navigateTo('explore');
+    }
   });
 
   // 粘贴时清除格式
@@ -586,22 +626,46 @@ async function handleSubmit(canvas) {
   if (blocks.length === 0) { showToast('请输入内容'); return; }
 
   const btn = document.getElementById('editor-submit-btn');
+  const isEdit = !!_editingPostId;
   btn.disabled = true;
-  btn.textContent = '发布中...';
+  btn.textContent = isEdit ? '保存中...' : '发布中...';
 
   try {
-    const res = await apiPost('/api/explore/posts', {
-      title,
-      content: JSON.stringify(blocks)
-    });
+    let res;
+
+    if (isEdit) {
+      // 编辑模式 → PUT 请求
+      const token = getToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const fetchRes = await fetch(`/api/explore/posts/${_editingPostId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ title, content: JSON.stringify(blocks) })
+      });
+      res = await fetchRes.json();
+    } else {
+      // 创建模式 → POST 请求
+      res = await apiPost('/api/explore/posts', {
+        title,
+        content: JSON.stringify(blocks)
+      });
+    }
+
     if (res.error) { showToast(res.error); return; }
-    showToast('发布成功');
-    navigateTo('explore');
+    showToast(isEdit ? '已保存' : '发布成功');
+
+    if (isEdit) {
+      navigateTo('explore-post-detail', _editingPostId);
+    } else {
+      navigateTo('explore');
+    }
   } catch (e) {
-    showToast('发布失败');
+    showToast(isEdit ? '保存失败' : '发布失败');
   } finally {
     btn.disabled = false;
-    btn.textContent = '发布';
+    btn.textContent = isEdit ? '保存' : '发布';
   }
 }
 
@@ -624,4 +688,4 @@ function escAttr(str) {
    页面注册
    ============================================= */
 
-registerPage('explore-post-editor', (container) => renderPostEditor(container));
+registerPage('explore-post-editor', (container, postId) => renderPostEditor(container, postId));

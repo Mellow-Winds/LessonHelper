@@ -2,7 +2,7 @@
 
 ## 设计语言
 
-Material Design 3（MD3），详细规则见项目根目录 [themerules](../themerules)。
+Material Design 3（MD3），详细规则见项目根目录 [rules](../rules)。
 
 ---
 
