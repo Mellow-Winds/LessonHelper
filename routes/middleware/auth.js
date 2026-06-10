@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-// JWT Secret — 生产环境应放在环境变量中
-const JWT_SECRET = process.env.JWT_SECRET || 'kedazi_jwt_secret_2026';
+// JWT Secret — 从环境变量读取；详见 .env 配置
+const JWT_SECRET = process.env.JWT_SECRET || '';
 const TOKEN_EXPIRY = '7d';
 
 // 生成 Token

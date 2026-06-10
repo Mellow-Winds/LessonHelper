@@ -1075,8 +1075,7 @@ async function loadMaterials(contentEl, courseId, enrolled, opts = {}) {
       ${createMdSelect({
         id: 'detail-mat-category',
         options: categories.map(c => ({ text: c, value: c === '全部' ? 'all' : c })),
-        style: 'width:120px;margin-bottom:0',
-        onchange: `refreshMyMaterials(${courseId})`
+        style: 'width:120px;margin-bottom:0'
       })}
       ${createMdSelect({
         id: 'detail-mat-sort',
@@ -1085,8 +1084,7 @@ async function loadMaterials(contentEl, courseId, enrolled, opts = {}) {
           { text: '评分最高', value: 'rating' },
           { text: '下载最多', value: 'downloads' }
         ],
-        style: 'width:130px;margin-bottom:0',
-        onchange: `refreshMyMaterials(${courseId})`
+        style: 'width:130px;margin-bottom:0'
       })}
       ${createMdInput({
         id: 'detail-mat-chapter',
@@ -1102,6 +1100,10 @@ async function loadMaterials(contentEl, courseId, enrolled, opts = {}) {
       ${renderMaterialsList(materials, courseId, enrolled)}
     </div>
   `;
+
+  // 绑定资料筛选下拉事件
+  document.getElementById('detail-mat-category-container')?.addEventListener('md-select-change', () => refreshMyMaterials(courseId));
+  document.getElementById('detail-mat-sort-container')?.addEventListener('md-select-change', () => refreshMyMaterials(courseId));
 
   const cards = contentEl.querySelectorAll('.material-card');
   if (cards.length) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });

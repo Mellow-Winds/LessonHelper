@@ -333,6 +333,22 @@ module.exports = function (db) {
     const { content, parent_id } = req.body;
     const imageFile = req.file;
 
+    // 风控：同一用户 30 秒内只能评论一次
+    const lastComment = db.get(
+      'SELECT MAX(created_at) as last_time FROM square_comments WHERE author_id = ?',
+      [userId]
+    );
+    if (lastComment?.last_time) {
+      const elapsed = Date.now() - new Date(lastComment.last_time).getTime();
+      if (elapsed < 30000) {
+        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+        return res.status(429).json({
+          error: `评论发送太频繁，请 ${Math.ceil((30000 - elapsed) / 1000)} 秒后再试`,
+          retryAfter: Math.ceil((30000 - elapsed) / 1000)
+        });
+      }
+    }
+
     // 至少需要文字或图片
     if ((!content || !content.trim()) && !imageFile) {
       if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);

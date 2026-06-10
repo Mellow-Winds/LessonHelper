@@ -32,8 +32,7 @@ export async function renderInvites(container) {
           { text: '今天', value: 'today' },
           { text: '近7天', value: 'week' }
         ],
-        style: 'width:auto;min-width:100px;margin-bottom:0',
-        onchange: 'refreshInvites()'
+        style: 'width:auto;min-width:100px;margin-bottom:0'
       })}
       ${createMdSelect({
         id: 'invite-filter-status',
@@ -43,12 +42,14 @@ export async function renderInvites(container) {
           { text: '已满', value: 'full' },
           { text: '已关闭', value: 'closed' }
         ],
-        style: 'width:auto;min-width:100px;margin-bottom:0',
-        onchange: 'refreshInvites()'
+        style: 'width:auto;min-width:100px;margin-bottom:0'
       })}
     </div>
     <div id="invites-list"></div>
   `;
+
+  document.getElementById('invite-filter-date-container')?.addEventListener('md-select-change', refreshInvites);
+  document.getElementById('invite-filter-status-container')?.addEventListener('md-select-change', refreshInvites);
 
   await refreshInvites();
 }

@@ -26,6 +26,8 @@ module.exports = function (db) {
       .filter(b => b.type === 'text' && b.data)
       .map(b => b.data)
       .join(' ')
+      .replace(/<[^>]+>/g, '')   // 去除 HTML 标签
+      .replace(/&[a-z]+;/gi, '')  // 去除 HTML 实体
       .replace(/[#*_`~\[\]]/g, '')
       .replace(/\n+/g, ' ')
       .slice(0, maxLen);

@@ -32,12 +32,13 @@ export async function renderSquare(container) {
       ${createMdSelect({
         id: 'square-filter-category',
         options: [{ text: '全部类型', value: 'all' }, ...SQUARE_CATEGORIES.map(c => ({ text: c, value: c }))],
-        style: 'width:auto;min-width:120px;margin-bottom:0',
-        onchange: 'refreshSquarePosts()'
+        style: 'width:auto;min-width:120px;margin-bottom:0'
       })}
     </div>
     <div id="square-posts-list"></div>
   `;
+
+  document.getElementById('square-filter-category-container')?.addEventListener('md-select-change', refreshSquarePosts);
 
   await refreshSquarePosts();
 }

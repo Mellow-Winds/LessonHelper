@@ -1,4 +1,6 @@
+require('dotenv').config();
 const express = require('express');
+const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 const initSqlJs = require('sql.js');
@@ -642,7 +644,24 @@ async function start() {
   db.save();
 
   // --- Middleware ---
-  app.use(express.json());
+  // 仅保留必要安全头：COOP + CORP + X-Content-Type + X-Frame + STS + Referrer-Policy
+  // 禁用 CSP（与 CDN 资源冲突）、禁用 X-Permitted-Cross-Domain（无 Adobe 需求）
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+      xDnsPrefetchControl: false,
+      xPermittedCrossDomainPolicies: false,
+    })
+  );
+  app.use(express.json({ limit: '10mb' }));
+  // 环境变量注入：将 .env 中前端需要公开的 Key 注入为全局变量
+  app.get('/env.js', (req, res) => {
+    res.type('application/javascript');
+    res.send(`window.ENV = {
+  TURNSTILE_SITE_KEY: '${process.env.TURNSTILE_SITE_KEY || ''}'
+};`);
+  });
   app.use(express.static(path.join(__dirname, 'public')));
   app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
   app.use('/data', express.static(path.join(__dirname, 'data')));

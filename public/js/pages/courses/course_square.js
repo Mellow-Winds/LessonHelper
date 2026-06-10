@@ -39,8 +39,7 @@ export async function renderCourseSquareTab(container, courseId, prefix) {
       ${createMdSelect({
         id: `${prefix}-sq-filter-category`,
         options: [{ text: '全部类型', value: 'all' }, ...COURSE_SQUARE_CATEGORIES.map(c => ({ text: c, value: c }))],
-        style: 'width:auto;min-width:120px;margin-bottom:0',
-        onchange: `window._refreshCourseSquare_${prefix}(${courseId})`
+        style: 'width:auto;min-width:120px;margin-bottom:0'
       })}
       <button class="btn btn-primary btn-compact" id="${prefix}-sq-create-btn">
         <span class="mi">add</span> 发布搭子帖
@@ -54,8 +53,10 @@ export async function renderCourseSquareTab(container, courseId, prefix) {
     openCourseSquareCreateModal(courseId, prefix);
   });
 
-  // 注册全局刷新函数
-  window[`_refreshCourseSquare_${prefix}`] = (cid) => refreshCourseSquarePosts(cid, prefix);
+  // 绑定分类筛选下拉事件
+  document.getElementById(`${prefix}-sq-filter-category-container`)?.addEventListener('md-select-change', () => {
+    refreshCourseSquarePosts(courseId, prefix);
+  });
 
   await refreshCourseSquarePosts(courseId, prefix);
 }

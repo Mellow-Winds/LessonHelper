@@ -14,7 +14,9 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cropperjs": "^1.6.2",
+    "dotenv": "^17.4.2",
     "express": "^4.21.0",
+    "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "markdown-it": "^14.2.0",
     "marked": "^18.0.4",
