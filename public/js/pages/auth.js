@@ -1112,7 +1112,8 @@ registerPage('search', async (container, data) => {
     <div class="search-bar-row form-row" style="margin-bottom:16px">
       ${createMdInput({
         id: 'search-page-input',
-        label: '搜索课程、资料、帖子、广场...',
+        label: '搜索',
+        placeholder: ' ',
         value: q,
         style: 'flex:1;margin-bottom:0',
         attrs: `onkeydown="handleSearchPageKey(event)"`

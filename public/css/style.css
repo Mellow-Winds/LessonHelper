@@ -1410,30 +1410,9 @@ select::-ms-expand {
   flex-shrink: 0;
 }
 
-/* ---- Search Bar: input & button height sync ---- */
-.search-bar-row .md-input-group .md-input,
-.search-bar-row .md-input-group .md-border,
-.search-bar-row > .btn,
-.search-bar-row > button {
-  height: 48px !important;
-  border-radius: 12px !important;
-}
-.search-bar-row .md-input-group .md-border {
-  display: none !important;
-}
-.search-bar-row .md-input-group .md-input {
-  padding: 0 16px !important;
-  line-height: 48px !important;
-  border: 1px solid var(--md-outline) !important;
-}
+/* ---- Search Bar: keep MD3 outlined style, only layout overrides ---- */
 .search-bar-row .md-input-group {
-  margin-bottom: 0 !important;
-}
-.search-bar-row > .btn,
-.search-bar-row > button {
-  padding: 0 24px !important;
-  flex-shrink: 0;
-  border: 1px solid var(--md-outline) !important;
+  margin-bottom: 0;
 }
 
 /* ---- Material Filter Bar ---- */
@@ -5135,27 +5114,10 @@ input, textarea, select, button,
     overflow: hidden;
   }
 
-  /* 输入框本体：48px 高，12px 圆角 */
-  .search-bar-row .md-input,
-  .search-bar-row input {
-    height: 48px !important;
-    border-radius: 12px !important;
-    padding: 0 16px !important;
-    font-size: 16px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  /* 搜索按钮：固定 96px 宽，48px 高，12px 圆角 */
+  /* 搜索按钮 */
   .search-bar-row > .btn,
   .search-bar-row > button {
     flex-shrink: 0;
-    width: 96px !important;
-    min-width: 96px;
-    max-width: 96px;
-    height: 48px !important;
-    border-radius: 12px !important;
-    font-size: 16px !important;
     font-weight: 500;
     padding: 0;
     justify-content: center;
@@ -5252,19 +5214,11 @@ input, textarea, select, button,
   }
 
   /* ---- 问题8：搜索栏输入框和按钮一致性 ---- */
-  .search-bar-row .md-input-group .md-input {
-    height: 48px !important;
-    border-radius: 12px !important;
-    border: 1px solid var(--md-outline) !important;
-  }
-  .search-bar-row .md-input-group .md-border {
-    display: none !important;
-  }
-  .search-bar-row .md-input-group .md-border legend {
-    display: none !important;
+  .search-bar-row .md-input-group {
+    margin-bottom: 0;
   }
   .search-bar-row > .btn {
-    border: 1px solid var(--md-outline) !important;
+    flex-shrink: 0;
   }
 
   /* ---- 问题9：并列选择框换行支持 ---- */
