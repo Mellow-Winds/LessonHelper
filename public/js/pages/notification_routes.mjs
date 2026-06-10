@@ -1,4 +1,4 @@
-export function resolveNotificationTarget(relatedType, relatedId, courseId) {
+export function resolveNotificationTarget(relatedType, relatedId, courseId, relatedCommentId = 0) {
   if ((relatedType === 'post' || relatedType === 'material') && courseId) {
     return { page: 'course-detail', data: courseId };
   }
@@ -12,7 +12,10 @@ export function resolveNotificationTarget(relatedType, relatedId, courseId) {
   }
 
   if (relatedType === 'explore_post' && relatedId) {
-    return { page: 'explore-post-detail', data: relatedId };
+    return {
+      page: 'explore-post-detail',
+      data: relatedCommentId ? { id: relatedId, commentId: relatedCommentId } : relatedId
+    };
   }
 
   if (relatedType === 'course_square_post' && courseId) {

@@ -58,12 +58,18 @@ async function renderExplore(container) {
   // 渲染 MD3 搜索输入框
   const searchBarEl = container.querySelector('#explore-search-bar');
   if (searchBarEl) {
-    searchBarEl.innerHTML = createMdInput({
-      id: 'explore-search',
-      label: '搜索',
-      placeholder: ' ',
-      value: _keyword
-    });
+    searchBarEl.innerHTML = `
+      <div class="search-bar-row form-row" style="margin-bottom:var(--space-6)">
+        ${createMdInput({
+          id: 'explore-search',
+          label: '搜索',
+          placeholder: ' ',
+          value: _keyword,
+          style: 'flex:1;margin-bottom:0'
+        })}
+        <button class="btn btn-primary" id="explore-search-btn">搜索</button>
+      </div>
+    `;
   }
 
   // 绑定事件
@@ -102,15 +108,29 @@ function bindExploreEvents(container) {
   // 搜索框
   let searchTimer = null;
   const searchInput = container.querySelector('#explore-search');
+  const runSearch = async () => {
+    _keyword = searchInput?.value.trim() || '';
+    _posts = [];
+    _page = 1;
+    _hasMore = true;
+    await loadPosts(container);
+  };
   searchInput?.addEventListener('input', (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(async () => {
-      _keyword = e.target.value.trim();
-      _posts = [];
-      _page = 1;
-      _hasMore = true;
-      await loadPosts(container);
+      await runSearch();
     }, 300);
+  });
+  searchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(searchTimer);
+      runSearch();
+    }
+  });
+  container.querySelector('#explore-search-btn')?.addEventListener('click', () => {
+    clearTimeout(searchTimer);
+    runSearch();
   });
 
   // 帖子点击 → 详情
@@ -209,7 +229,9 @@ async function loadPosts(container) {
    帖子详情页
    ============================================= */
 
-registerPage('explore-post-detail', async (container, postId) => {
+registerPage('explore-post-detail', async (container, postData) => {
+  const postId = (typeof postData === 'object' && postData) ? postData.id : postData;
+  const targetCommentId = (typeof postData === 'object' && postData) ? Number(postData.commentId || 0) : 0;
   if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
 
   container.innerHTML = `
@@ -265,13 +287,13 @@ registerPage('explore-post-detail', async (container, postId) => {
       }
     }
 
-    renderPostDetail(container.querySelector('#detail-content'), post);
+    renderPostDetail(container.querySelector('#detail-content'), post, { targetCommentId });
   } catch (e) {
     container.querySelector('#detail-content').innerHTML = `<div class="card"><p class="text-secondary">加载失败</p></div>`;
   }
 });
 
-function renderPostDetail(el, post) {
+function renderPostDetail(el, post, options = {}) {
   const nickname = post.creator_nickname || post.creator_name || '匿名';
   const timeStr = new Date(post.created_at).toLocaleString('zh-CN');
   const isOwner = post.creator_id && window._currentUser?.id === post.creator_id;
@@ -326,7 +348,7 @@ function renderPostDetail(el, post) {
       <div class="explore-detail-content">${contentHtml}</div>
 
       <div class="explore-detail-comments">
-        <h3 style="font-size:var(--text-base);font-weight:600;margin-bottom:12px"><span class="mi" style="font-size:16px;vertical-align:-3px">chat</span> 评论 (${post.comment_count || 0})</h3>
+        <h3 id="explore-comment-count-${post.id}" style="font-size:var(--text-base);font-weight:600;margin-bottom:12px"><span class="mi" style="font-size:16px;vertical-align:-3px">chat</span> 评论 (${post.comment_count || 0})</h3>
         <div id="explore-comments-${post.id}"></div>
       </div>
     </div>
@@ -348,7 +370,7 @@ function renderPostDetail(el, post) {
   });
 
   // 加载评论（论坛风格）
-  toggleExploreComments(post.id);
+  toggleExploreComments(post.id, options.targetCommentId || 0);
 }
 
 /**
@@ -465,11 +487,11 @@ function loadExploreCooldowns() {
   } catch { /* ignore */ }
 }
 
-function saveExploreCooldown(postId) {
+function saveExploreCooldown(postId, seconds = 30) {
   try {
     const raw = localStorage.getItem(COOLDOWN_STORAGE_KEY);
     const data = raw ? JSON.parse(raw) : {};
-    data[postId] = Date.now() + 30000;
+    data[postId] = Date.now() + (seconds * 1000);
     localStorage.setItem(COOLDOWN_STORAGE_KEY, JSON.stringify(data));
   } catch { /* ignore */ }
 }
@@ -505,13 +527,13 @@ function cleanExploreCooldownStorage() {
   } catch { /* ignore */ }
 }
 
-function startExploreCooldown(postId, ctxKey) {
-  _exploreCooldownTimers[postId] = 30;
-  saveExploreCooldown(postId);
+function startExploreCooldown(postId, ctxKey, seconds = 30) {
+  _exploreCooldownTimers[postId] = seconds;
+  saveExploreCooldown(postId, seconds);
   const btn = document.getElementById(`explore-send-${ctxKey}`);
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span style="font-size:11px">重新发送(30s)</span>';
+    btn.innerHTML = `<span style="font-size:11px">重新发送(${seconds}s)</span>`;
   }
   resumeExploreCooldownTick(postId);
 }
@@ -554,7 +576,7 @@ function renderExploreCommentImages(imageUrlStr) {
   return `<div class="forum-image-grid">${urls.map(url => `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="评论图片" loading="lazy"></a>`).join('')}</div>`;
 }
 
-async function toggleExploreComments(postId) {
+async function toggleExploreComments(postId, targetCommentId = 0) {
   const section = document.getElementById(`explore-comments-${postId}`);
   if (!section) return;
 
@@ -583,12 +605,25 @@ async function toggleExploreComments(postId) {
     });
 
     const childMap = {};
+    const byId = {};
     allComments.forEach(c => {
+      byId[c.id] = c;
       if (c.parent_id) {
         if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
         childMap[c.parent_id].push(c);
       }
     });
+
+    if (targetCommentId && byId[targetCommentId]) {
+      let current = byId[targetCommentId];
+      while (current?.parent_id) {
+        _exploreExpandedReplies[current.parent_id] = true;
+        current = byId[current.parent_id];
+      }
+    }
+
+    const countEl = document.getElementById(`explore-comment-count-${postId}`);
+    if (countEl) countEl.innerHTML = `<span class="mi" style="font-size:16px;vertical-align:-3px">chat</span> 评论 (${data.comment_count ?? allComments.length})`;
 
     if (topComments.length === 0) {
       section.innerHTML = `
@@ -609,11 +644,27 @@ async function toggleExploreComments(postId) {
     }
 
     bindExploreForumEvents(section, postId);
+    if (targetCommentId) scrollToExploreComment(targetCommentId);
   } catch {
     section.innerHTML = '<p style="font-size:12px;color:var(--md-error);padding:8px 0">加载失败，点击重试</p>';
     section.style.cursor = 'pointer';
     section.onclick = () => { section.onclick = null; toggleExploreComments(postId); };
   }
+}
+
+function scrollToExploreComment(commentId) {
+  setTimeout(() => {
+    const target = document.getElementById(`explore-comment-${commentId}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.animate(
+      [
+        { backgroundColor: 'rgba(25, 118, 210, 0.18)' },
+        { backgroundColor: 'transparent' }
+      ],
+      { duration: 1400, easing: 'ease-out' }
+    );
+  }, 120);
 }
 
 function renderExploreForumComment(c, postId, childMap) {
@@ -684,7 +735,7 @@ function renderExploreNestedReply(child, parentAuthorName, parentAuthorId, postI
     : '';
 
   return `
-    <div class="forum-nested-reply">
+    <div class="forum-nested-reply" id="explore-comment-${child.id}">
       <div>
         ${child.author_avatar
           ? `<img class="forum-reply-avatar" src="${child.author_avatar}" alt="" data-action="explore-navigate-profile" data-user-id="${child.author_id}" style="cursor:pointer">`
@@ -922,6 +973,10 @@ window._submitExploreForumReply = async function(postId, parentCommentId, ctxKey
 
     if (result.error) {
       showToast(result.error);
+      if (result.retry_after) {
+        startExploreCooldown(postId, ctxKey, Number(result.retry_after) || 30);
+        return;
+      }
       if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<span class="mi">send</span>'; }
       return;
     }
