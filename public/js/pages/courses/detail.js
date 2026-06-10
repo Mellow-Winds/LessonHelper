@@ -155,10 +155,99 @@ const _forumExpandedReplies = {};    // { [commentId]: bool }
 const _forumLikeState = {};          // { 'p123': { liked: bool, count: N } }
 const _forumReplyImages = {};        // { ctxKey: { files: [], urls: [] } }
 const _forumCooldownTimers = {};     // { postId: secondsRemaining }
+const _forumCooldownTicking = new Set();  // 防重复 tick
+
+const FORUM_COOLDOWN_KEY = 'fc_cooldowns';  // localStorage key for forum cooldowns
+
+function loadForumCooldowns() {
+  try {
+    const raw = localStorage.getItem(FORUM_COOLDOWN_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);  // { postId: endTimestamp }
+    const now = Date.now();
+    for (const [postId, endTime] of Object.entries(data)) {
+      const remaining = Math.ceil((endTime - now) / 1000);
+      if (remaining > 0) {
+        const pid = Number(postId);
+        _forumCooldownTimers[pid] = remaining;
+        if (!_forumCooldownTicking.has(pid)) resumeForumCooldownTick(pid);
+      }
+    }
+    cleanForumCooldownStorage();
+  } catch { /* ignore */ }
+}
+
+function saveForumCooldown(postId) {
+  try {
+    const raw = localStorage.getItem(FORUM_COOLDOWN_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    data[postId] = Date.now() + 30000;
+    localStorage.setItem(FORUM_COOLDOWN_KEY, JSON.stringify(data));
+  } catch { /* ignore */ }
+}
+
+function removeForumCooldown(postId) {
+  try {
+    const raw = localStorage.getItem(FORUM_COOLDOWN_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    delete data[postId];
+    if (Object.keys(data).length === 0) localStorage.removeItem(FORUM_COOLDOWN_KEY);
+    else localStorage.setItem(FORUM_COOLDOWN_KEY, JSON.stringify(data));
+  } catch { /* ignore */ }
+}
+
+function cleanForumCooldownStorage() {
+  try {
+    const raw = localStorage.getItem(FORUM_COOLDOWN_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    const now = Date.now();
+    let changed = false;
+    for (const [postId, endTime] of Object.entries(data)) {
+      if (endTime <= now) { delete data[postId]; changed = true; }
+    }
+    if (changed) {
+      if (Object.keys(data).length === 0) localStorage.removeItem(FORUM_COOLDOWN_KEY);
+      else localStorage.setItem(FORUM_COOLDOWN_KEY, JSON.stringify(data));
+    }
+  } catch { /* ignore */ }
+}
+
+function resumeForumCooldownTick(postId) {
+  _forumCooldownTicking.add(postId);
+  const tick = () => {
+    const remaining = _forumCooldownTimers[postId];
+    if (!remaining || remaining <= 0) {
+      delete _forumCooldownTimers[postId];
+      _forumCooldownTicking.delete(postId);
+      removeForumCooldown(postId);
+      // 仅恢复属于本 post 的冷却按钮
+      document.querySelectorAll(`[id^="forum-send-"][data-post-id="${postId}"]`).forEach(b => {
+        if (!b.disabled) return;
+        b.disabled = false;
+        b.innerHTML = '<span class="mi">send</span>';
+      });
+      return;
+    }
+    _forumCooldownTimers[postId] = remaining - 1;
+    // 仅更新属于本 post 的冷却按钮文字
+    document.querySelectorAll(`[id^="forum-send-"][data-post-id="${postId}"]`).forEach(b => {
+      if (b.disabled && b.innerHTML.includes('重新发送')) {
+        b.innerHTML = `<span style="font-size:11px">重新发送(${remaining - 1}s)</span>`;
+      }
+    });
+    setTimeout(tick, 1000);
+  };
+  setTimeout(tick, 1000);
+}
 let _forumDailyCount = 0;            // 当日发布计数
 let _forumDailyDate = '';            // 当日日期标记
 
 async function renderForumTab(contentEl, courseId, enrolled) {
+  // 恢复 localStorage 中的冷却状态
+  loadForumCooldowns();
+
   contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
   const posts = await apiGet(`/api/courses/${courseId}/posts`);
   const favoritePostIds = await getFavoritePostIds();
@@ -666,6 +755,7 @@ export function openForumInlineEditor(postId, parentCommentId, ctxKey) {
             <span class="mi">photo_camera</span>
           </button>
           <button class="forum-editor-btn forum-editor-send" id="forum-send-${ctxKey}"
+            data-post-id="${postId}"
             onclick="submitForumReply(${postId}, ${parentCommentId || 'null'}, '${ctxKey}')"
             ${sendDisabled ? 'disabled' : ''}>
             ${cooldown > 0 ? `<span style="font-size:11px">${sendLabel}</span>` : '<span class="mi">send</span>'}
@@ -867,22 +957,13 @@ export async function submitForumReply(postId, parentCommentId, ctxKey) {
 
 function startForumCooldown(postId, ctxKey) {
   _forumCooldownTimers[postId] = 30;
+  saveForumCooldown(postId);
   const btn = document.getElementById(`forum-send-${ctxKey}`);
   if (btn) {
     btn.disabled = true;
     btn.innerHTML = '<span style="font-size:11px">重新发送(30s)</span>';
   }
-  const tick = () => {
-    _forumCooldownTimers[postId]--;
-    if (_forumCooldownTimers[postId] <= 0) {
-      delete _forumCooldownTimers[postId];
-      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="mi">send</span>'; }
-      return;
-    }
-    if (btn) btn.innerHTML = `<span style="font-size:11px">重新发送(${_forumCooldownTimers[postId]}s)</span>`;
-    setTimeout(tick, 1000);
-  };
-  setTimeout(tick, 1000);
+  resumeForumCooldownTick(postId);
 }
 
 /* ---- 帖子创作（行内 compose） ---- */

@@ -51,43 +51,42 @@ module.exports = function (db) {
     const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(pageSize);
     const limit = Math.min(100, Math.max(1, parseInt(pageSize)));
 
-    // 顶层评论
-    const comments = db.all(
+    // 拉取该帖子所有评论，在前端构建嵌套树（保证楼中楼递归展示）
+    const allComments = db.all(
       `SELECT ec.*,
-        u.username AS author_name,
-        u.nickname AS author_nickname,
+        u.nickname AS author_name,
+        u.username AS author_username,
         u.avatar_url AS author_avatar
        FROM explore_comments ec
        LEFT JOIN users u ON u.id = ec.author_id
-       WHERE ec.post_id = ? AND ec.parent_id IS NULL
-       ORDER BY ec.created_at ASC
-       LIMIT ? OFFSET ?`,
-      [postId, limit, offset]
+       WHERE ec.post_id = ?
+       ORDER BY ec.created_at ASC`,
+      [postId]
     );
 
-    // 为每个评论查回复
-    for (const c of comments) {
-      const replies = db.all(
-        `SELECT ec.*,
-          u.username AS author_name,
-          u.nickname AS author_nickname,
-          u.avatar_url AS author_avatar
-         FROM explore_comments ec
-         LEFT JOIN users u ON u.id = ec.author_id
-         WHERE ec.parent_id = ?
-         ORDER BY ec.created_at ASC`,
-        [c.id]
-      );
-      c.replies = replies;
-      c.reply_count = replies.length;
+    // 构建 parentId -> children 映射
+    const childrenMap = {};
+    allComments.forEach(c => {
+      const pid = c.parent_id;
+      if (!childrenMap[pid]) childrenMap[pid] = [];
+      childrenMap[pid].push(c);
+    });
+
+    // 递归挂载 replies
+    function attachReplies(comment) {
+      const replies = childrenMap[comment.id] || [];
+      for (const r of replies) attachReplies(r);
+      comment.replies = replies;
+      comment.reply_count = replies.length;
     }
 
-    const total = db.get(
-      'SELECT COUNT(*) AS cnt FROM explore_comments WHERE post_id = ? AND parent_id IS NULL',
-      [postId]
-    )?.cnt || 0;
+    const topComments = allComments.filter(c => !c.parent_id);
+    topComments.forEach(attachReplies);
 
-    res.json({ items: comments, total, page: parseInt(page), pageSize: limit });
+    const total = topComments.length;
+    const paged = topComments.slice(offset, offset + limit);
+
+    res.json({ items: paged, total, page: parseInt(page), pageSize: limit });
   });
 
   // POST /api/explore/posts/:postId/comments — 发表评论 [Auth]（支持图片 + 楼中楼）
@@ -168,8 +167,8 @@ module.exports = function (db) {
     // 返回完整评论
     const comment = db.get(
       `SELECT ec.*,
-        u.username AS author_name,
-        u.nickname AS author_nickname,
+        u.nickname AS author_name,
+        u.username AS author_username,
         u.avatar_url AS author_avatar
        FROM explore_comments ec
        LEFT JOIN users u ON u.id = ec.author_id
