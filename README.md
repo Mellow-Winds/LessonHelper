@@ -29,23 +29,29 @@ $env:RESEND_API_KEY="re_xxxxxx"
 
 ### 用户系统
 - 邮箱验证码注册 + 密码登录（JWT 认证）
-- 个人资料：昵称、专业、年级、QQ、微信、抖音、MBTI、肖像描述
+- 个人资料：昵称、性别、专业、年级、QQ、微信、抖音、MBTI、肖像描述
 - 每日签到（连续打卡 + 双重宽限期保护）
 - 完整度进度条（7 项因子）
 - 关注/粉丝系统 + 关注动态
 - 隐私设置（公开资料 / 允许被匹配）
-- 个人名片公开主页
-- 预览「他人看我」模式
+- 个人名片公开主页 + 预览「他人看我」模式
 - 数据导出（JSON）
 - 问题反馈
 
 ### 课程系统
 - 课表 Excel 导入（南京大学教务系统 XLSX 解析）
-- 课程列表（学期筛选、选课/退课、50 门上限）
-- 课程空间：论坛（发帖/评论/附件）+ 资料（上传/下载/评分）+ 成员（筛选/统计）
+- 课程列表（学期筛选、选课/退课、移学期、50 门上限）
+- 大课空间：论坛（发帖/评论/楼中楼/附件）+ 资料（上传/下载/评分）+ 搭子
 - 课程广场：全校课程聚合浏览（大课归并、跨班内容共享）
 - 统一发布页：富文本编辑器 + 多文件附件（最多 9 个）+ 分类选择
-- 课程成员访问控制（仅选课用户可查看成员）
+- 未选课用户只读模式
+
+### 发现模块
+- 全局帖子流（瀑布流卡片布局）
+- 帖子详情页（编辑/删除 + 论坛式评论）
+- 论坛式评论系统：内联编辑器 + 图片上传 + 楼中楼递归渲染 + 30 秒冷却
+- 评论冷却 localStorage 持久化（刷新不丢失）
+- 我的发布管理
 
 ### 学习资料
 - 上传：PDF / PPT / Word / 图片，单文件 20MB
@@ -66,7 +72,8 @@ $env:RESEND_API_KEY="re_xxxxxx"
 
 ### 消息通知
 - 铃铛角标 + 通知面板 + 30 秒轮询
-- 点击跳转、全部已读
+- 点击通知跳转对应帖子/课程/用户
+- 全部已读
 
 ### 全局搜索
 - 搜索课程 / 资料 / 帖子
@@ -88,16 +95,16 @@ $env:RESEND_API_KEY="re_xxxxxx"
 | 前端 | 原生 JavaScript SPA + ES6 Modules |
 | 设计系统 | Material Design 3 |
 | Markdown | markdown-it |
-| 测试 | node:test |
+| 测试 | node:test（16 个测试文件，49 个测试用例） |
 
 ## 项目结构
 
 详见 [CLAUDE.md](CLAUDE.md)。简要概览：
 
-- `routes/` — 11 个后端 API 路由文件
-- `public/js/pages/` — 14 个前端页面模块
-- `tests/` — 13 个自动化测试文件
-- `docs/` — 项目文档（需求/技术/设计/API/开发步骤）
+- `routes/` — 12 个后端 API 路由文件
+- `public/js/pages/` — 15+ 个前端页面模块
+- `tests/` — 16 个自动化测试文件
+- `docs/` — 项目文档（需求/技术/设计/API/开发步骤/课程设计）
 - `todolist/` — 待规划功能清单
 - `devlog/` — 开发日志
 
@@ -111,5 +118,6 @@ $env:RESEND_API_KEY="re_xxxxxx"
 | 设计规范 | [docs/design-spec.md](docs/design-spec.md) |
 | 开发步骤 | [docs/development-steps.md](docs/development-steps.md) |
 | API 文档 | [docs/api-spec.md](docs/api-spec.md) |
+| 课程系统设计 | [docs/course.md](docs/course.md) |
 | 开发日志 | [devlog/](devlog/) |
 | 待办事项 | [todolist/](todolist/) |
