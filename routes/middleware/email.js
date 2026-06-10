@@ -1,10 +1,10 @@
 const { Resend } = require('resend');
 
-// >>>在此处输入resend key<<<
-const RESEND_API_KEY = 're_ZfBLgW3c_7TgkZ2qdgon9bENCuDKtrQ4G';
+// Resend API Key — 从环境变量读取，测试/开发环境可在 .env 中设置
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 
 let resend = null;
-if (RESEND_API_KEY && RESEND_API_KEY !== '>>>在此处输入resend key<<<') {
+if (RESEND_API_KEY) {
   resend = new Resend(RESEND_API_KEY);
 }
 

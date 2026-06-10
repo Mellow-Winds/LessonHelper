@@ -113,7 +113,7 @@ export function createMdTextarea(config) {
  * @returns {string} HTML string
  */
 export function createMdSelect(config) {
-  const { id = '', label = '', options, selected = '', style = '', onchange = '' } = config;
+  const { id = '', label = '', options, selected = '', style = '' } = config;
   const containerId = id ? `${id}-container` : 'md-select-' + Math.random().toString(36).slice(2, 8);
   const hiddenId = id;
   const valueId = id ? `${id}-value` : '';
@@ -126,10 +126,9 @@ export function createMdSelect(config) {
   ).join('');
 
   const styleAttr = style ? ` style="${style}"` : '';
-  const onchangeAttr = onchange ? ` data-onchange="${escHtml(onchange)}"` : '';
 
   return `
-    <div class="md-select-container" id="${containerId}"${styleAttr}${onchangeAttr}>
+    <div class="md-select-container" id="${containerId}"${styleAttr}>
       <div class="md-select-trigger">
         <span class="md-select-value" id="${valueId}">${escHtml(triggerLabel)}</span>
         <span class="md-select-arrow mi">arrow_drop_down</span>
@@ -178,10 +177,6 @@ document.addEventListener('click', (e) => {
       });
       container.classList.remove('open');
       container.dispatchEvent(new CustomEvent('md-select-change', { detail: { value, text }, bubbles: true }));
-      const onchangeStr = container.getAttribute('data-onchange');
-      if (onchangeStr) {
-        try { eval(onchangeStr); } catch (err) { console.error('md-select onchange error:', err); }
-      }
       e.stopPropagation();
     }
     return;

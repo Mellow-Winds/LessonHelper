@@ -37,8 +37,8 @@ const SALT_ROUNDS = 10;
 const CODE_EXPIRY_MINUTES = 5;
 const MAX_VERIFY_ATTEMPTS = 3;
 
-// >>>在此处填写site key<<<
-const TURNSTILE_SECRET_KEY = '0x4AAAAAADe2Tz_a_IQV5AOP5D1rQk3o7Lg';
+// Turnstile Secret Key — 从环境变量读取；详见 .env 中的测试/正式密钥说明
+const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || '';
 
 // 简单内存限流（生产环境建议用 Redis）
 const rateLimitMap = new Map();
@@ -148,8 +148,8 @@ module.exports = function (db) {
 
   // Cloudflare Turnstile 验证
   async function verifyTurnstile(token, ip) {
-    // 如果 Secret Key 未配置，返回失败
-    if (!TURNSTILE_SECRET_KEY || TURNSTILE_SECRET_KEY === '>>>在此处填写site key<<<') {
+    // 如果 Secret Key 未配置（环境变量未设置），返回失败
+    if (!TURNSTILE_SECRET_KEY) {
       console.error('[Auth] Turnstile Secret Key 未配置');
       return { ok: false, error: '系统出现未知错误，请在看到此消息后及时反馈' };
     }
@@ -356,7 +356,17 @@ module.exports = function (db) {
   // POST /api/auth/login — 登录
   router.post('/login', async (req, res) => {
     try {
-      const { studentId, password } = req.body;
+      const { studentId, password, turnstileToken } = req.body;
+
+      // Turnstile 人机验证
+      if (!turnstileToken) {
+        return res.status(400).json({ error: '人机验证未完成' });
+      }
+      const clientIp = getClientIp(req);
+      const turnstileResult = await verifyTurnstile(turnstileToken, clientIp);
+      if (!turnstileResult.ok) {
+        return res.status(403).json({ error: turnstileResult.error });
+      }
 
       if (!studentId || !password) {
         return res.status(400).json({ error: '请填写完整信息' });

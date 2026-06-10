@@ -83,6 +83,11 @@ function renderLoginForm() {
 
       <div class="form-error" id="login-error" style="display:none"></div>
 
+      <!-- Turnstile 容器（初始隐藏，点击登录后显示） -->
+      <div class="auth-turnstile-wrapper" id="login-turnstile-wrapper" style="display:none">
+        <div class="auth-turnstile-container" id="login-turnstile-container"></div>
+      </div>
+
       <div class="auth-buttons">
         <button type="button" class="btn btn-text" onclick="switchAuthView('register')">注册</button>
         <button type="button" class="btn btn-text" onclick="switchAuthView('forgot')">忘记密码</button>
@@ -266,8 +271,8 @@ window.togglePasswordVisibility = function(btn) {
    Turnstile 集成
    ============================================= */
 
-// >>>在此处填写site key<<<
-const TURNSTILE_SITE_KEY = '0x4AAAAAADe2T-HGZoN-UUNX';
+// Turnstile Site Key — 从 /env.js 注入，详见 .env 配置
+const TURNSTILE_SITE_KEY = window.ENV?.TURNSTILE_SITE_KEY || '';
 
 function loadTurnstile() {
   // 如果 Turnstile 脚本未加载，动态加载
@@ -291,7 +296,7 @@ function renderTurnstile() {
   if (!container || !window.turnstile) return;
 
   // 检查 Site Key 是否为占位符（测试 Key 1x00000000000000000000AA 是有效的）
-  if (!TURNSTILE_SITE_KEY || TURNSTILE_SITE_KEY === '>>>在此处填写site key<<<') {
+  if (!TURNSTILE_SITE_KEY) {
     console.error('[Turnstile] Site Key 未配置');
     showToast('系统出现未知错误，请在看到此消息后及时反馈');
     return;
@@ -329,6 +334,10 @@ function renderTurnstile() {
    处理函数
    ============================================= */
 
+// 登录表单凭据暂存（Turnstile 通过后使用）
+let _loginStudentId = '';
+let _loginPassword = '';
+
 // 登录
 export async function handleLogin(e) {
   e.preventDefault();
@@ -352,33 +361,128 @@ export async function handleLogin(e) {
     return;
   }
 
-  const btn = form.querySelector('button[type="submit"]');
-  btn.disabled = true;
-  btn.textContent = '登录中...';
+  // 暂存凭据，等 Turnstile 通过后使用
+  _loginStudentId = studentId;
+  _loginPassword = password;
+
+  // 显示 Turnstile 验证框
+  const turnstileWrapper = document.getElementById('login-turnstile-wrapper');
+  if (turnstileWrapper) {
+    turnstileWrapper.style.display = 'block';
+    loadLoginTurnstile();
+  }
+}
+
+// 加载 Turnstile（登录专用）
+function loadLoginTurnstile() {
+  if (!window.turnstile) {
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => renderLoginTurnstile();
+    script.onerror = () => {
+      showToast('系统出现未知错误，请在看到此消息后及时反馈');
+    };
+    document.head.appendChild(script);
+  } else {
+    renderLoginTurnstile();
+  }
+}
+
+// 渲染 Turnstile 验证框（登录专用）
+function renderLoginTurnstile() {
+  const container = document.getElementById('login-turnstile-container');
+  if (!container || !window.turnstile) return;
+
+  if (!TURNSTILE_SITE_KEY) {
+    console.error('[Turnstile] Site Key 未配置');
+    showToast('系统出现未知错误，请在看到此消息后及时反馈');
+    return;
+  }
+
+  container.innerHTML = '';
 
   try {
-    const result = await apiPost('/api/auth/login', { studentId, password });
+    window.turnstile.render(container, {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: (token) => {
+        // Turnstile 验证成功，发送登录请求
+        onLoginTurnstileSuccess(token);
+      },
+      'error-callback': () => {
+        showToast('系统出现未知错误，请在看到此消息后及时反馈');
+        resetLoginBtn();
+      },
+      'expired-callback': () => {
+        resetLoginBtn();
+      },
+      'timeout-callback': () => {
+        showToast('系统出现未知错误，请在看到此消息后及时反馈');
+        resetLoginBtn();
+      },
+    });
+  } catch (e) {
+    console.error('[Turnstile] 渲染失败:', e);
+    showToast('系统出现未知错误，请在看到此消息后及时反馈');
+    resetLoginBtn();
+  }
+}
+
+// Turnstile 验证成功后的回调（登录专用）
+async function onLoginTurnstileSuccess(token) {
+  const form = document.getElementById('login-form');
+  const btn = form ? form.querySelector('button[type="submit"]') : null;
+  const errEl = document.getElementById('login-error');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '登录中...';
+  }
+
+  try {
+    const result = await apiPost('/api/auth/login', {
+      studentId: _loginStudentId,
+      password: _loginPassword,
+      turnstileToken: token,
+    });
 
     if (result.error) {
-      errEl.textContent = result.error;
-      errEl.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = '下一步';
+      if (errEl) { errEl.textContent = result.error; errEl.style.display = 'block'; }
+      resetLoginBtn();
       return;
     }
 
     saveToken(result.token);
     window._currentUser = result.user;
     showToast('登录成功');
+
+    // 隐藏 Turnstile
+    const turnstileWrapper = document.getElementById('login-turnstile-wrapper');
+    if (turnstileWrapper) turnstileWrapper.style.display = 'none';
+
     navigateTo('mycourse');
     refreshNotifBadge();
     if (!window._notifInterval) window._notifInterval = setInterval(refreshNotifBadge, 30000);
   } catch (e) {
-    errEl.textContent = '系统出现未知错误，请在看到此消息后及时反馈';
-    errEl.style.display = 'block';
+    if (errEl) {
+      errEl.textContent = '系统出现未知错误，请在看到此消息后及时反馈';
+      errEl.style.display = 'block';
+    }
+    resetLoginBtn();
+  }
+}
+
+function resetLoginBtn() {
+  const form = document.getElementById('login-form');
+  const btn = form ? form.querySelector('button[type="submit"]') : null;
+  if (btn) {
     btn.disabled = false;
     btn.textContent = '下一步';
   }
+  // 隐藏 Turnstile
+  const turnstileWrapper = document.getElementById('login-turnstile-wrapper');
+  if (turnstileWrapper) turnstileWrapper.style.display = 'none';
 }
 
 export async function handleForgotSendCode(e) {
@@ -427,7 +531,7 @@ function renderForgotTurnstile() {
   const container = document.getElementById('forgot-turnstile-container');
   if (!container || !window.turnstile) return;
 
-  if (!TURNSTILE_SITE_KEY || TURNSTILE_SITE_KEY === '>>>在此处填写site key<<<') {
+  if (!TURNSTILE_SITE_KEY) {
     console.error('[Turnstile] Site Key 未配置');
     showToast('系统出现未知错误，请在看到此消息后及时反馈');
     return;
@@ -795,7 +899,7 @@ window.showPrivacyModal = async function(e, type) {
     const markdown = await response.text();
 
     // 使用 markdown-it 渲染
-    const html = window.markdownit ? window.markdownit().render(markdown) : markdown;
+    const html = window.markdownit ? window.markdownit({ html: false }).render(markdown) : markdown;
 
     // 创建弹窗
     const modal = document.createElement('div');

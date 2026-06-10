@@ -59,7 +59,7 @@ export function animOut(el, opts = {}) {
 
 export function renderMarkdown(text) {
   if (typeof markdownit === 'function') {
-    return markdownit().render(text);
+    return markdownit({ html: false }).render(text);
   }
   console.warn('markdown-it not loaded, using fallback renderer');
   return '<p>' + text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
@@ -82,6 +82,7 @@ const ROUTES = [
   { page: 'explore',      pattern: '/explore',             nav: 'explore' },
   { page: 'explore-posts',pattern: '/explore/posts',       nav: 'explore' },
   { page: 'explore-post-detail', pattern: '/explore/post/:id', nav: 'explore' },
+  { page: 'explore-tutorial',   pattern: '/explore/tutorial', nav: 'explore' },
   { page: 'explore-post-editor', pattern: '/explore/new',  nav: 'explore' },
   { page: 'explore-my-posts', pattern: '/explore/mine',    nav: 'explore' },
   { page: 'square-post',  pattern: '/explore/square/post/:id', nav: 'explore' },

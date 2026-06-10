@@ -442,6 +442,22 @@ module.exports = function (db) {
     const { content, parent_id } = req.body;
     const imageFiles = req.files || [];
 
+    // 风控：同一用户 30 秒内只能评论一次
+    const lastComment = db.get(
+      'SELECT MAX(created_at) as last_time FROM comments WHERE author_id = ?',
+      [req.user.userId]
+    );
+    if (lastComment?.last_time) {
+      const elapsed = Date.now() - new Date(lastComment.last_time).getTime();
+      if (elapsed < 30000) {
+        imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+        return res.status(429).json({
+          error: `评论发送太频繁，请 ${Math.ceil((30000 - elapsed) / 1000)} 秒后再试`,
+          retryAfter: Math.ceil((30000 - elapsed) / 1000)
+        });
+      }
+    }
+
     // 至少需要文字或图片
     if ((!content || !content.trim()) && imageFiles.length === 0) {
       imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
@@ -882,6 +898,21 @@ module.exports = function (db) {
     const postId = Number(req.params.postId);
     const userId = req.user.userId;
     if (!isEnrolledInBigCourse(userId, bigCourseId)) return res.status(403).json({ error: '未选修该课程' });
+
+    // 风控：同一用户 30 秒内只能评论一次
+    const lastComment = db.get(
+      'SELECT MAX(created_at) as last_time FROM square_comments WHERE author_id = ?',
+      [userId]
+    );
+    if (lastComment?.last_time) {
+      const elapsed = Date.now() - new Date(lastComment.last_time).getTime();
+      if (elapsed < 30000) {
+        return res.status(429).json({
+          error: `评论发送太频繁，请 ${Math.ceil((30000 - elapsed) / 1000)} 秒后再试`,
+          retryAfter: Math.ceil((30000 - elapsed) / 1000)
+        });
+      }
+    }
 
     const { content, parent_id } = req.body;
     const imageFile = req.file;

@@ -25,40 +25,7 @@ let _editingPostId = null;     // 编辑模式下的帖子 ID，null = 创建模
    使用教程弹窗
    ============================================= */
 
-function showEditorTutorial() {
-  return new Promise((resolve) => {
-    const tutorialMd = `## 发布指南
-
-### 基本操作
-- **输入文字**：在左侧编辑区直接打字，回车换行
-- **插入卡片**：从右侧模板列表拖拽到编辑区，或点击模板上的 **+** 按钮
-- **编辑卡片**：点击已插入的卡片，在弹窗中填写各字段
-- **删除卡片**：鼠标悬停卡片，点击右上角 **×** 按钮
-- **移动卡片**：拖拽卡片到目标位置
-
-### 排版规范
-- 文字和卡片可以自由交替排列
-- 一张帖子可以包含多张卡片
-- 粘贴内容会自动清除格式
-
-### 使用规范
-- 内容真实有效，禁止虚假信息
-- 尊重他人，禁止恶意内容
-- 联系方式请填写在卡片对应字段中`;
-
-    openModal('发布指南', `
-      <div class="editor-tutorial-content">${renderMarkdown(tutorialMd)}</div>
-      <div class="card-edit-actions">
-        <button class="btn btn-primary" id="tutorial-agree">我知道了</button>
-      </div>
-    `);
-
-    document.getElementById('tutorial-agree')?.addEventListener('click', () => {
-      closeModal();
-      resolve();
-    });
-  });
-}
+/* 教程页已改为独立路由 explore-tutorial，见文件末尾 */
 
 /* =============================================
    入口
@@ -84,9 +51,6 @@ async function renderPostEditor(container, postId) {
     } catch (e) { /* fallback to create mode */ }
   }
 
-  // 首次进入弹出使用教程（创建模式）
-  if (!isEdit) await showEditorTutorial();
-
   container.innerHTML = `
     <div class="page-header">
       <button class="btn btn-secondary btn-compact" id="editor-back-btn">
@@ -100,12 +64,22 @@ async function renderPostEditor(container, postId) {
 
     <div class="editor-split">
       <div class="editor-left">
-        <div class="editor-toolbar">
-          <button class="editor-toolbar-btn" data-cmd="bold" title="加粗"><i class="ri-bold"></i></button>
-          <button class="editor-toolbar-btn" data-cmd="italic" title="斜体"><i class="ri-italic"></i></button>
-          <button class="editor-toolbar-btn" data-cmd="underline" title="下划线"><i class="ri-underline"></i></button>
+        <div class="editor-toolbar" id="editor-toolbar">
+          <button class="editor-toolbar-btn" data-cmd="bold" title="加粗 Ctrl+B"><i class="ri-bold"></i></button>
+          <button class="editor-toolbar-btn" data-cmd="italic" title="斜体 Ctrl+I"><i class="ri-italic"></i></button>
+          <button class="editor-toolbar-btn" data-cmd="underline" title="下划线 Ctrl+U"><i class="ri-underline"></i></button>
+          <button class="editor-toolbar-btn" data-cmd="strikeThrough" title="删除线"><i class="ri-strikethrough"></i></button>
           <div class="editor-toolbar-sep"></div>
-          <button class="editor-toolbar-btn" id="toolbar-insert-card" title="插入卡片"><i class="ri-layout-grid-line"></i> 卡片</button>
+          <button class="editor-toolbar-btn" data-cmd="insertUnorderedList" title="无序列表"><i class="ri-list-unordered"></i></button>
+          <button class="editor-toolbar-btn" data-cmd="insertOrderedList" title="有序列表"><i class="ri-list-ordered"></i></button>
+          <div class="editor-toolbar-sep"></div>
+          <button class="editor-toolbar-btn" data-cmd="justifyLeft" title="左对齐"><i class="ri-align-left"></i></button>
+          <button class="editor-toolbar-btn" data-cmd="justifyCenter" title="居中"><i class="ri-align-center"></i></button>
+          <button class="editor-toolbar-btn" data-cmd="justifyRight" title="右对齐"><i class="ri-align-right"></i></button>
+          <div class="editor-toolbar-sep"></div>
+          <button class="editor-toolbar-btn" id="toolbar-insert-link" title="插入链接 Ctrl+K"><i class="ri-link"></i></button>
+          <div class="editor-toolbar-sep"></div>
+          <span class="editor-char-count" id="editor-char-count">0 字</span>
         </div>
         <div class="editor-canvas" id="editor-canvas" contenteditable="true"></div>
       </div>
@@ -145,12 +119,24 @@ function restoreBlocksToCanvas(canvas, blocks) {
   if (!blocks || blocks.length === 0) return;
   for (const block of blocks) {
     if (block.type === 'text' && block.data) {
-      canvas.appendChild(document.createTextNode(block.data));
-      canvas.appendChild(document.createElement('br'));
+      // contentEditable 需要 HTML 元素来保留格式（对齐、粗体等）
+      // 检测是否为 HTML 内容
+      const isHtml = /<[a-z][\s\S]*>/i.test(block.data);
+      if (isHtml) {
+        const div = document.createElement('div');
+        div.innerHTML = block.data;
+        canvas.appendChild(div);
+      } else {
+        const div = document.createElement('div');
+        div.textContent = block.data;
+        canvas.appendChild(div);
+      }
     } else if (block.type === 'card' && block.card) {
       const cardEl = createCardElement(block.card);
       canvas.appendChild(cardEl);
-      canvas.appendChild(document.createTextNode('\n'));
+      const spacer = document.createElement('div');
+      spacer.innerHTML = '<br>';
+      canvas.appendChild(spacer);
     }
   }
 }
@@ -167,7 +153,7 @@ function renderTemplateList(el) {
   }
 
   el.innerHTML = _templates.map(t => `
-    <div class="editor-template-item" draggable="true" data-template-id="${t.id}">
+    <div class="editor-template-item" draggable="true" data-template-id="${t.id}" data-template="${t.id}">
       <div class="editor-template-icon"><i class="${t.icon || 'ri-layout-grid-line'}"></i></div>
       <div class="editor-template-info">
         <div class="editor-template-name">${escHtml(t.name)}</div>
@@ -213,7 +199,7 @@ function renderTemplateList(el) {
 
 function bindEditorEvents(container) {
   const canvas = container.querySelector('#editor-canvas');
-  const toolbar = container.querySelector('.editor-toolbar');
+  const toolbar = container.querySelector('#editor-toolbar');
 
   // 工具栏格式化
   toolbar.addEventListener('click', (e) => {
@@ -222,12 +208,56 @@ function bindEditorEvents(container) {
     const cmd = btn.dataset.cmd;
     document.execCommand(cmd, false, null);
     canvas.focus();
+    syncToolbarButtons(toolbar);
   });
 
-  // 工具栏插入卡片按钮
-  toolbar.querySelector('#toolbar-insert-card')?.addEventListener('click', () => {
-    // 打开模板选择 modal
-    openTemplatePickerModal(canvas);
+  // 插入链接按钮 → 自定义 modal
+  toolbar.querySelector('#toolbar-insert-link')?.addEventListener('click', () => {
+    const sel = window.getSelection();
+    const selectedText = sel.toString();
+
+    openModal('插入链接', `
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div id="link-url-input"></div>
+        <div id="link-text-input"></div>
+        <div class="card-edit-actions" style="margin-top:8px">
+          <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+          <button class="btn btn-primary" id="link-confirm-btn">插入</button>
+        </div>
+      </div>
+    `);
+
+    document.querySelector('#link-url-input').innerHTML = createMdInput({
+      id: 'link-url', label: '链接地址', type: 'url', value: 'https://', placeholder: ' '
+    });
+    document.querySelector('#link-text-input').innerHTML = createMdInput({
+      id: 'link-text', label: '显示文字', value: selectedText || '', placeholder: ' '
+    });
+    setTimeout(() => document.getElementById('link-url')?.focus(), 100);
+
+    document.getElementById('link-confirm-btn')?.addEventListener('click', () => {
+      const url = document.getElementById('link-url')?.value?.trim();
+      const text = document.getElementById('link-text')?.value?.trim() || url;
+      closeModal();
+      canvas.focus();
+      if (!url) return;
+      const html = `<a href="${escAttr(url)}" target="_blank" rel="noopener">${escHtml(text)}</a>`;
+      document.execCommand('insertHTML', false, html);
+    });
+  });
+
+  // 字符计数
+  canvas.addEventListener('input', () => {
+    updateCharCount(canvas);
+  });
+
+  // 按钮状态同步
+  canvas.addEventListener('keyup', () => syncToolbarButtons(toolbar));
+  canvas.addEventListener('mouseup', () => syncToolbarButtons(toolbar));
+  document.addEventListener('selectionchange', () => {
+    if (document.activeElement === canvas || canvas.contains(document.activeElement)) {
+      syncToolbarButtons(toolbar);
+    }
   });
 
   // 编辑区内拖拽
@@ -290,13 +320,29 @@ function bindEditorEvents(container) {
     removeDropIndicator();
   });
 
-  // Delete 键删除选中的卡片
+  // Delete 键删除选中的卡片 / 键盘快捷键
   canvas.addEventListener('keydown', (e) => {
+    // Ctrl+快捷键
+    if (e.ctrlKey || e.metaKey) {
+      switch (e.key.toLowerCase()) {
+        case 'b': e.preventDefault(); document.execCommand('bold', false, null); break;
+        case 'i': e.preventDefault(); document.execCommand('italic', false, null); break;
+        case 'u': e.preventDefault(); document.execCommand('underline', false, null); break;
+        case 'k':
+          e.preventDefault();
+          // 触发链接按钮的点击事件，走自定义 modal 逻辑
+          document.getElementById('toolbar-insert-link')?.click();
+          break;
+      }
+      syncToolbarButtons(toolbar);
+      return;
+    }
+
+    // Delete/Backspace 删除选中卡片
     if (e.key === 'Delete' || e.key === 'Backspace') {
       const sel = window.getSelection();
       if (!sel.rangeCount) return;
       const node = sel.anchorNode;
-      // 检查选区是否在卡片上
       const cardEl = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement)?.closest?.('.editor-card-embed');
       if (cardEl && canvas.contains(cardEl)) {
         e.preventDefault();
@@ -318,13 +364,25 @@ function bindEditorEvents(container) {
       navigateTo('explore');
     }
   });
+}
 
-  // 粘贴时清除格式
-  canvas.addEventListener('paste', (e) => {
-    e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
-    document.execCommand('insertText', false, text);
+/* ---- 工具栏状态同步 ---- */
+
+function syncToolbarButtons(toolbar) {
+  toolbar.querySelectorAll('[data-cmd]').forEach(btn => {
+    const cmd = btn.dataset.cmd;
+    try {
+      const active = document.queryCommandState(cmd);
+      btn.classList.toggle('active', active);
+    } catch (e) { /* some commands don't support queryCommandState */ }
   });
+}
+
+function updateCharCount(canvas) {
+  const countEl = document.getElementById('editor-char-count');
+  if (!countEl) return;
+  const text = canvas.textContent || '';
+  countEl.textContent = `${text.length} 字`;
 }
 
 /* =============================================
@@ -382,9 +440,13 @@ function insertCardAtPosition(canvas, template, insertBefore) {
     canvas.appendChild(cardEl);
   }
 
-  // 插入后在卡片后面加一个空文本节点，方便继续打字
-  const textNode = document.createTextNode('\n');
-  canvas.insertBefore(textNode, cardEl.nextSibling);
+  // 卡片前后各插入一个空段落 div（visible block），确保卡片前后都能点击输入文字
+  const beforeP = document.createElement('div');
+  beforeP.innerHTML = '<br>';
+  canvas.insertBefore(beforeP, cardEl);
+  const afterP = document.createElement('div');
+  afterP.innerHTML = '<br>';
+  canvas.insertBefore(afterP, cardEl.nextSibling);
 
   // 滚动到卡片位置
   cardEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -444,17 +506,35 @@ function openCardEditModal(cardEl) {
   const cardData = JSON.parse(cardEl.dataset.cardJson || '{}');
   const components = cardData.components || [];
 
+  // 为每个字段生成 MD3 输入框（days_matter 用 date picker）
   const fieldsHtml = components.map((comp, i) => {
-    const inputId = `card-edit-field-${i}`;
-    const val = escAttr(comp.value || '');
-    return `
-      <div class="card-edit-field">
-        <label class="card-edit-label">
-          <i class="${comp.icon || 'ri-text'}"></i> ${escHtml(comp.label || `字段${i + 1}`)}
-        </label>
-        <input class="card-edit-input" id="${inputId}" value="${val}" placeholder=" " data-field-index="${i}">
-      </div>
-    `;
+    const id = `card-edit-field-${i}`;
+    const label = `${escHtml(comp.label || `字段${i + 1}`)}`;
+    const val = comp.value || '';
+
+    if (comp.type === 'days_matter') {
+      // 日期选择器
+      const dateVal = val && val.match(/^\d{4}-\d{2}-\d{2}/) ? val.slice(0, 10) : '';
+      return `
+        <div class="card-edit-field">
+          <label class="card-edit-label">
+            <i class="${comp.icon || 'ri-calendar-event-line'}"></i> ${label}
+          </label>
+          <div class="md-input-group" style="margin-bottom:0">
+            <input class="md-input" type="date" id="${id}" value="${dateVal}" placeholder=" "
+              data-field-index="${i}" data-field-type="${comp.type}"
+              style="padding:14px 16px;font-size:14px">
+            <fieldset class="md-border"><legend><span>${label}</span></legend></fieldset>
+            <label class="md-label">${label}</label>
+          </div>
+        </div>`;
+    }
+
+    // 其他类型：MD3 text input
+    return `<div class="card-edit-field">${createMdInput({
+      id, label, value: val, placeholder: ' ',
+      attrs: `data-field-index="${i}" data-field-type="${comp.type}"`
+    })}</div>`;
   }).join('');
 
   openModal(escHtml(cardData.title || '编辑卡片'), `
@@ -466,13 +546,13 @@ function openCardEditModal(cardEl) {
   `);
 
   // 聚焦第一个输入框
-  const firstInput = document.querySelector('.card-edit-input');
+  const firstInput = document.querySelector('.card-edit-form .md-input, #card-edit-field-0');
   if (firstInput) setTimeout(() => firstInput.focus(), 100);
 
   // 确定
   document.getElementById('card-edit-confirm')?.addEventListener('click', () => {
-    // 读取各字段值
-    document.querySelectorAll('.card-edit-input').forEach(input => {
+    // 读取各字段值（md-input 或 date input）
+    document.querySelectorAll('.card-edit-form .md-input, .card-edit-form input[type="date"]').forEach(input => {
       const idx = parseInt(input.dataset.fieldIndex);
       if (components[idx] !== undefined) {
         components[idx].value = input.value;
@@ -486,10 +566,8 @@ function openCardEditModal(cardEl) {
     showToast('卡片已更新');
   });
 
-  // 取消
-  document.getElementById('card-edit-cancel')?.addEventListener('click', () => {
-    closeModal();
-  });
+  // 取消 / × 关闭
+  document.getElementById('card-edit-cancel')?.addEventListener('click', () => closeModal());
 }
 
 /**
@@ -572,44 +650,60 @@ function getInsertPoint(canvas, clientY) {
 
 function serializeEditor(editorEl) {
   const blocks = [];
-  let pendingText = '';
+  let pendingHtml = '';
 
   function flushText() {
-    const trimmed = pendingText.trim();
-    if (trimmed) {
-      blocks.push({ type: 'text', data: trimmed });
+    // 移除空 <div><br></div> 占位符
+    const cleaned = pendingHtml.replace(/<div>\s*<br>\s*<\/div>/gi, '').trim();
+    // 进一步移除纯 <br> 且无其他内容的情况
+    const hasContent = cleaned.replace(/<br\s*\/?>/gi, '').trim();
+    if (hasContent || (cleaned.includes('<img') || cleaned.includes('<a '))) {
+      blocks.push({ type: 'text', data: sanitizeHtml(cleaned) });
     }
-    pendingText = '';
+    pendingHtml = '';
   }
 
   for (const node of editorEl.childNodes) {
     if (node.nodeType === Node.TEXT_NODE) {
-      pendingText += node.textContent;
+      pendingHtml += escHtmlForSerialize(node.textContent);
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       if (node.classList.contains('editor-card-embed')) {
         flushText();
         const json = node.dataset.cardJson;
         if (json) {
-          try {
-            blocks.push({ type: 'card', card: JSON.parse(json) });
-          } catch (e) { /* skip invalid card */ }
+          try { blocks.push({ type: 'card', card: JSON.parse(json) }); } catch (e) {}
         }
       } else if (node.classList.contains('editor-drop-indicator')) {
-        // 忽略拖拽指示线
-      } else if (node.tagName === 'DIV') {
-        // contentEditable 生成的段落 div
-        pendingText += node.textContent + '\n';
+        // 忽略
       } else if (node.tagName === 'BR') {
-        pendingText += '\n';
+        pendingHtml += '<br>';
       } else {
-        // 其他元素（b, i, u, span 等）
-        pendingText += node.textContent;
+        // 格式化元素（div, p, ul, ol, b, i, u, a 等）→ 保留 innerHTML
+        pendingHtml += node.outerHTML || node.innerHTML || node.textContent || '';
       }
     }
   }
 
   flushText();
   return blocks;
+}
+
+/**
+ * HTML 白名单过滤：只允许安全标签
+ */
+function sanitizeHtml(html) {
+  if (!html) return '';
+  // 移除事件和脚本
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '');
+}
+
+function escHtmlForSerialize(text) {
+  if (!text) return '';
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /* =============================================
@@ -689,3 +783,45 @@ function escAttr(str) {
    ============================================= */
 
 registerPage('explore-post-editor', (container, postId) => renderPostEditor(container, postId));
+
+/* =============================================
+   发布指南页（独立路由）
+   ============================================= */
+
+registerPage('explore-tutorial', (container) => {
+  const tutorialMd = `## 发布指南
+
+### 基本操作
+- **输入文字**：在左侧编辑区直接打字，回车换行
+- **插入卡片**：从右侧模板列表拖拽到编辑区，或点击模板上的 **+** 按钮
+- **编辑卡片**：点击已插入的卡片，在弹窗中填写各字段
+- **删除卡片**：鼠标悬停卡片，点击右上角 **×** 按钮
+- **移动卡片**：拖拽卡片到目标位置
+
+### 排版规范
+- 文字和卡片可以自由交替排列
+- 一张帖子可以包含多张卡片
+
+### 使用规范
+- 内容真实有效，禁止虚假信息
+- 尊重他人，禁止恶意内容
+- 联系方式请填写在卡片对应字段中`;
+
+  container.innerHTML = `
+    <div class="page-header" style="justify-content:flex-start;gap:12px">
+      <button class="btn btn-secondary btn-compact" id="tutorial-back-btn">
+        <i class="ri-arrow-left-line"></i>
+      </button>
+      <h1 class="page-title" style="margin:0">发布指南</h1>
+    </div>
+    <div class="card" style="max-width:680px;margin:0 auto">
+      <div class="editor-tutorial-content">${renderMarkdown(tutorialMd)}</div>
+      <div class="card-edit-actions" style="justify-content:center;margin-top:24px">
+        <button class="btn btn-primary" id="tutorial-confirm">确认，开始编辑</button>
+      </div>
+    </div>
+  `;
+
+  container.querySelector('#tutorial-back-btn')?.addEventListener('click', () => navigateTo('explore'));
+  container.querySelector('#tutorial-confirm')?.addEventListener('click', () => navigateTo('explore-post-editor'));
+});
