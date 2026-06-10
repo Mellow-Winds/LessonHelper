@@ -176,21 +176,37 @@ function logout() {
 }
 
 function updateSidebarAvatar() {
-  const el = document.getElementById('sidebar-avatar');
-  if (!el) return;
+  const area = document.getElementById('sidebar-avatar-area');
+  if (!area) return;
   const user = window._currentUser;
+
+  const svgEl = area.querySelector('.sidebar-avatar-icon');
+  const imgEl = area.querySelector('.sidebar-avatar-img');
+
   if (user?.avatar_url) {
-    const img = document.createElement('img');
-    img.src = user.avatar_url;
-    img.alt = user.nickname || '头像';
-    img.className = 'sidebar-avatar-img';
-    el.replaceWith(img);
+    // 有头像 → 隐藏 SVG，显示 img
+    if (svgEl) svgEl.style.display = 'none';
+    if (imgEl) {
+      imgEl.src = user.avatar_url;
+      imgEl.style.display = '';
+    } else {
+      const img = document.createElement('img');
+      img.src = user.avatar_url;
+      img.alt = user.nickname || '';
+      img.className = 'sidebar-avatar-img';
+      area.appendChild(img);
+    }
+  } else {
+    // 无头像 → 显示 SVG，隐藏 img
+    if (svgEl) svgEl.style.display = '';
+    if (imgEl) imgEl.style.display = 'none';
   }
 }
 
 // 挂载到 window 供页面模块和 HTML 内联事件使用
 window.loadCurrentUser = loadCurrentUser;
 window.logout = logout;
+window.updateSidebarAvatar = updateSidebarAvatar;
 window.navigateTo = navigateTo;
 window.showToast = showToast;
 
