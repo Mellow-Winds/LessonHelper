@@ -9,6 +9,7 @@ const { sendVerificationCode } = require('./middleware/email');
 const AVATAR_DIR = path.join(__dirname, '..', 'uploads', 'avatars');
 const AVATAR_MAX = 2 * 1024 * 1024;
 const AVATAR_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+const AVATAR_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
 const avatarUpload = multer({
   storage: multer.diskStorage({
@@ -24,7 +25,11 @@ const avatarUpload = multer({
   limits: { fileSize: AVATAR_MAX, files: 1 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, AVATAR_EXT.has(ext));
+    // 双重校验：MIME 类型 + 扩展名
+    if (!AVATAR_MIME.has(file.mimetype) || !AVATAR_EXT.has(ext)) {
+      return cb(new Error('AVATAR_FORMAT'));
+    }
+    cb(null, true);
   }
 });
 
@@ -580,6 +585,12 @@ module.exports = function (db) {
       return res.status(400).json({ error: '无效的性别选项' });
     }
 
+    // 如果清空头像（恢复默认），删除旧头像文件
+    if (avatar_url === '' && user.avatar_url && user.avatar_url.startsWith('/uploads/avatars/')) {
+      const oldPath = path.join(__dirname, '..', user.avatar_url);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+
     db.run(
       'UPDATE users SET nickname = ?, major = ?, grade = ?, avatar_url = ?, qq = ?, wechat = ?, douyin = ?, avatar_desc = ?, mbti = ?, gender = ?, privacy_show_profile = ?, privacy_allow_match = ?, privacy_show_following = ?, privacy_show_followers = ? WHERE id = ?',
       [
@@ -670,13 +681,15 @@ module.exports = function (db) {
     res.json({ streak, alreadyCheckedIn: false });
   });
 
-  // POST /api/auth/avatar — 上传头像 [Auth]
+  // POST /api/auth/avatar — 上传头像 [Auth]（含 sharp 安全处理）
   router.post('/avatar', authMiddleware, (req, res) => {
-    avatarUpload.single('avatar')(req, res, (error) => {
+    avatarUpload.single('avatar')(req, res, async (error) => {
       if (error) {
         const message = error.code === 'LIMIT_FILE_SIZE'
           ? '头像不能超过 2MB'
-          : '仅支持 jpg/jpeg/png/gif/webp 格式';
+          : error.message === 'AVATAR_FORMAT'
+            ? '仅支持 jpg/jpeg/png/gif/webp 格式'
+            : '仅支持 jpg/jpeg/png/gif/webp 格式';
         return res.status(400).json({ error: message });
       }
 
@@ -684,19 +697,43 @@ module.exports = function (db) {
         return res.status(400).json({ error: '请选择图片文件' });
       }
 
-      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      const originalPath = req.file.path;
+      const outputFilename = `av_${req.user.userId}_${Date.now()}.jpg`;
+      const outputPath = path.join(AVATAR_DIR, outputFilename);
+      const avatarUrl = `/uploads/avatars/${outputFilename}`;
 
-      // 删除旧头像文件（如果有的话）
-      const user = db.get('SELECT avatar_url FROM users WHERE id = ?', [req.user.userId]);
-      if (user?.avatar_url && user.avatar_url.startsWith('/uploads/avatars/')) {
-        const oldPath = path.join(__dirname, '..', user.avatar_url);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      try {
+        // sharp 安全处理：裁剪正方形 → 384×384 → JPEG → 剥离 EXIF
+        const sharp = require('sharp');
+        await sharp(originalPath)
+          .resize(384, 384, { fit: 'cover', position: 'centre' })
+          .jpeg({ quality: 85, mozjpeg: true })
+          .rotate() // 自动纠正方向 + 清除 EXIF
+          .toFile(outputPath);
+
+        // 删除原始上传文件（保留处理后的）
+        if (originalPath !== outputPath && fs.existsSync(originalPath)) {
+          fs.unlinkSync(originalPath);
+        }
+
+        // 删除旧头像文件（如果有的话）
+        const user = db.get('SELECT avatar_url FROM users WHERE id = ?', [req.user.userId]);
+        if (user?.avatar_url && user.avatar_url.startsWith('/uploads/avatars/')) {
+          const oldPath = path.join(__dirname, '..', user.avatar_url);
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+
+        db.run('UPDATE users SET avatar_url = ? WHERE id = ?', [avatarUrl, req.user.userId]);
+        db.save();
+
+        res.json({ avatar_url: avatarUrl, message: '头像已更新' });
+      } catch (processingError) {
+        // 清理：删除可能残留的文件
+        if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+        if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath);
+        console.error('Avatar processing error:', processingError);
+        res.status(500).json({ error: '图片处理失败，请重试' });
       }
-
-      db.run('UPDATE users SET avatar_url = ? WHERE id = ?', [avatarUrl, req.user.userId]);
-      db.save();
-
-      res.json({ avatar_url: avatarUrl, message: '头像已更新' });
     });
   });
 

@@ -295,3 +295,94 @@ export function bindLoginPrompt(container, renderAuthFn) {
     });
   }
 }
+
+/* =============================================
+   Bottom Sheet — MD3 底部动作菜单
+   ============================================= */
+
+/**
+ * 显示 MD3 底部动作菜单
+ * @param {Array} items - [{ icon, label, onClick, danger, hideOnDesktop }]
+ *   - icon: Material Icons 名称（可选，取消项不需要）
+ *   - label: 菜单文字
+ *   - onClick: 点击回调（可选）
+ *   - danger: 红色文字（用于"恢复默认"等操作，可选）
+ *   - hideOnDesktop: 桌面端隐藏（如"拍照上传"，可选）
+ *   - isCancel: 是否为取消按钮（自动放到最下面，可选）
+ */
+export function showBottomSheet(items) {
+  // 移除已有的
+  const existing = document.querySelector('.bottom-sheet-overlay');
+  if (existing) existing.remove();
+
+  const isMobile = window.matchMedia('(max-width: 767px)').matches;
+
+  // 分离常规项和取消项
+  const regularItems = items.filter(i => !i.isCancel);
+  const cancelItem = items.find(i => i.isCancel);
+
+  // 过滤桌面端隐藏项
+  const visibleItems = regularItems.filter(i => !i.hideOnDesktop || isMobile);
+
+  const itemsHtml = visibleItems.map((item, i) => {
+    const showDivider = i < visibleItems.length - 1 || cancelItem;
+    const divider = showDivider ? '<div class="bottom-sheet-divider"></div>' : '';
+    const dangerClass = item.danger ? ' bottom-sheet-item--danger' : '';
+    return `
+      <button class="bottom-sheet-item${dangerClass}" data-bs-index="${i}">
+        ${item.icon ? `<span class="mi" style="font-size:24px;color:var(--md-on-surface-variant);flex-shrink:0">${item.icon}</span>` : ''}
+        <span>${item.label}</span>
+      </button>
+      ${divider}
+    `;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'bottom-sheet-overlay';
+  overlay.id = 'bottom-sheet-overlay';
+  overlay.innerHTML = `
+    <div class="bottom-sheet">
+      <div class="bottom-sheet-items">${itemsHtml}</div>
+      ${cancelItem ? `<button class="bottom-sheet-cancel">${cancelItem.label}</button>` : ''}
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // 绑定点击事件
+  overlay.querySelectorAll('.bottom-sheet-item').forEach((btn, i) => {
+    btn.addEventListener('click', () => {
+      const fn = visibleItems[i]?.onClick;
+      closeBottomSheet();
+      if (fn) fn();
+    });
+  });
+
+  overlay.querySelector('.bottom-sheet-cancel')?.addEventListener('click', () => {
+    closeBottomSheet();
+  });
+
+  // 点击遮罩关闭
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeBottomSheet();
+  });
+
+  // Escape 关闭
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { closeBottomSheet(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  // 入场动画
+  requestAnimationFrame(() => {
+    overlay.classList.add('active');
+  });
+}
+
+function closeBottomSheet() {
+  const overlay = document.querySelector('.bottom-sheet-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 300);
+}
+
+window.closeBottomSheet = closeBottomSheet;
