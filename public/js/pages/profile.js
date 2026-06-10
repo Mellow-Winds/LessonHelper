@@ -5,7 +5,7 @@
 
 import { apiGet, apiPut, apiPost, apiDelete, getToken } from '../core/api.js';
 import { navigateTo, animIn, animStagger } from '../core/router.js';
-import { showToast, openModal, closeModal, escHtml, createMdInput, createMdSelect, createMdTextarea, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
+import { showToast, openModal, closeModal, escHtml, createMdInput, createMdSelect, createMdTextarea, renderLoginPrompt, bindLoginPrompt, showBottomSheet } from '../components/ui.js';
 import { renderAuth } from './auth.js';
 
 /* =============================================
@@ -162,6 +162,7 @@ async function renderProfilePage(container) {
   animateProfile(container);
   bindProfileInteractions(container);
   bindModeSwitch(container);
+  bindAvatarClick();
 }
 
 function renderErrorCard(msg) {
@@ -213,11 +214,10 @@ function renderProfileCard(data, mode) {
     : `<span class="profile-avatar-letter">${(data.nickname || data.username || '?')[0]}</span>`;
 
   const avatar = isOwner
-    ? `<label class="profile-avatar profile-avatar-upload" title="点击更换头像">
+    ? `<div class="profile-avatar profile-avatar-clickable" id="profile-avatar-area" title="点击更换头像">
          ${avatarImg}
-         <input type="file" accept="image/*" style="display:none" id="avatar-upload-input" onchange="window._handleAvatarUpload(event)">
          <span class="profile-avatar-overlay"><span class="mi" style="font-size:20px;color:#fff">photo_camera</span></span>
-       </label>`
+       </div>`
     : `<div class="profile-avatar">${avatarImg}</div>`;
 
   const streak = data.checkin_streak || 0;
@@ -345,9 +345,9 @@ function updateCompletionBar(container, data) {
 function renderProfileFields(data) {
   const genderText = data.gender === 'male' ? '男' : data.gender === 'female' ? '女' : '';
   const fields = [
+    { icon: 'person',            remixIcon: null,             label: '性别',     value: genderText },
     { icon: 'school',            remixIcon: null,             label: '专业',     value: data.major },
     { icon: 'class',             remixIcon: null,             label: '年级',     value: data.grade },
-    { icon: 'person',            remixIcon: null,             label: '性别',     value: genderText },
     { icon: '',                  remixIcon: 'ri-qq-fill',     label: 'QQ号',     value: data.qq },
     { icon: '',                  remixIcon: 'ri-wechat-fill', label: '微信号',   value: data.wechat },
     { icon: '',                  remixIcon: 'ri-tiktok-fill', label: '抖音号',   value: data.douyin },
@@ -989,9 +989,9 @@ function renderPublicProfileCard(data, options = {}) {
 
   const genderText = data.gender === 'male' ? '男' : data.gender === 'female' ? '女' : '';
   const fields = [
+    { icon: 'person',      remixIcon: null,             label: '性别', value: genderText },
     { icon: 'school',      remixIcon: null,             label: '专业', value: data.major },
     { icon: 'class',       remixIcon: null,             label: '年级', value: data.grade },
-    { icon: 'person',      remixIcon: null,             label: '性别', value: genderText },
     { icon: '',            remixIcon: 'ri-qq-fill',     label: 'QQ号', value: data.qq },
     { icon: '',            remixIcon: 'ri-wechat-fill', label: '微信号', value: data.wechat },
     { icon: '',            remixIcon: 'ri-tiktok-fill', label: '抖音号', value: data.douyin },
@@ -1147,6 +1147,12 @@ async function renderEditPage(container) {
       <div class="profile-card">
         <h2 class="profile-section-title">基本资料</h2>
         ${createMdInput({ id: 'edit-nickname', label: '昵称', value: data.nickname || '', required: true })}
+        ${createMdSelect({
+          id: 'edit-gender',
+          label: '性别',
+          options: GENDER_OPTIONS,
+          selected: data.gender || ''
+        })}
         ${createMdInput({ id: 'edit-major', label: '专业', value: data.major || '' })}
         ${createMdInput({ id: 'edit-grade', label: '年级', value: data.grade || '' })}
         ${createMdInput({ id: 'edit-qq', label: 'QQ号', value: data.qq || '' })}
@@ -1169,12 +1175,6 @@ async function renderEditPage(container) {
             ...MBTI_OPTIONS.map(m => ({ text: m, value: m }))
           ],
           selected: data.mbti || ''
-        })}
-        ${createMdSelect({
-          id: 'edit-gender',
-          label: '性别',
-          options: GENDER_OPTIONS,
-          selected: data.gender || ''
         })}
       </div>
 
@@ -1436,49 +1436,436 @@ function handleExportData() {
    头像上传
    ============================================= */
 
-window._handleAvatarUpload = async function(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
+/* =============================================
+   头像交互 — 底部抽屉 → 裁剪 → 上传
+   ============================================= */
 
-  if (file.size > 2 * 1024 * 1024) {
-    showToast('头像不能超过 2MB');
-    return;
-  }
-  if (!file.type.startsWith('image/')) {
-    showToast('请选择图片文件');
-    return;
-  }
+const AVATAR_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const AVATAR_MAX_SIZE = 2 * 1024 * 1024;
 
-  const formData = new FormData();
-  formData.append('avatar', file);
+/**
+ * 点击头像 → 弹出底部动作菜单
+ */
+function openAvatarSheet() {
+  // 检测是否有真实摄像头（桌面端即使 DevTools 模拟手机，也没有摄像头）
+  const hasCamera = !!navigator.mediaDevices?.getUserMedia;
+  const hasAvatar = !!window._currentUser?.avatar_url;
 
-  try {
-    const token = getToken();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+  const items = [
+    {
+      icon: 'image',
+      label: '从相册选择',
+      onClick: () => pickImageFile(false)
+    }
+  ];
 
-    const res = await fetch('/api/auth/avatar', {
-      method: 'POST',
-      headers,
-      body: formData
+  // 仅有真实摄像头的设备才显示拍照上传
+  if (hasCamera) {
+    items.push({
+      icon: 'camera_alt',
+      label: '拍照上传',
+      onClick: () => pickImageFile(true)
     });
-    const result = await res.json();
+  }
 
-    if (result.error) {
-      showToast(result.error);
+  // 仅当前有自定义头像时才显示恢复默认
+  if (hasAvatar) {
+    items.push({
+      icon: 'refresh',
+      label: '恢复默认头像',
+      onClick: resetToDefaultAvatar
+    });
+  }
+
+  items.push({ label: '取消', isCancel: true });
+
+  showBottomSheet(items);
+}
+
+/**
+ * 打开文件选择器（相册或拍照）
+ */
+function pickImageFile(capture) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  // 拍照模式：accept="image/*" 配合 capture 属性，强制调用摄像头
+  input.accept = capture ? 'image/*' : AVATAR_ALLOWED_TYPES.join(',');
+  if (capture) {
+    input.setAttribute('capture', 'environment');
+  }
+  input.style.display = 'none';
+
+  input.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 前端文件校验
+    const error = validateAvatarFile(file);
+    if (error) {
+      showToast(error);
       return;
     }
 
-    // 更新当前用户头像
-    if (window._currentUser) {
-      window._currentUser.avatar_url = result.avatar_url;
-    }
-    showToast('头像已更新');
-    // 刷新页面以更新头像显示
-    navigateTo('profile');
-  } catch {
-    showToast('上传失败，请重试');
+    showAvatarCropper(file);
+  });
+
+  document.body.appendChild(input);
+  input.click();
+
+  // 清理
+  setTimeout(() => input.remove(), 500);
+
+  // 检测摄像头权限被拒（仅拍照模式）
+  if (capture) {
+    setTimeout(async () => {
+      if (input.files?.length || document.querySelector('.cropper-fullscreen')) return;
+      try {
+        const status = await navigator.permissions.query({ name: 'camera' });
+        if (status.state === 'denied') {
+          showToast('需要相机权限才能拍照上传');
+        }
+      } catch { /* 不支持 permissions API */ }
+    }, 1500);
   }
+}
+
+/**
+ * 文件前端校验
+ */
+function validateAvatarFile(file) {
+  if (file.size > AVATAR_MAX_SIZE) {
+    return '图片过大，请选择小于 2MB 的图片';
+  }
+  if (!AVATAR_ALLOWED_TYPES.includes(file.type)) {
+    return '仅支持 JPG、PNG、GIF、WebP 格式';
+  }
+  return null;
+}
+
+/**
+ * 读取 JPEG EXIF Orientation
+ */
+function getExifOrientation(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const view = new DataView(e.target.result);
+      if (view.getUint16(0, false) !== 0xFFD8) return resolve(1);
+      const length = view.byteLength;
+      let offset = 2;
+      while (offset < length) {
+        if (view.getUint16(offset, false) !== 0xFFE1) {
+          offset += 2 + view.getUint16(offset + 2, false);
+          continue;
+        }
+        offset += 4;
+        if (view.getUint32(offset, false) !== 0x45786966) return resolve(1);
+        offset += 6;
+        const little = view.getUint16(offset, false) === 0x4949;
+        const ifdOffset = offset + 2 + view.getUint32(offset + 2, little);
+        const tags = view.getUint16(ifdOffset, little);
+        let tagOffset = ifdOffset + 2;
+        for (let i = 0; i < tags; i++) {
+          if (view.getUint16(tagOffset, little) === 0x0112) {
+            return resolve(view.getUint16(tagOffset + 8, little));
+          }
+          tagOffset += 12;
+        }
+        break;
+      }
+      resolve(1);
+    };
+    reader.readAsArrayBuffer(file.slice(0, 65536));
+  });
+}
+
+/**
+ * 根据 EXIF Orientation 旋转图片，返回修正后的 object URL
+ */
+function applyExifRotation(url, orientation) {
+  return new Promise((resolve) => {
+    if (orientation <= 1) return resolve(url);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const { width, height } = img;
+
+      if (orientation >= 5) {
+        canvas.width = height;
+        canvas.height = width;
+      } else {
+        canvas.width = width;
+        canvas.height = height;
+      }
+
+      ctx.save();
+      switch (orientation) {
+        case 2: ctx.transform(-1, 0, 0, 1, width, 0); break;
+        case 3: ctx.transform(-1, 0, 0, -1, width, height); break;
+        case 4: ctx.transform(1, 0, 0, -1, 0, height); break;
+        case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;
+        case 6: ctx.transform(0, 1, -1, 0, height, 0); break;
+        case 7: ctx.transform(0, -1, -1, 0, height, width); break;
+        case 8: ctx.transform(0, -1, 1, 0, 0, width); break;
+      }
+      ctx.drawImage(img, 0, 0);
+      ctx.restore();
+
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(url);
+        resolve(URL.createObjectURL(blob));
+      }, 'image/jpeg', 0.95);
+    };
+    img.src = url;
+  });
+}
+
+/**
+ * 打开裁剪界面
+ */
+async function showAvatarCropper(file) {
+  let objectURL = URL.createObjectURL(file);
+
+  // 修正 EXIF 方向（手机拍照常见问题）
+  try {
+    const orientation = await getExifOrientation(file);
+    if (orientation > 1) {
+      objectURL = await applyExifRotation(objectURL, orientation);
+    }
+  } catch { /* 修正失败则用原图 */ }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'cropper-fullscreen';
+  overlay.id = 'cropper-overlay';
+  overlay.innerHTML = `
+    <div class="cropper-wrapper">
+      <div class="cropper-header">
+        <button class="cropper-btn-text" id="cropper-cancel">取消</button>
+        <span class="cropper-title">裁剪头像</span>
+        <button class="cropper-btn-fill" id="cropper-save">保存</button>
+      </div>
+      <div class="cropper-area">
+        <img id="cropper-image" src="${objectURL}" alt="">
+      </div>
+      <div class="cropper-footer">
+        <button class="cropper-btn-icon" id="cropper-rotate" title="旋转">
+          <span class="mi">rotate_right</span>
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // 初始化 Cropper（v1.6.2，构造函数直接在 window.Cropper）
+  const imageEl = overlay.querySelector('#cropper-image');
+  const cropper = new Cropper(imageEl, {
+    aspectRatio: 1,
+    viewMode: 1,            // 禁止图片拖出裁剪框
+    dragMode: 'move',       // 拖动图片而非裁剪框
+    autoCropArea: 1,        // 裁剪框初始占满图片
+    minCanvasWidth: 300,    // 强制图片最小宽度
+    minCanvasHeight: 300,   // 强制图片最小高度
+    minCropBoxWidth: 192,   // 裁剪框最小尺寸
+    cropBoxMovable: false,  // 禁止移动裁剪框
+    cropBoxResizable: false,// 禁止调整裁剪框大小
+    guides: true,           // 九宫格辅助线
+    background: false,
+    modal: true,            // 裁剪框外半透明遮罩
+    rotatable: true,
+    scalable: true,
+    zoomable: true,
+    zoomOnWheel: true,
+    responsive: true,
+    restore: false
+  });
+
+  // 保存按钮
+  const saveBtn = overlay.querySelector('#cropper-save');
+  saveBtn.addEventListener('click', async () => {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="md-spinner" style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block"></span> 正在上传...';
+
+    try {
+      const canvas = cropper.getCroppedCanvas({ width: 384, height: 384 });
+      const result = await uploadCroppedAvatar(canvas);
+
+      // 成功
+      if (window._currentUser) {
+        window._currentUser.avatar_url = result.avatar_url;
+      }
+      showToast('头像更新成功');
+
+      // 关闭裁剪界面
+      closeCropper(overlay, cropper, objectURL);
+
+      // 更新页面上的头像
+      updateProfileAvatarDisplay(result.avatar_url);
+      // 更新侧边栏
+      if (typeof window.updateSidebarAvatar === 'function') {
+        window.updateSidebarAvatar();
+      }
+    } catch (err) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '保存';
+      showToast(err.message || '上传失败，请检查网络后重试');
+    }
+  });
+
+  // 取消按钮
+  overlay.querySelector('#cropper-cancel').addEventListener('click', () => {
+    closeCropper(overlay, cropper, objectURL);
+  });
+
+  // Escape 关闭
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeCropper(overlay, cropper, objectURL);
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  // 旋转按钮
+  overlay.querySelector('#cropper-rotate').addEventListener('click', () => {
+    cropper.rotate(90);
+  });
+}
+
+function closeCropper(overlay, cropper, objectURL) {
+  if (cropper) cropper.destroy();
+  if (objectURL) URL.revokeObjectURL(objectURL);
+  if (overlay) overlay.remove();
+}
+
+/**
+ * 上传裁剪后的头像
+ */
+async function uploadCroppedAvatar(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        reject(new Error('图片处理失败'));
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('avatar', blob, 'avatar.jpg');
+
+      try {
+        const token = getToken();
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/auth/avatar', {
+          method: 'POST',
+          headers,
+          body: formData
+        });
+        const result = await res.json();
+
+        if (result.error) {
+          reject(new Error(result.error));
+        } else {
+          resolve(result);
+        }
+      } catch {
+        reject(new Error('上传失败，请检查网络后重试'));
+      }
+    }, 'image/jpeg', 0.9);
+  });
+}
+
+/**
+ * 恢复默认头像
+ */
+async function resetToDefaultAvatar() {
+  openModal('恢复默认头像', `
+    <p class="text-secondary">确定要恢复为系统默认头像吗？此操作不可撤销。</p>
+    <div style="display:flex;gap:var(--space-2);justify-content:flex-end;margin-top:var(--space-4)">
+      <button class="btn btn-secondary" id="reset-avatar-cancel-btn">取消</button>
+      <button class="btn btn-primary" id="reset-avatar-confirm-btn">确定</button>
+    </div>
+  `);
+
+  document.getElementById('reset-avatar-cancel-btn')?.addEventListener('click', closeModal);
+  document.getElementById('reset-avatar-confirm-btn')?.addEventListener('click', async () => {
+    closeModal();
+    try {
+      const token = getToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/auth/me', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ avatar_url: '' })
+      });
+      const result = await res.json();
+
+      if (result.error) {
+        showToast(result.error);
+        return;
+      }
+
+      if (window._currentUser) {
+        window._currentUser.avatar_url = '';
+      }
+      showToast('已恢复默认头像');
+      updateProfileAvatarDisplay('');
+      if (typeof window.updateSidebarAvatar === 'function') {
+        window.updateSidebarAvatar();
+      }
+    } catch {
+      showToast('操作失败，请重试');
+    }
+  });
+}
+
+/**
+ * 局部更新页面上的头像显示（不刷新整页）
+ */
+function updateProfileAvatarDisplay(avatarUrl) {
+  const container = document.querySelector('#profile-avatar-area');
+  if (!container) return;
+
+  if (avatarUrl) {
+    container.innerHTML = `
+      <img class="profile-avatar-img" src="${escHtml(avatarUrl)}" alt="">
+      <span class="profile-avatar-overlay"><span class="mi" style="font-size:20px;color:#fff">photo_camera</span></span>
+    `;
+  } else {
+    const user = window._currentUser;
+    const initial = (user?.nickname || user?.username || '?')[0];
+    container.innerHTML = `
+      <span class="profile-avatar-letter">${escHtml(initial)}</span>
+      <span class="profile-avatar-overlay"><span class="mi" style="font-size:20px;color:#fff">photo_camera</span></span>
+    `;
+  }
+}
+
+// 绑定头像点击事件需要在页面渲染后执行
+function bindAvatarClick() {
+  const avatarArea = document.getElementById('profile-avatar-area');
+  if (avatarArea && !avatarArea.dataset.bound) {
+    avatarArea.dataset.bound = '1';
+    avatarArea.addEventListener('click', openAvatarSheet);
+  }
+}
+
+// 导出供 renderOwnerProfile 调用
+function bindProfileEvents(container) {
+  bindAvatarClick();
+}
+
+// 挂载到 window（旧兼容）
+window._handleAvatarUpload = function(event) {
+  // 已废弃，保留以兼容旧代码
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const error = validateAvatarFile(file);
+  if (error) { showToast(error); return; }
+  showAvatarCropper(file);
 };
 
 export async function showFeedbackModal() {
