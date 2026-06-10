@@ -27,6 +27,9 @@ async function renderExplore(container) {
   // 清理旧定时器
   if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
 
+  // 恢复 localStorage 中的冷却状态
+  loadExploreCooldowns();
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title" style="margin:0">
@@ -151,12 +154,12 @@ async function loadPosts(container) {
     if (newItems.length === 0 && _page === 1) {
       // 不使用 explore-posts-grid 的 columns 布局，独立渲染居中卡片
       listEl.style.display = 'block';
-      listEl.style.columns = 'none';
+      listEl.style.columns = 'auto';
       listEl.innerHTML = `
         <div class="card" style="text-align:center;padding:48px">
-          <span class="mi" style="font-size:48px;color:var(--md-outline-variant);display:block;margin-bottom:12px">inbox</span>
+          <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">inbox</span>
           <p class="text-secondary" style="margin-top:12px">还没有帖子</p>
-          <p class="text-secondary" style="font-size:12px;color:var(--md-outline);margin-top:4px">点击右下角「发布」创建第一条内容</p>
+          <p class="text-secondary">点击右下角「发布」创建第一条内容</p>
         </div>`;
       loadMoreEl.innerHTML = '';
       return;
@@ -438,6 +441,108 @@ function openCardEditModal(post, blocks, blockIndex, detailEl) {
 
 const _exploreExpandedReplies = {};
 const _exploreReplyImages = {};
+const _exploreCooldownTimers = {};     // { postId: secondsRemaining }
+const _exploreCooldownTicking = new Set();  // 防重复 tick
+const COOLDOWN_STORAGE_KEY = 'lc_cooldowns';  // localStorage key
+
+// 读取 localStorage 中的冷却记录，恢复未过期的计时器
+function loadExploreCooldowns() {
+  try {
+    const raw = localStorage.getItem(COOLDOWN_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);  // { postId: endTimestamp }
+    const now = Date.now();
+    for (const [postId, endTime] of Object.entries(data)) {
+      const remaining = Math.ceil((endTime - now) / 1000);
+      if (remaining > 0) {
+        const pid = Number(postId);
+        _exploreCooldownTimers[pid] = remaining;
+        if (!_exploreCooldownTicking.has(pid)) resumeExploreCooldownTick(pid);
+      }
+    }
+    // 清理过期条目
+    cleanExploreCooldownStorage();
+  } catch { /* ignore */ }
+}
+
+function saveExploreCooldown(postId) {
+  try {
+    const raw = localStorage.getItem(COOLDOWN_STORAGE_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    data[postId] = Date.now() + 30000;
+    localStorage.setItem(COOLDOWN_STORAGE_KEY, JSON.stringify(data));
+  } catch { /* ignore */ }
+}
+
+function removeExploreCooldown(postId) {
+  try {
+    const raw = localStorage.getItem(COOLDOWN_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    delete data[postId];
+    if (Object.keys(data).length === 0) {
+      localStorage.removeItem(COOLDOWN_STORAGE_KEY);
+    } else {
+      localStorage.setItem(COOLDOWN_STORAGE_KEY, JSON.stringify(data));
+    }
+  } catch { /* ignore */ }
+}
+
+function cleanExploreCooldownStorage() {
+  try {
+    const raw = localStorage.getItem(COOLDOWN_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    const now = Date.now();
+    let changed = false;
+    for (const [postId, endTime] of Object.entries(data)) {
+      if (endTime <= now) { delete data[postId]; changed = true; }
+    }
+    if (changed) {
+      if (Object.keys(data).length === 0) localStorage.removeItem(COOLDOWN_STORAGE_KEY);
+      else localStorage.setItem(COOLDOWN_STORAGE_KEY, JSON.stringify(data));
+    }
+  } catch { /* ignore */ }
+}
+
+function startExploreCooldown(postId, ctxKey) {
+  _exploreCooldownTimers[postId] = 30;
+  saveExploreCooldown(postId);
+  const btn = document.getElementById(`explore-send-${ctxKey}`);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span style="font-size:11px">重新发送(30s)</span>';
+  }
+  resumeExploreCooldownTick(postId);
+}
+
+function resumeExploreCooldownTick(postId) {
+  _exploreCooldownTicking.add(postId);
+  const tick = () => {
+    const remaining = _exploreCooldownTimers[postId];
+    if (!remaining || remaining <= 0) {
+      delete _exploreCooldownTimers[postId];
+      _exploreCooldownTicking.delete(postId);
+      removeExploreCooldown(postId);
+      // 仅恢复属于本 post 的冷却按钮
+      document.querySelectorAll(`[id^="explore-send-"][data-post-id="${postId}"]`).forEach(b => {
+        if (!b.disabled) return;
+        b.disabled = false;
+        b.innerHTML = '<span class="mi">send</span>';
+      });
+      return;
+    }
+    _exploreCooldownTimers[postId] = remaining - 1;
+    // 仅更新属于本 post 的冷却按钮文字
+    document.querySelectorAll(`[id^="explore-send-"][data-post-id="${postId}"]`).forEach(b => {
+      if (b.disabled && b.innerHTML.includes('重新发送')) {
+        b.innerHTML = `<span style="font-size:11px">重新发送(${remaining - 1}s)</span>`;
+      }
+    });
+    setTimeout(tick, 1000);
+  };
+  setTimeout(tick, 1000);
+}
 
 function renderExploreCommentImages(imageUrlStr) {
   if (!imageUrlStr) return '';
@@ -457,11 +562,28 @@ async function toggleExploreComments(postId) {
 
   try {
     const data = await apiGet(`/api/explore/posts/${postId}/comments`);
-    const comments = Array.isArray(data) ? data : (data.items || []);
 
-    const topComments = comments.filter(c => !c.parent_id);
+    // 递归展平后端返回的嵌套 replies，使 childMap 能捕获所有层级的楼中楼
+    function flattenReplies(comment) {
+      const result = [];
+      if (comment.replies && comment.replies.length) {
+        comment.replies.forEach(r => {
+          result.push(r);
+          result.push(...flattenReplies(r));
+        });
+      }
+      return result;
+    }
+
+    const topComments = data.items || [];
+    const allComments = [];
+    topComments.forEach(c => {
+      allComments.push(c);
+      allComments.push(...flattenReplies(c));
+    });
+
     const childMap = {};
-    comments.forEach(c => {
+    allComments.forEach(c => {
       if (c.parent_id) {
         if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
         childMap[c.parent_id].push(c);
@@ -495,7 +617,8 @@ async function toggleExploreComments(postId) {
 }
 
 function renderExploreForumComment(c, postId, childMap) {
-  const avatarLetter = (c.author_name || '?')[0].toUpperCase();
+  const displayName = c.author_nickname || c.author_name || '匿名';
+  const avatarLetter = (displayName || '?')[0].toUpperCase();
   const children = childMap[c.id] || [];
   const previewChildren = children.slice(-2);
   const hiddenCount = children.length - previewChildren.length;
@@ -513,7 +636,7 @@ function renderExploreForumComment(c, postId, childMap) {
       <div class="forum-reply-content">
         <div class="forum-reply-header">
           <div class="forum-reply-meta">
-            <button class="forum-reply-name" data-action="explore-navigate-profile" data-user-id="${c.author_id}">${escHtml(c.author_name)}</button>
+            <button class="forum-reply-name" data-action="explore-navigate-profile" data-user-id="${c.author_id}">${escHtml(displayName)}</button>
             <span class="forum-reply-time">${escHtml(timeStr)}</span>
           </div>
         </div>
@@ -529,7 +652,7 @@ function renderExploreForumComment(c, postId, childMap) {
         ${children.length > 0 ? `
           ${isExpanded ? `
             <div class="forum-nested-replies">
-              ${children.map(child => renderExploreNestedReply(child, c.author_name, c.author_id, postId, childMap)).join('')}
+              ${children.map(child => renderExploreNestedReply(child, displayName, c.author_id, postId, childMap)).join('')}
             </div>
             <button class="forum-view-replies" data-action="explore-toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">── 收起回复 🔼</button>
           ` : `
@@ -549,13 +672,14 @@ function renderExploreForumComment(c, postId, childMap) {
 }
 
 function renderExploreNestedReply(child, parentAuthorName, parentAuthorId, postId, childMap, depth = 1) {
-  const avatarLetter = (child.author_name || '?')[0].toUpperCase();
+  const childDisplayName = child.author_nickname || child.author_name || '匿名';
+  const avatarLetter = (childDisplayName || '?')[0].toUpperCase();
   const timeStr = child.created_at ? new Date(child.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
   const grandchildren = childMap[child.id] || [];
-  const maxDepth = 3;
-  const childrenHtml = (grandchildren.length > 0 && depth < maxDepth)
+  const maxDepth = 10;
+  const childrenHtml = (grandchildren.length > 0 && depth <= maxDepth)
     ? `<div class="forum-nested-replies">${grandchildren.map(c =>
-        renderExploreNestedReply(c, child.author_name, child.author_id, postId, childMap, depth + 1)
+        renderExploreNestedReply(c, childDisplayName, child.author_id, postId, childMap, depth + 1)
       ).join('')}</div>`
     : '';
 
@@ -570,7 +694,7 @@ function renderExploreNestedReply(child, parentAuthorName, parentAuthorId, postI
       <div class="forum-reply-content">
         <div class="forum-reply-header">
           <div class="forum-reply-meta">
-            <button class="forum-reply-name" data-action="explore-navigate-profile" data-user-id="${child.author_id}">${escHtml(child.author_name)}</button>
+            <button class="forum-reply-name" data-action="explore-navigate-profile" data-user-id="${child.author_id}">${escHtml(childDisplayName)}</button>
             <span class="forum-reply-to">回复 <button class="forum-reply-link" data-action="explore-navigate-profile" data-user-id="${parentAuthorId}">${escHtml(parentAuthorName || '')}</button></span>
             <span class="forum-reply-time">${escHtml(timeStr)}</span>
           </div>
@@ -658,6 +782,10 @@ function openExploreInlineEditor(postId, parentCommentId, ctxKey) {
 
   _exploreReplyImages[ctxKey] = { files: [], urls: [] };
 
+  const cooldown = _exploreCooldownTimers[postId] || 0;
+  const sendDisabled = cooldown > 0;
+  const sendLabel = cooldown > 0 ? `重新发送(${cooldown}s)` : '';
+
   container.innerHTML = `
     <div class="forum-inline-editor">
       <div class="forum-editor-row">
@@ -670,8 +798,10 @@ function openExploreInlineEditor(postId, parentCommentId, ctxKey) {
             <span class="mi">photo_camera</span>
           </button>
           <button class="forum-editor-btn forum-editor-send" id="explore-send-${ctxKey}"
-            onclick="window._submitExploreForumReply(${postId}, ${parentCommentId || 'null'}, '${ctxKey}')">
-            <span class="mi">send</span>
+            data-post-id="${postId}"
+            onclick="window._submitExploreForumReply(${postId}, ${parentCommentId || 'null'}, '${ctxKey}')"
+            ${sendDisabled ? 'disabled' : ''}>
+            ${sendDisabled ? `<span style="font-size:11px">${sendLabel}</span>` : '<span class="mi">send</span>'}
           </button>
         </div>
       </div>
@@ -753,6 +883,12 @@ window._submitExploreForumReply = async function(postId, parentCommentId, ctxKey
     return;
   }
 
+  // 冷却检查
+  if (_exploreCooldownTimers[postId] > 0) {
+    showToast(`请等待 ${_exploreCooldownTimers[postId]} 秒后再发送`);
+    return;
+  }
+
   const sendBtn = document.getElementById(`explore-send-${ctxKey}`);
   if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<span class="mi">hourglass_empty</span>'; }
 
@@ -792,6 +928,9 @@ window._submitExploreForumReply = async function(postId, parentCommentId, ctxKey
 
     closeExploreInlineEditor(ctxKey);
     showToast('回复成功');
+
+    // 启动 30 秒冷却
+    startExploreCooldown(postId, ctxKey);
     toggleExploreComments(postId);
   } catch {
     showToast('网络错误，请重试');
@@ -825,7 +964,7 @@ registerPage('explore-my-posts', async (container) => {
     if (posts.length === 0) {
       listEl.innerHTML = `
         <div class="card" style="text-align:center;padding:48px">
-          <span class="mi" style="font-size:48px;color:var(--md-outline-variant);display:block;margin-bottom:12px">post_add</span>
+          <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">post_add</span>
           <p class="text-secondary">还没有发布过内容</p>
         </div>`;
       return;

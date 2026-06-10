@@ -43,12 +43,15 @@
   <script src="https://unpkg.com/motion@11.18.2/dist/motion.js" defer></script>
   <!-- markdown-it (markdown rendering) -->
   <script src="/js/markdown-it.min.js" defer></script>
+  <!-- Cropper.js (头像裁剪) -->
+  <script src="/lib/cropperjs/cropper.min.js?v=1" defer></script>
 
   <!-- Cloudflare Turnstile (人机验证) -->
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
   <!-- 本地样式表（在异步外部 CSS 之后，解析不被阻塞） -->
-  <link rel="stylesheet" href="/css/style.css?v=10">
+  <link rel="stylesheet" href="/css/style.css?v=12">
+  <link rel="stylesheet" href="/lib/cropperjs/cropper.min.css">
 </head>
 <body>
 
@@ -82,7 +85,9 @@
       <section class="nav-section">
         <span class="nav-section-label">个人</span>
         <a class="nav-item" data-page="profile">
-          <svg class="mi-svg sidebar-avatar-icon" id="sidebar-avatar" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4s-4 1.79-4 4s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v1c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-1c0-2.66-5.33-4-8-4z"/></svg>
+          <span id="sidebar-avatar-area" style="display:inline-flex;align-items:center">
+            <svg class="mi-svg sidebar-avatar-icon" id="sidebar-avatar" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4s-4 1.79-4 4s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v1c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-1c0-2.66-5.33-4-8-4z"/></svg>
+          </span>
           <span>个人中心</span>
         </a>
         <a class="nav-item" data-page="my_post">
@@ -131,6 +136,6 @@
     </a>
   </nav>
 
-  <script type="module" src="/js/main.js?v=22"></script>
+  <script type="module" src="/js/main.js?v=27"></script>
 </body>
 </html>

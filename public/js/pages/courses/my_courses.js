@@ -172,7 +172,7 @@ async function loadMyCourseList(semester) {
         <div class="card" style="text-align:center;padding:48px">
           <span class="mi" style="font-size:48px;color:var(--md-outline-variant)">menu_book</span>
           <p class="text-secondary" style="margin-top:12px">该学期暂无课程</p>
-          <p class="text-secondary">点击"导入课程表"或"选择已有课程"添加</p>
+          <p class="text-secondary" style="white-space:nowrap">点击"导入课程表"或"选择已有课程"添加</p>
         </div>
       `;
       animIn(listEl.querySelector('.card'), { y: 20, delay: 80 });
