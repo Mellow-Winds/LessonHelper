@@ -166,16 +166,6 @@ module.exports = function (db) {
     }
 
     // 楼中楼：校验 parent_id
-    const lastComment = db.get(
-      'SELECT created_at FROM explore_comments WHERE post_id = ? AND author_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
-      [postId, userId]
-    );
-    const retryAfter = getRemainingCooldownSeconds(lastComment);
-    if (retryAfter > 0) {
-      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
-      return res.status(429).json({ error: `请等待 ${retryAfter} 秒后再发送`, retry_after: retryAfter });
-    }
-
     let parentId = null;
     if (parent_id) {
       parentId = Number(parent_id);
