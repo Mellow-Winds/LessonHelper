@@ -82,8 +82,8 @@ async function renderActiveTab() {
     listContainer?.addEventListener('click', (e) => {
       const item = e.target.closest('.notif-page-item');
       if (!item) return;
-      const { notifId, relatedType, relatedId, courseId, isRead } = item.dataset;
-      handleNotifItemClick(Number(notifId), relatedType, Number(relatedId), Number(courseId), isRead === 'true');
+      const { notifId, relatedType, relatedId, relatedCommentId, courseId, isRead } = item.dataset;
+      handleNotifItemClick(Number(notifId), relatedType, Number(relatedId), Number(courseId), isRead === 'true', Number(relatedCommentId));
     });
     await loadNotifications();
   }
@@ -124,6 +124,7 @@ async function loadNotifications() {
            data-notif-id="${n.id}"
            data-related-type="${n.related_type || ''}"
            data-related-id="${n.related_id || 0}"
+           data-related-comment-id="${n.related_comment_id || 0}"
            data-course-id="${n.course_id || 0}"
            data-is-read="${!!n.is_read}">
         <div style="display:flex;align-items:flex-start;gap:12px">
@@ -149,7 +150,7 @@ async function loadNotifications() {
    点击通知项
    ============================================= */
 
-async function handleNotifItemClick(notifId, relatedType, relatedId, courseId, isRead) {
+async function handleNotifItemClick(notifId, relatedType, relatedId, courseId, isRead, relatedCommentId = 0) {
   if (!isRead) {
     await apiPut(`/api/notifications/${notifId}/read`, {});
     if (window.refreshNotifBadge) window.refreshNotifBadge();
@@ -161,7 +162,7 @@ async function handleNotifItemClick(notifId, relatedType, relatedId, courseId, i
     return;
   }
 
-  const target = resolveNotificationTarget(relatedType, relatedId, courseId);
+  const target = resolveNotificationTarget(relatedType, relatedId, courseId, relatedCommentId);
   if (target) navigateTo(target.page, target.data);
 }
 
