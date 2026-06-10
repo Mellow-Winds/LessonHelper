@@ -242,6 +242,7 @@ async function start() {
     message TEXT NOT NULL,
     related_type TEXT,
     related_id INTEGER,
+    related_comment_id INTEGER,
     course_id INTEGER,
     is_read INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -249,6 +250,8 @@ async function start() {
   )`);
 
   // New table: square_posts (交友广场帖子)
+  migrateTable('notifications', 'related_comment_id', 'INTEGER');
+
   db.run(`CREATE TABLE IF NOT EXISTS square_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     creator_id INTEGER NOT NULL,

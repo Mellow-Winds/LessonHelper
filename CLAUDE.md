@@ -17,7 +17,7 @@
 | 设计系统 | Material Design 3（自定义 CSS） |
 | Markdown | markdown-it（本地副本） |
 | 图标 | Material Icons + Remix Icon |
-| 测试 | node:test（13 个测试文件） |
+| 测试 | node:test（16 个测试文件） |
 
 ## 项目结构
 
@@ -27,6 +27,7 @@ Lessonhelper/
 ├── package.json                 # 依赖配置
 ├── rules                        # 前端设计规范 + 统一规则（颜色/排版/间距/组件/输入框规范）
 ├── CLAUDE.md                    # 本文件 — 项目指南
+├── README.md                    # 项目说明与快速开始
 ├── data/
 │   └── schedule/
 │       ├── notes.md             # 导入说明
@@ -36,14 +37,15 @@ Lessonhelper/
 │   ├── tech-spec.md             #   技术规范（数据库/API/安全）
 │   ├── design-spec.md           #   设计规范（页面布局/组件风格）
 │   ├── development-steps.md     #   分步开发计划（当前进度 + 待办）
-│   └── api-spec.md              #   API 接口规范
+│   ├── api-spec.md              #   API 接口规范
+│   └── course.md                #   课程系统设计文档
 ├── devlog/                      # 📝 开发日志（每天一个文件）
 ├── todolist/                    # 📋 待规划功能清单
-├── tests/                       # 🧪 自动化测试（node:test）
+├── tests/                       # 🧪 自动化测试（node:test，16 个文件）
 ├── db/                          # SQLite 数据库文件
-├── routes/                      # 后端路由（11 个文件）
+├── routes/                      # 后端路由（12 个文件）
 │   ├── auth.js                  #   注册/登录/个人信息/签到/数据导出
-│   ├── courses.js               #   课程/帖子/评论/成员
+│   ├── courses.js               #   课程/帖子/评论/搭子帖/成员
 │   ├── user.js                  #   用户公开名片/关注/反馈/关注动态
 │   ├── schedule.js              #   课表导入
 │   ├── materials.js             #   学习资料上传/下载/评分
@@ -51,6 +53,7 @@ Lessonhelper/
 │   ├── notifications.js         #   消息通知
 │   ├── search.js                #   全局搜索
 │   ├── square.js                #   交友广场
+│   ├── explore_comments.js      #   发现模块评论（楼中楼 + 图片）
 │   ├── favorites.js             #   收藏（课程/帖子）
 │   ├── my_posts.js              #   我的发布
 │   └── middleware/
@@ -65,35 +68,42 @@ Lessonhelper/
 │       │   ├── api.js           #   Fetch 请求层 + Token 管理
 │       │   └── router.js        #   路由系统 + 动效引擎
 │       ├── components/
-│       │   └── ui.js            #   MD3 组件工厂 + Toast + Modal
+│       │   ├── ui.js            #   MD3 组件工厂 + Toast + Modal
+│       │   └── card-renderer.js #   发现模块卡片渲染 + 计时器
 │       └── pages/
 │           ├── auth.js          #   登录/注册 + 搜索页
 │           ├── profile.js       #   个人中心（三栖视角 + 签到 + 关注）
-│           ├── notifications.js #   通知中心
+│           ├── notifications.js #   通知中心（含路由跳转）
 │           ├── favorites.js     #   我的收藏
 │           ├── following_feed.js #  关注动态
 │           ├── my_posts.js      #   我的发布
-│           ├── explore.js       #   探索页入口
+│           ├── notification_routes.mjs # 通知跳转路由映射
+│           ├── explore.js       #   发现页（帖子流 + 详情 + 论坛式评论 + 冷却）
 │           ├── explore/
 │           │   ├── invites.js   #   自习邀约
 │           │   ├── square.js    #   交友广场
-│           │   └── posts.js     #   统一发布页
+│           │   └── posts.js     #   统一发布页（含编辑功能）
 │           └── courses/
 │               ├── my_courses.js #   我的课程（导入/列表/详情）
-│               ├── plaza.js     #   课程广场（大课聚合）
-│               └── publish.js   #   发布（富文本+附件）
+│               ├── all_courses.js#   课程广场（大课聚合）
+│               ├── detail.js    #   统一大课空间详情页
+│               ├── plaza.js     #   课程广场（非选课用户只读视图）
+│               ├── publish.js   #   发布（富文本+附件）
+│               ├── course_square.js # 课程搭子 Tab
+│               └── post_attachments.js # 帖子附件渲染工具
 └── uploads/                     # 上传文件存储
-    └── materials/               #   学习资料文件
+    ├── materials/               #   学习资料文件
+    └── comment-images/          #   评论图片
 ```
 
-## 数据库表（18 张）
+## 数据库表（19 张）
 
 | 表名 | 说明 |
 |------|------|
 | users | 用户账号（含 wechat/douyin/mbti/avatar_desc/签到/隐私字段） |
 | courses | 课程目录 |
 | posts | 课程论坛帖子 |
-| comments | 帖子评论 |
+| comments | 帖子评论（支持 parent_id 楼中楼） |
 | user_courses | 选课关系（多对多） |
 | materials | 学习资料 |
 | material_ratings | 资料评分 |
@@ -103,6 +113,8 @@ Lessonhelper/
 | square_posts | 交友广场帖子（7天过期，course_id 课程作用域） |
 | square_interests | 广场感兴趣记录 |
 | square_comments | 广场评论 |
+| explore_posts | 发现模块帖子（全局流） |
+| explore_comments | 发现模块评论（支持 parent_id 楼中楼 + 图片） |
 | follows | 关注关系 |
 | feedback | 问题反馈 |
 | favorite_courses | 课程收藏 |
@@ -118,6 +130,7 @@ Lessonhelper/
 | 页面长什么样 | [docs/design-spec.md](docs/design-spec.md) |
 | 开发到哪一步了 | [docs/development-steps.md](docs/development-steps.md) |
 | API怎么调用 | [docs/api-spec.md](docs/api-spec.md) |
+| 课程体系设计 | [docs/course.md](docs/course.md) |
 | 今天的进度 | [devlog/](devlog/) 最新文件 |
 | 样式规则 + 统一规范 | [rules](rules) |
 | 待办事项 | [todolist/](todolist/) |
@@ -140,6 +153,8 @@ Lessonhelper/
 - 新页面用 `registerPage(name, renderFn)` 注册
 - 输入框必须用 `createMdInput()` / `createMdSelect()` 工厂，禁止原生 `<select>`
 - **输入框 placeholder 禁止使用汉字**，只允许 `placeholder: ' '`（一个空格）
+- 评论系统统一使用论坛式风格（内联编辑器 + 图片上传 + 楼中楼递归 + 30 秒冷却）
+- 冷却状态通过 localStorage 持久化，刷新不丢失
 
 ### 启动命令
 ```bash
@@ -155,4 +170,4 @@ npm run dev          # 启动服务器 http://localhost:3000
 
 ---
 
-> 创建于 2026-05-30 | 最后更新：2026-06-03（输入框规范 + rules 重命名）
+> 创建于 2026-05-30 | 最后更新：2026-06-10（文档清理 + 冷却持久化 + 楼中楼修复）
