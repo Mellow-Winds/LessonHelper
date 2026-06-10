@@ -8,6 +8,7 @@ const { createNotification } = require('./notifications');
 const COMMENT_IMAGE_DIR = path.join(__dirname, '..', 'uploads', 'comment-images');
 const COMMENT_IMAGE_MAX = 1 * 1024 * 1024;
 const COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png']);
+const COMMENT_COOLDOWN_SECONDS = 30;
 
 const commentUpload = multer({
   storage: multer.diskStorage({
@@ -41,6 +42,40 @@ function parseCommentImage(req, res, next) {
   });
 }
 
+function getRemainingCooldownSeconds(comment) {
+  if (!comment?.created_at) return 0;
+  const createdAt = new Date(String(comment.created_at).replace(' ', 'T') + 'Z').getTime();
+  if (!Number.isFinite(createdAt)) return 0;
+  const elapsedSeconds = Math.floor((Date.now() - createdAt) / 1000);
+  return Math.max(0, COMMENT_COOLDOWN_SECONDS - elapsedSeconds);
+}
+
+function getCommentCount(db, postId) {
+  return (db.get('SELECT COUNT(*) AS cnt FROM explore_comments WHERE post_id = ?', [postId]) || {}).cnt || 0;
+}
+
+function collectDescendantComments(db, commentId) {
+  const result = [];
+  const stack = [commentId];
+  while (stack.length > 0) {
+    const currentId = stack.pop();
+    const children = db.all('SELECT * FROM explore_comments WHERE parent_id = ?', [currentId]);
+    for (const child of children) {
+      result.push(child);
+      stack.push(child.id);
+    }
+  }
+  return result;
+}
+
+function deleteCommentImage(imageUrl) {
+  if (!imageUrl) return;
+  imageUrl.split(';').filter(Boolean).forEach(url => {
+    const imgPath = path.join(__dirname, '..', url);
+    if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+  });
+}
+
 module.exports = function (db) {
   const router = express.Router();
 
@@ -51,43 +86,42 @@ module.exports = function (db) {
     const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(pageSize);
     const limit = Math.min(100, Math.max(1, parseInt(pageSize)));
 
-    // 顶层评论
-    const comments = db.all(
+    // 拉取该帖子所有评论，在前端构建嵌套树（保证楼中楼递归展示）
+    const allComments = db.all(
       `SELECT ec.*,
-        u.username AS author_name,
-        u.nickname AS author_nickname,
+        u.nickname AS author_name,
+        u.username AS author_username,
         u.avatar_url AS author_avatar
        FROM explore_comments ec
        LEFT JOIN users u ON u.id = ec.author_id
-       WHERE ec.post_id = ? AND ec.parent_id IS NULL
-       ORDER BY ec.created_at ASC
-       LIMIT ? OFFSET ?`,
-      [postId, limit, offset]
+       WHERE ec.post_id = ?
+       ORDER BY ec.created_at ASC`,
+      [postId]
     );
 
-    // 为每个评论查回复
-    for (const c of comments) {
-      const replies = db.all(
-        `SELECT ec.*,
-          u.username AS author_name,
-          u.nickname AS author_nickname,
-          u.avatar_url AS author_avatar
-         FROM explore_comments ec
-         LEFT JOIN users u ON u.id = ec.author_id
-         WHERE ec.parent_id = ?
-         ORDER BY ec.created_at ASC`,
-        [c.id]
-      );
-      c.replies = replies;
-      c.reply_count = replies.length;
+    // 构建 parentId -> children 映射
+    const childrenMap = {};
+    allComments.forEach(c => {
+      const pid = c.parent_id;
+      if (!childrenMap[pid]) childrenMap[pid] = [];
+      childrenMap[pid].push(c);
+    });
+
+    // 递归挂载 replies
+    function attachReplies(comment) {
+      const replies = childrenMap[comment.id] || [];
+      for (const r of replies) attachReplies(r);
+      comment.replies = replies;
+      comment.reply_count = replies.length;
     }
 
-    const total = db.get(
-      'SELECT COUNT(*) AS cnt FROM explore_comments WHERE post_id = ? AND parent_id IS NULL',
-      [postId]
-    )?.cnt || 0;
+    const topComments = allComments.filter(c => !c.parent_id);
+    topComments.forEach(attachReplies);
 
-    res.json({ items: comments, total, page: parseInt(page), pageSize: limit });
+    const total = topComments.length;
+    const paged = topComments.slice(offset, offset + limit);
+
+    res.json({ items: paged, total, comment_count: allComments.length, page: parseInt(page), pageSize: limit });
   });
 
   // POST /api/explore/posts/:postId/comments — 发表评论 [Auth]（支持图片 + 楼中楼）
@@ -132,6 +166,16 @@ module.exports = function (db) {
     }
 
     // 楼中楼：校验 parent_id
+    const lastComment = db.get(
+      'SELECT created_at FROM explore_comments WHERE post_id = ? AND author_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+      [postId, userId]
+    );
+    const retryAfter = getRemainingCooldownSeconds(lastComment);
+    if (retryAfter > 0) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(429).json({ error: `请等待 ${retryAfter} 秒后再发送`, retry_after: retryAfter });
+    }
+
     let parentId = null;
     if (parent_id) {
       parentId = Number(parent_id);
@@ -163,7 +207,8 @@ module.exports = function (db) {
           title: '评论回复',
           message: `${userName} 回复了你在「${post.title}」下的评论`,
           relatedType: 'explore_post',
-          relatedId: postId
+          relatedId: postId,
+          relatedCommentId: commentId
         });
       }
     } else {
@@ -174,7 +219,8 @@ module.exports = function (db) {
           title: '新评论',
           message: `${userName} 评论了你的帖子「${post.title}」`,
           relatedType: 'explore_post',
-          relatedId: postId
+          relatedId: postId,
+          relatedCommentId: commentId
         });
       }
     }
@@ -184,8 +230,8 @@ module.exports = function (db) {
     // 返回完整评论
     const comment = db.get(
       `SELECT ec.*,
-        u.username AS author_name,
-        u.nickname AS author_nickname,
+        u.nickname AS author_name,
+        u.username AS author_username,
         u.avatar_url AS author_avatar
        FROM explore_comments ec
        LEFT JOIN users u ON u.id = ec.author_id
@@ -197,24 +243,24 @@ module.exports = function (db) {
 
   // DELETE /api/explore/posts/:postId/comments/:commentId — 删除评论 [Auth, 仅作者]（硬删除）
   router.delete('/:postId/comments/:commentId', authMiddleware, (req, res) => {
+    const postId = parseInt(req.params.postId);
     const commentId = parseInt(req.params.commentId);
     const userId = req.user.userId;
 
-    const comment = db.get('SELECT * FROM explore_comments WHERE id = ?', [commentId]);
+    const comment = db.get('SELECT * FROM explore_comments WHERE id = ? AND post_id = ?', [commentId, postId]);
     if (!comment) return res.status(404).json({ error: '评论不存在' });
     if (comment.author_id !== userId) return res.status(403).json({ error: '只能删除自己的评论' });
 
     // 删除图片文件
-    if (comment.image_url) {
-      const imgPath = path.join(__dirname, '..', comment.image_url);
-      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
-    }
+    const descendants = collectDescendantComments(db, commentId);
+    [comment, ...descendants].forEach(c => deleteCommentImage(c.image_url));
 
     // 硬删除
-    db.run('DELETE FROM explore_comments WHERE id = ?', [commentId]);
+    const ids = [commentId, ...descendants.map(c => c.id)];
+    for (const id of ids) db.run('DELETE FROM explore_comments WHERE id = ?', [id]);
     db.save();
 
-    res.json({ message: '已删除' });
+    res.json({ message: '已删除', deleted_count: ids.length, comment_count: getCommentCount(db, postId) });
   });
 
   // GET /api/explore/posts/:postId/comments/:commentId/replies — 获取楼中楼回复
