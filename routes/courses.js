@@ -449,7 +449,7 @@ module.exports = function (db) {
     }
 
     const postId = Number(req.params.postId);
-    const post = db.get('SELECT id FROM posts WHERE id = ?', [postId]);
+    const post = db.get('SELECT id, course_id FROM posts WHERE id = ?', [postId]);
     if (!post) {
       imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
       return res.status(404).json({ error: '帖子不存在' });
@@ -485,7 +485,7 @@ module.exports = function (db) {
         createNotification(db, {
           userId: parentComment.author_id, type: 'new_comment', title: '新回复',
           message: `${commenter?.nickname || '匿名'} 回复了你的评论`,
-          relatedType: 'post', relatedId: postId
+          relatedType: 'post', relatedId: postId, courseId: post.course_id
         });
         db.save();
       }
@@ -927,7 +927,7 @@ module.exports = function (db) {
         createNotification(db, {
           userId: parentComment.author_id, type: 'new_comment', title: '新回复',
           message: `${commenter?.nickname || '匿名'} 回复了你的评论`,
-          relatedType: 'course_square_post', relatedId: postId
+          relatedType: 'course_square_post', relatedId: postId, courseId: bigCourseId
         });
         db.save();
       }
@@ -936,7 +936,7 @@ module.exports = function (db) {
         createNotification(db, {
           userId: post.creator_id, type: 'new_comment', title: '新评论',
           message: `${commenter?.nickname || '匿名'} 评论了你的搭子帖「${post.title}」`,
-          relatedType: 'course_square_post', relatedId: postId
+          relatedType: 'course_square_post', relatedId: postId, courseId: bigCourseId
         });
         db.save();
       }
