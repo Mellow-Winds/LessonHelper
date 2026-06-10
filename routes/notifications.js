@@ -2,11 +2,27 @@ const express = require('express');
 const { authMiddleware } = require('./middleware/auth');
 
 // 通知辅助函数 — 供其他路由调用
-function createNotification(db, { userId, type, title, message, relatedType, relatedId, courseId }) {
+function createNotification(db, { userId, type, title, message, relatedType, relatedId, relatedCommentId, courseId }) {
+  let hasCommentAnchor = false;
+  try {
+    hasCommentAnchor = db.all("PRAGMA table_info(notifications)").some(col => col.name === 'related_comment_id');
+  } catch {
+    hasCommentAnchor = false;
+  }
+
+  if (!hasCommentAnchor) {
+    db.run(
+      `INSERT INTO notifications (user_id, type, title, message, related_type, related_id, course_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [userId, type, title, message, relatedType || null, relatedId || null, courseId || null]
+    );
+    return;
+  }
+
   db.run(
-    `INSERT INTO notifications (user_id, type, title, message, related_type, related_id, course_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [userId, type, title, message, relatedType || null, relatedId || null, courseId || null]
+    `INSERT INTO notifications (user_id, type, title, message, related_type, related_id, related_comment_id, course_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [userId, type, title, message, relatedType || null, relatedId || null, relatedCommentId || null, courseId || null]
   );
 }
 
