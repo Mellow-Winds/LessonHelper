@@ -57,6 +57,15 @@ POST /api/auth/checkin
 ```
 Response: `{ "streak": 5, "grace_days": 0, "message": "签到成功" }`
 
+### 上传头像 [Auth]
+```
+POST /api/auth/avatar
+```
+Content-Type: `multipart/form-data`
+Body: `avatar (file, ≤2MB, JPG/PNG)`
+Response 200: `{ "avatar_url": "/uploads/avatars/xxx.jpg", "message": "头像已更新" }`
+> 前端已完成三级压缩（预压缩 → 标准化 384×384 → 质量自动降级），后端直接存盘。
+
 ---
 
 ## 2. 课程 `/api/courses`
@@ -543,4 +552,4 @@ set RESEND_API_KEY=re_xxxxxx
 
 ---
 
-> 最后更新：2026-06-10（新增发现模块 API 第 13 节）
+> 最后更新：2026-06-11（新增头像上传端点、文档全面清理）
