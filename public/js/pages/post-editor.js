@@ -84,9 +84,33 @@ async function renderPostEditor(container, postId) {
         <div class="editor-canvas" id="editor-canvas" contenteditable="true"></div>
       </div>
       <div class="editor-right">
-        <div class="editor-right-header">卡片模板</div>
-        <div class="editor-template-list" id="editor-template-list"></div>
+        <!-- 卡片收藏面板 -->
+        <div class="editor-collection" id="editor-collection">
+          <div class="editor-collection-header">
+            <span>卡片收藏</span>
+            <button class="btn btn-sm btn-primary" id="new-card-btn" title="自定义卡片">
+              <i class="ri-add-line"></i> 自定义卡片
+            </button>
+          </div>
+          <div class="editor-collection-list" id="editor-collection-list"></div>
+        </div>
       </div>
+    </div>
+
+    <!-- 卡片市场（独立模块，跨全宽） -->
+    <div class="editor-market-section" id="editor-market">
+      <div class="editor-market-section-header">
+        <span>卡片市场</span>
+      </div>
+      <div class="editor-market-filters" id="editor-market-filters">
+        <button class="market-filter-chip active" data-cat="all">全部</button>
+        <button class="market-filter-chip" data-cat="study">学习</button>
+        <button class="market-filter-chip" data-cat="social">社交</button>
+        <button class="market-filter-chip" data-cat="trade">交易</button>
+        <button class="market-filter-chip" data-cat="project">项目</button>
+        <button class="market-filter-chip" data-cat="general">通用</button>
+      </div>
+      <div class="editor-market-grid" id="editor-market-grid"></div>
     </div>
   `;
 
@@ -99,8 +123,9 @@ async function renderPostEditor(container, postId) {
     value: existingPost?.title || ''
   });
 
-  // 渲染模板列表
-  renderTemplateList(container.querySelector('#editor-template-list'));
+  // 渲染卡片收藏 + 卡片市场
+  renderCollectionPanel(container);
+  renderMarketPanel(container, 'all');
 
   // 编辑模式：还原已有内容到编辑区
   if (isEdit && existingPost) {
@@ -142,31 +167,128 @@ function restoreBlocksToCanvas(canvas, blocks) {
 }
 
 /* =============================================
-   模板列表（右栏）
+   卡片收藏（localStorage）
    ============================================= */
 
-function renderTemplateList(el) {
+function getFavoriteIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem('card_favorites') || '[]'));
+  } catch (e) { return new Set(); }
+}
+
+function saveFavoriteIds(ids) {
+  localStorage.setItem('card_favorites', JSON.stringify([...ids]));
+}
+
+function toggleFavorite(templateId) {
+  const ids = getFavoriteIds();
+  if (ids.has(templateId)) {
+    ids.delete(templateId);
+  } else {
+    ids.add(templateId);
+  }
+  saveFavoriteIds(ids);
+  return ids;
+}
+
+/* =============================================
+   卡片收藏面板（右上）
+   ============================================= */
+
+function renderCollectionPanel(container) {
+  const el = container.querySelector('#editor-collection-list');
   if (!el) return;
-  if (_templates.length === 0) {
-    el.innerHTML = '<p class="text-secondary" style="padding:16px;font-size:13px">暂无模板</p>';
+
+  const favIds = getFavoriteIds();
+  const favorited = _templates.filter(t => favIds.has(t.id));
+
+  if (favorited.length === 0) {
+    el.innerHTML = '<p class="text-secondary" style="padding:12px;font-size:12px;text-align:center">在卡片市场中点击 ☆ 收藏</p>';
+  } else {
+    el.innerHTML = favorited.map(t => `
+      <div class="collection-card" draggable="true" data-template-id="${t.id}"
+        style="background:${(t.styles && t.styles.bg) || '#fff'};border-left:3px solid ${(t.styles && t.styles.accent) || '#1565C0'}">
+        <i class="${t.icon || 'ri-layout-grid-line'}"></i>
+        <span>${escHtml(t.name)}</span>
+        ${t.is_official ? '' : '<span class="badge-community">社区</span>'}
+      </div>
+    `).join('');
+
+    // 拖拽
+    el.querySelectorAll('.collection-card[draggable]').forEach(item => {
+      item.addEventListener('dragstart', (e) => {
+        const tid = item.dataset.templateId;
+        _draggedTemplate = _templates.find(t => t.id === tid) || null;
+        _draggedCardEl = null;
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('text/plain', tid);
+        item.classList.add('dragging');
+      });
+      item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
+        _draggedTemplate = null;
+        removeDropIndicator();
+      });
+    });
+  }
+}
+
+/* =============================================
+   卡片市场面板（右下）
+   ============================================= */
+
+let _marketCategory = 'all';
+
+function renderMarketPanel(container, category) {
+  _marketCategory = category || 'all';
+  const gridEl = container.querySelector('#editor-market-grid');
+  if (!gridEl) return;
+
+  const favIds = getFavoriteIds();
+  const filtered = _marketCategory === 'all'
+    ? _templates
+    : _templates.filter(t => t.category === _marketCategory);
+
+  if (filtered.length === 0) {
+    gridEl.innerHTML = '<p class="text-secondary" style="padding:16px;font-size:13px;text-align:center">暂无卡片</p>';
     return;
   }
 
-  el.innerHTML = _templates.map(t => `
-    <div class="editor-template-item" draggable="true" data-template-id="${t.id}" data-template="${t.id}">
-      <div class="editor-template-icon"><i class="${t.icon || 'ri-layout-grid-line'}"></i></div>
-      <div class="editor-template-info">
-        <div class="editor-template-name">${escHtml(t.name)}</div>
-        <div class="editor-template-desc">${escHtml(t.description || '')}</div>
+  gridEl.innerHTML = filtered.map(t => {
+    const isFav = favIds.has(t.id);
+    const starIcon = isFav ? 'ri-star-fill' : 'ri-star-line';
+    const starCls = isFav ? 'star-active' : '';
+    return `
+      <div class="market-card" draggable="true" data-template-id="${t.id}"
+        style="background:${(t.styles && t.styles.bg) || '#fff'};border-left:3px solid ${(t.styles && t.styles.accent) || '#1565C0'}">
+        <button class="market-card-star ${starCls}" data-template-id="${t.id}" title="${isFav ? '取消收藏' : '收藏'}">
+          <i class="${starIcon}"></i>
+        </button>
+        <div class="market-card-icon"><i class="${t.icon || 'ri-layout-grid-line'}"></i></div>
+        <div class="market-card-name">${escHtml(t.name)}</div>
+        <div class="market-card-desc">${escHtml(t.description || '')}</div>
+        <div class="market-card-meta">
+          ${t.is_official ? '<span class="badge-official">官方</span>' : '<span class="badge-community">社区</span>'}
+          ${t.creator_name ? `<span class="text-secondary" style="font-size:11px">${escHtml(t.creator_name)}</span>` : ''}
+        </div>
       </div>
-      <button class="editor-template-insert" data-template-id="${t.id}" title="插入">
-        <i class="ri-add-line"></i>
-      </button>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
-  // 拖拽开始
-  el.querySelectorAll('.editor-template-item[draggable]').forEach(item => {
+  // 收藏按钮
+  gridEl.querySelectorAll('.market-card-star').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tid = btn.dataset.templateId;
+      toggleFavorite(tid);
+      // 刷新两个面板
+      renderCollectionPanel(container);
+      renderMarketPanel(container, _marketCategory);
+    });
+  });
+
+  // 拖拽
+  gridEl.querySelectorAll('.market-card[draggable]').forEach(item => {
     item.addEventListener('dragstart', (e) => {
       const tid = item.dataset.templateId;
       _draggedTemplate = _templates.find(t => t.id === tid) || null;
@@ -179,16 +301,6 @@ function renderTemplateList(el) {
       item.classList.remove('dragging');
       _draggedTemplate = null;
       removeDropIndicator();
-    });
-  });
-
-  // 点击插入
-  el.querySelectorAll('.editor-template-insert').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tid = btn.dataset.templateId;
-      const template = _templates.find(t => t.id === tid);
-      if (!template) return;
-      insertCardAtCursor(template);
     });
   });
 }
@@ -363,6 +475,20 @@ function bindEditorEvents(container) {
     } else {
       navigateTo('explore');
     }
+  });
+
+  // 分类筛选 chip 按钮
+  container.querySelector('#editor-market-filters')?.addEventListener('click', (e) => {
+    const chip = e.target.closest('.market-filter-chip');
+    if (!chip) return;
+    container.querySelectorAll('.market-filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    renderMarketPanel(container, chip.dataset.cat);
+  });
+
+  // 自定义卡片按钮
+  container.querySelector('#new-card-btn')?.addEventListener('click', () => {
+    navigateTo('card-editor');
   });
 }
 

@@ -93,6 +93,21 @@ module.exports = function (db) {
         LIMIT ? OFFSET ?
       `, [keyword, keyword, limit, offset]);
     }
+
+    if (type === 'all' || type === 'templates') {
+      const countResult = db.all(`SELECT COUNT(*) AS cnt FROM card_templates ct WHERE ct.name LIKE ? OR ct.description LIKE ?`, [keyword, keyword]);
+      total += countResult[0]?.cnt || 0;
+      results.templates = db.all(`
+        SELECT ct.id, ct.name, ct.description, ct.icon, ct.category,
+          ct.styles, ct.is_official, ct.usage_count, ct.created_at,
+          u.nickname AS creator_name
+        FROM card_templates ct
+        LEFT JOIN users u ON ct.creator_id = u.id
+        WHERE ct.name LIKE ? OR ct.description LIKE ?
+        ORDER BY ct.is_official DESC, ct.usage_count DESC
+        LIMIT ? OFFSET ?
+      `, [keyword, keyword, limit, offset]);
+    }
     res.json({ ...results, total, q: q.trim() });
   });
 
