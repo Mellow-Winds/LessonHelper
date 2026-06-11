@@ -16,7 +16,7 @@ export function renderCard(card, opts = {}) {
   const templateAttr = card.template_id ? ` data-template="${card.template_id}"` : '';
   const styles = card.styles || {};
   const styleAttr = (styles.bg || styles.accent)
-    ? ` style="background:${styles.bg || '#fff'};border-left:3px solid ${styles.accent || '#1565C0'}"`
+    ? ` style="background:${styles.bg || '#fff'};border-color:${styles.accent || '#1565C0'}"`
     : '';
   let html = `<div class="explore-card" data-card-id="${card.id || ''}"${templateAttr}${styleAttr}>`;
 

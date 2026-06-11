@@ -52,7 +52,7 @@ async function renderMyCards(container) {
   grid.innerHTML = templates.map(t => {
     const styles = t.styles || {};
     return `
-      <div class="card my-card-item" style="border-left:3px solid ${styles.accent || '#1565C0'};background:${styles.bg || '#fff'}">
+      <div class="card my-card-item" style="--card-accent:${styles.accent || 'transparent'};border-color:${styles.accent || 'transparent'};background:${styles.bg || '#fff'}">
         <div class="my-card-header">
           <i class="${t.icon || 'ri-layout-grid-line'}" style="font-size:20px"></i>
           <h3 style="margin:0;font-size:15px">${escHtml(t.name)}</h3>

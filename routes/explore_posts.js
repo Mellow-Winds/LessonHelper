@@ -39,7 +39,8 @@ module.exports = function (db) {
       .map(b => ({
         title: b.card.title || '',
         template_id: b.card.template_id || null,
-        components: Array.isArray(b.card.components) ? b.card.components : []
+        components: Array.isArray(b.card.components) ? b.card.components : [],
+        styles: b.card.styles || {}
       }));
   }
 

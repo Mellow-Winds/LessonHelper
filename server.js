@@ -521,11 +521,8 @@ async function start() {
   // 预置官方模板数据
   const templates = [
     {
-      id: 'book_sale',
-      name: '二手书',
-      description: '出二手教材/书籍',
-      icon: 'ri-book-2-line',
-      category: 'trade',
+      id: 'book_sale',       styles: { bg: '#FDF6E8', accent: '#E8A838' },
+      name: '二手书',        description: '出二手教材/书籍',    icon: 'ri-book-2-line',         category: 'trade',
       components_schema: JSON.stringify([
         { type: 'input', icon: 'ri-book-2-line', label: '书名', value: '' },
         { type: 'price', icon: 'ri-money-cny-circle-line', label: '价格', value: '' },
@@ -535,11 +532,8 @@ async function start() {
       ])
     },
     {
-      id: 'study_invite',
-      name: '自习邀约',
-      description: '组队自习',
-      icon: 'ri-book-open-line',
-      category: 'study',
+      id: 'study_invite',    styles: { bg: '#EBF3FC', accent: '#4A90D9' },
+      name: '自习邀约',      description: '组队自习',            icon: 'ri-book-open-line',      category: 'study',
       components_schema: JSON.stringify([
         { type: 'input', icon: 'ri-calendar-line', label: '时间', value: '' },
         { type: 'input', icon: 'ri-map-pin-line', label: '地点', value: '' },
@@ -548,11 +542,8 @@ async function start() {
       ])
     },
     {
-      id: 'social_buddy',
-      name: '找搭子',
-      description: '通用交友/搭伴',
-      icon: 'ri-team-line',
-      category: 'social',
+      id: 'social_buddy',    styles: { bg: '#F3EFFE', accent: '#7B61FF' },
+      name: '找搭子',        description: '通用交友/搭伴',      icon: 'ri-team-line',           category: 'social',
       components_schema: JSON.stringify([
         { type: 'input', icon: 'ri-user-line', label: '简介', value: '' },
         { type: 'input', icon: 'ri-focus-3-line', label: '目标', value: '' },
@@ -560,11 +551,8 @@ async function start() {
       ])
     },
     {
-      id: 'project_team',
-      name: '项目组队',
-      description: '课程项目/竞赛组队',
-      icon: 'ri-group-line',
-      category: 'project',
+      id: 'project_team',    styles: { bg: '#E8F8EF', accent: '#2EAD6B' },
+      name: '项目组队',      description: '课程项目/竞赛组队',  icon: 'ri-group-line',          category: 'project',
       components_schema: JSON.stringify([
         { type: 'input', icon: 'ri-lightbulb-line', label: '项目描述', value: '' },
         { type: 'input', icon: 'ri-user-add-line', label: '需要人数', value: '' },
@@ -573,11 +561,8 @@ async function start() {
       ])
     },
     {
-      id: 'event_buddy',
-      name: '活动搭子',
-      description: '演唱会/运动/聚餐等',
-      icon: 'ri-calendar-event-line',
-      category: 'social',
+      id: 'event_buddy',     styles: { bg: '#FDEEF1', accent: '#E85D75' },
+      name: '活动搭子',      description: '演唱会/运动/聚餐等', icon: 'ri-calendar-event-line', category: 'social',
       components_schema: JSON.stringify([
         { type: 'input', icon: 'ri-music-line', label: '活动', value: '' },
         { type: 'input', icon: 'ri-calendar-line', label: '时间', value: '' },
@@ -586,11 +571,8 @@ async function start() {
       ])
     },
     {
-      id: 'skill_exchange',
-      name: '技能交换',
-      description: '互教互学',
-      icon: 'ri-exchange-line',
-      category: 'study',
+      id: 'skill_exchange',  styles: { bg: '#FEF6E7', accent: '#F59E0B' },
+      name: '技能交换',      description: '互教互学',            icon: 'ri-exchange-line',       category: 'study',
       components_schema: JSON.stringify([
         { type: 'input', icon: 'ri-book-2-line', label: '我会的', value: '' },
         { type: 'input', icon: 'ri-focus-3-line', label: '想学的', value: '' },
@@ -598,11 +580,8 @@ async function start() {
       ])
     },
     {
-      id: 'study_group',
-      name: '学习小组',
-      description: '长期学习小组',
-      icon: 'ri-book-open-line',
-      category: 'study',
+      id: 'study_group',     styles: { bg: '#EBF3FC', accent: '#3B82F6' },
+      name: '学习小组',      description: '长期学习小组',        icon: 'ri-book-open-line',      category: 'study',
       components_schema: JSON.stringify([
         { type: 'input', icon: 'ri-book-2-line', label: '学习内容', value: '' },
         { type: 'input', icon: 'ri-calendar-line', label: '计划时间', value: '' },
@@ -614,9 +593,14 @@ async function start() {
 
   for (const t of templates) {
     db.run(
-      `INSERT OR IGNORE INTO card_templates (id, name, description, icon, category, components_schema, is_official)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [t.id, t.name, t.description, t.icon, t.category, t.components_schema]
+      `INSERT OR IGNORE INTO card_templates (id, name, description, icon, category, components_schema, is_official, styles)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+      [t.id, t.name, t.description, t.icon, t.category, t.components_schema, JSON.stringify(t.styles)]
+    );
+    // Update existing official rows that were seeded before styles column existed
+    db.run(
+      `UPDATE card_templates SET styles = ? WHERE id = ? AND is_official = 1 AND (styles IS NULL OR styles = '{}')`,
+      [JSON.stringify(t.styles), t.id]
     );
   }
   console.log('  ✓ 探索模块表 + 模板数据初始化完成');

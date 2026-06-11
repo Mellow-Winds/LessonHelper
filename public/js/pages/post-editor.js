@@ -207,7 +207,7 @@ function renderCollectionPanel(container) {
   } else {
     el.innerHTML = favorited.map(t => `
       <div class="collection-card" draggable="true" data-template-id="${t.id}"
-        style="background:${(t.styles && t.styles.bg) || '#fff'};border-left:3px solid ${(t.styles && t.styles.accent) || '#1565C0'}">
+        style="--card-accent:${(t.styles && t.styles.accent) || 'transparent'};background:${(t.styles && t.styles.bg) || '#fff'};border-color:${(t.styles && t.styles.accent) || 'transparent'}">
         <i class="${t.icon || 'ri-layout-grid-line'}"></i>
         <span>${escHtml(t.name)}</span>
         ${t.is_official ? '' : '<span class="badge-community">社区</span>'}
@@ -260,7 +260,7 @@ function renderMarketPanel(container, category) {
     const starCls = isFav ? 'star-active' : '';
     return `
       <div class="market-card" draggable="true" data-template-id="${t.id}"
-        style="background:${(t.styles && t.styles.bg) || '#fff'};border-left:3px solid ${(t.styles && t.styles.accent) || '#1565C0'}">
+        style="--card-accent:${(t.styles && t.styles.accent) || 'transparent'};background:${(t.styles && t.styles.bg) || '#fff'};border-color:${(t.styles && t.styles.accent) || 'transparent'}">
         <button class="market-card-star ${starCls}" data-template-id="${t.id}" title="${isFav ? '取消收藏' : '收藏'}">
           <i class="${starIcon}"></i>
         </button>
@@ -329,7 +329,7 @@ function bindEditorEvents(container) {
     const selectedText = sel.toString();
 
     openModal('插入链接', `
-      <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
         <div id="link-url-input"></div>
         <div id="link-text-input"></div>
         <div class="card-edit-actions" style="margin-top:8px">
@@ -549,6 +549,7 @@ function insertCardAtPosition(canvas, template, insertBefore) {
   const cardData = {
     title: template.name || '',
     template_id: template.id || null,
+    styles: template.styles || {},
     components: (template.components_schema || []).map(comp => ({
       type: comp.type,
       icon: comp.icon || '',
@@ -596,6 +597,16 @@ function createCardElement(cardData) {
  * 渲染卡片 DOM 内容
  */
 function renderCardDom(cardEl, cardData) {
+  // 应用卡片自定义颜色（背景 + 边框）
+  const styles = cardData.styles || {};
+  if (styles.bg) {
+    cardEl.style.background = styles.bg;
+  }
+  if (styles.accent) {
+    cardEl.style.borderColor = styles.accent;
+    cardEl.style.setProperty('--card-accent', styles.accent);
+  }
+
   const icon = getTemplateIcon(cardData.template_id);
   const componentsHtml = (cardData.components || []).map((comp, i) =>
     renderModule(comp, i, null, {})
