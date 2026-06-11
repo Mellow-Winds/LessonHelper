@@ -1518,7 +1518,7 @@ export async function showEchoCaveModal() {
    ============================================= */
 
 const AVATAR_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const AVATAR_MAX_SIZE = 2 * 1024 * 1024;
+const AVATAR_MAX_SIZE = 30 * 1024 * 1024; // 30MB 极端兜底，大部分图片会预压缩
 
 /**
  * 点击头像 → 弹出底部动作菜单
@@ -1572,18 +1572,34 @@ function pickImageFile(capture) {
   }
   input.style.display = 'none';
 
-  input.addEventListener('change', (e) => {
+  input.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 前端文件校验
+    // 前端文件校验（30MB 极端兜底）
     const error = validateAvatarFile(file);
     if (error) {
       showToast(error);
       return;
     }
 
-    showAvatarCropper(file);
+    // 第一级：预压缩（> 1MB 或需 EXIF 修正时触发）
+    let imageUrl;
+    if (file.size > 1 * 1024 * 1024) {
+      showToast('正在自动压缩图片，请稍候...');
+    }
+    try {
+      const compressed = await precompressImage(file);
+      imageUrl = compressed.url;
+      // 保存预压缩 Blob 引用，供上传兜底
+      imageUrl._precompressedBlob = compressed.blob;
+      imageUrl._precompressed = compressed.precompressed;
+    } catch (err) {
+      showToast(err.message || '图片处理失败');
+      return;
+    }
+
+    showAvatarCropper(imageUrl);
   });
 
   document.body.appendChild(input);
@@ -1611,7 +1627,8 @@ function pickImageFile(capture) {
  */
 function validateAvatarFile(file) {
   if (file.size > AVATAR_MAX_SIZE) {
-    return '图片过大，请选择小于 2MB 的图片';
+    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+    return `图片过大（${sizeMB}MB），请选择小于 30MB 的图片`;
   }
   if (!AVATAR_ALLOWED_TYPES.includes(file.type)) {
     return '仅支持 JPG、PNG、GIF、WebP 格式';
@@ -1653,6 +1670,135 @@ function getExifOrientation(file) {
       resolve(1);
     };
     reader.readAsArrayBuffer(file.slice(0, 65536));
+  });
+}
+
+/**
+ * 第一级压缩：预压缩图片，使最长边 ≤ 2048px，同时修正 EXIF 方向
+ * 返回 { url, blob } — url 用于裁剪器预览，blob 用于兜底上传
+ */
+async function precompressImage(file) {
+  // 先检查是否需要预压缩（小图片直接跳过）
+  const needsPrecompress = file.size > 1 * 1024 * 1024; // > 1MB 才预压缩
+  const orientation = await getExifOrientation(file);
+  const needsRotation = orientation > 1;
+
+  if (!needsPrecompress && !needsRotation) {
+    // 小图片且无需旋转：直接使用原文件
+    return { url: URL.createObjectURL(file), blob: file, precompressed: false };
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectURL = URL.createObjectURL(file);
+
+    // 10 秒超时保护
+    const timeout = setTimeout(() => {
+      URL.revokeObjectURL(objectURL);
+      // 超时降级：直接使用原图
+      resolve({ url: objectURL, blob: file, precompressed: false, timeout: true });
+    }, 10000);
+
+    img.onload = () => {
+      clearTimeout(timeout);
+
+      try {
+        const MAX_EDGE = 2048;
+        let { width, height } = img;
+
+        // 等比缩放使最长边 ≤ MAX_EDGE
+        if (width > MAX_EDGE || height > MAX_EDGE) {
+          const ratio = Math.min(MAX_EDGE / width, MAX_EDGE / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        // iOS Safari canvas 像素限制兼容
+        const totalPixels = width * height;
+        if (totalPixels > 268435456) { // ~268MP, iOS Safari 硬限制
+          const scaleRatio = Math.sqrt(268435456 / totalPixels);
+          width = Math.round(width * scaleRatio);
+          height = Math.round(height * scaleRatio);
+          canvas.width = width;
+          canvas.height = height;
+        }
+
+        // 处理 EXIF 旋转
+        ctx.save();
+        switch (orientation) {
+          case 2: ctx.transform(-1, 0, 0, 1, width, 0); break;
+          case 3: ctx.transform(-1, 0, 0, -1, width, height); break;
+          case 4: ctx.transform(1, 0, 0, -1, 0, height); break;
+          case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;
+          case 6: ctx.transform(0, 1, -1, 0, height, 0); break;
+          case 7: ctx.transform(0, -1, -1, 0, height, width); break;
+          case 8: ctx.transform(0, -1, 1, 0, 0, width); break;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        ctx.restore();
+
+        URL.revokeObjectURL(objectURL);
+
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            // 降级：使用原图
+            resolve({ url: URL.createObjectURL(file), blob: file, precompressed: false });
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          resolve({ url, blob, precompressed: true });
+        }, 'image/jpeg', 0.9);
+      } catch (err) {
+        URL.revokeObjectURL(objectURL);
+        // 降级：使用原图
+        resolve({ url: URL.createObjectURL(file), blob: file, precompressed: false });
+        console.warn('预压缩失败，使用原图:', err);
+      }
+    };
+
+    img.onerror = () => {
+      clearTimeout(timeout);
+      URL.revokeObjectURL(objectURL);
+      reject(new Error('图片无法读取，请换一张重试'));
+    };
+
+    img.src = objectURL;
+  });
+}
+
+/**
+ * 第三级压缩：自动质量降级，确保 blob ≤ 2MB
+ * @param {HTMLCanvasElement} canvas
+ * @param {number} targetBytes
+ * @returns {Promise<Blob>}
+ */
+function compressToTargetSize(canvas, targetBytes = 2 * 1024 * 1024) {
+  return new Promise((resolve) => {
+    let quality = 0.9;
+    const minQuality = 0.3;
+
+    function tryCompress(q) {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          // 失败降级：最低质量
+          if (q > minQuality) { tryCompress(q - 0.1); return; }
+          canvas.toBlob((b) => resolve(b), 'image/jpeg', minQuality);
+          return;
+        }
+        if (blob.size <= targetBytes || q <= minQuality) {
+          resolve(blob);
+        } else {
+          tryCompress(Math.max(minQuality, q - 0.1));
+        }
+      }, 'image/jpeg', q);
+    }
+
+    tryCompress(quality);
   });
 }
 
@@ -1701,16 +1847,9 @@ function applyExifRotation(url, orientation) {
 /**
  * 打开裁剪界面
  */
-async function showAvatarCropper(file) {
-  let objectURL = URL.createObjectURL(file);
-
-  // 修正 EXIF 方向（手机拍照常见问题）
-  try {
-    const orientation = await getExifOrientation(file);
-    if (orientation > 1) {
-      objectURL = await applyExifRotation(objectURL, orientation);
-    }
-  } catch { /* 修正失败则用原图 */ }
+async function showAvatarCropper(imageUrl) {
+  // imageUrl 已是预压缩后的 URL（含 EXIF 修正），直接用于裁剪器
+  const objectURL = imageUrl;
 
   const overlay = document.createElement('div');
   overlay.className = 'cropper-fullscreen';
@@ -1759,13 +1898,17 @@ async function showAvatarCropper(file) {
 
   // 保存按钮
   const saveBtn = overlay.querySelector('#cropper-save');
+  const cancelBtn = overlay.querySelector('#cropper-cancel');
   saveBtn.addEventListener('click', async () => {
     saveBtn.disabled = true;
-    saveBtn.innerHTML = '<span class="md-spinner" style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block"></span> 正在上传...';
+    cancelBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="md-spinner" style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block"></span> 处理中...';
 
     try {
       const canvas = cropper.getCroppedCanvas({ width: 384, height: 384 });
-      const result = await uploadCroppedAvatar(canvas);
+      const result = await uploadCroppedAvatar(canvas, (progress) => {
+        saveBtn.innerHTML = `<span class="md-spinner" style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block"></span> ${progress}%`;
+      });
 
       // 成功
       if (window._currentUser) {
@@ -1784,6 +1927,7 @@ async function showAvatarCropper(file) {
       }
     } catch (err) {
       saveBtn.disabled = false;
+      cancelBtn.disabled = false;
       saveBtn.textContent = '保存';
       showToast(err.message || '上传失败，请检查网络后重试');
     }
@@ -1816,40 +1960,69 @@ function closeCropper(overlay, cropper, objectURL) {
 }
 
 /**
- * 上传裁剪后的头像
+ * 上传裁剪后的头像（第二级标准化 + 第三级降级 + XHR 进度）
+ * @param {HTMLCanvasElement} canvas
+ * @param {Function} onProgress — (percent: number) => void
  */
-async function uploadCroppedAvatar(canvas) {
+async function uploadCroppedAvatar(canvas, onProgress) {
   return new Promise((resolve, reject) => {
+    // 第二级：标准化输出 384×384 JPEG q=0.92
     canvas.toBlob(async (blob) => {
       if (!blob) {
         reject(new Error('图片处理失败'));
         return;
       }
 
-      const formData = new FormData();
-      formData.append('avatar', blob, 'avatar.jpg');
-
-      try {
-        const token = getToken();
-        const headers = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        const res = await fetch('/api/auth/avatar', {
-          method: 'POST',
-          headers,
-          body: formData
-        });
-        const result = await res.json();
-
-        if (result.error) {
-          reject(new Error(result.error));
-        } else {
-          resolve(result);
-        }
-      } catch {
-        reject(new Error('上传失败，请检查网络后重试'));
+      // 第三级：自动质量降级，确保 ≤ 2MB
+      let finalBlob = blob;
+      if (blob.size > 2 * 1024 * 1024) {
+        finalBlob = await compressToTargetSize(canvas);
       }
-    }, 'image/jpeg', 0.9);
+
+      // 极端情况：即使最低质量仍 > 2MB
+      if (finalBlob.size > 2 * 1024 * 1024) {
+        reject(new Error('图片过大，请选择更小的图片'));
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('avatar', finalBlob, 'avatar.jpg');
+
+      const token = getToken();
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && onProgress) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          onProgress(pct);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        try {
+          const result = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300 && !result.error) {
+            resolve(result);
+          } else {
+            reject(new Error(result.error || '上传失败'));
+          }
+        } catch {
+          reject(new Error('上传失败，请检查网络后重试'));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('上传失败，请检查网络后重试'));
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject(new Error('上传已取消'));
+      });
+
+      xhr.open('POST', '/api/auth/avatar');
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.send(formData);
+    }, 'image/jpeg', 0.92);
   });
 }
 
