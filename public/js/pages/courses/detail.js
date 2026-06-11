@@ -12,6 +12,7 @@ import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../../core/router.js';
 import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, formatTime, formatFileSize, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
 import { renderAuth } from '../auth.js';
+import { renderTkComment, renderTkInputArea, toggleSubReplies, toggleInlineReply, getTkImages, clearTkImages, getTkReplyImages, clearTkReplyImages, renderTkPreviews, renderTkReplyPreviews } from '../../components/tk-comments.js';
 import { getFavoriteCourseIds, getFavoritePostIds, renderCourseFavoriteButton, renderPostFavoriteButton } from '../favorites.js';
 import { renderPostAttachments } from './post_attachments.js';
 import { cleanBigCourseName } from './all_courses.js';
@@ -154,6 +155,7 @@ const _forumExpandedComments = {};   // { [postId]: bool }
 const _forumExpandedReplies = {};    // { [commentId]: bool }
 const _forumLikeState = {};          // { 'p123': { liked: bool, count: N } }
 const _forumReplyImages = {};        // { ctxKey: { files: [], urls: [] } }
+let _forumCommentsCache = {};  // postId → comments array
 const _forumCooldownTimers = {};     // { postId: secondsRemaining }
 const _forumCooldownTicking = new Set();  // 防重复 tick
 
@@ -483,8 +485,8 @@ async function refreshForumComments(postId) {
   try {
     const data = await apiGet(`/api/courses/posts/${postId}/comments`);
     const comments = Array.isArray(data) ? data : (data.comments || []);
+    _forumCommentsCache[postId] = comments;
 
-    // 按 parent_id 分组
     const topComments = comments.filter(c => !c.parent_id);
     const childMap = {};
     comments.forEach(c => {
@@ -495,18 +497,47 @@ async function refreshForumComments(postId) {
     });
 
     if (topComments.length === 0) {
-      section.innerHTML = `
-        <div class="forum-reply-section">
-          <p style="font-size:12px;color:var(--md-on-surface-variant);padding:8px 0">暂无回复</p>
-        </div>
-      `;
+      section.innerHTML = '<p style="font-size:12px;color:var(--md-on-surface-variant);padding:8px 0;text-align:center">暂无回复</p>';
     } else {
-      section.innerHTML = `
-        <div class="forum-reply-section">
-          ${topComments.map(c => renderForumComment(c, postId, childMap)).join('')}
-        </div>
-      `;
+      section.innerHTML = topComments.map(c => renderForumComment(c, postId, childMap)).join('');
     }
+
+    // Bind events
+    section.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const cid = Number(btn.dataset.commentId);
+      const pId = Number(btn.dataset.postId) || postId;
+
+      switch (action) {
+        case 'forum-reply':
+        case 'reply':
+          toggleInlineReply(cid, btn.dataset.author);
+          break;
+        case 'reply-send':
+          submitForumTkReply(pId, cid);
+          break;
+        case 'tk-toggle-sub':
+          toggleSubReplies(cid);
+          break;
+        case 'forum-delete-comment':
+        case 'delete-comment':
+          openModal('确认删除', `
+            <p style="margin-bottom:24px">确定要删除这条回复吗？</p>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+              <button class="btn btn-primary" id="confirm-del-fcmt" style="background:var(--md-error)">删除</button>
+            </div>
+          `);
+          document.getElementById('confirm-del-fcmt')?.addEventListener('click', async () => {
+            const result = await apiDelete(`/api/courses/posts/${pId}/comments/${cid}`);
+            if (result.error) { showToast(result.error); } else { showToast('已删除'); refreshForumComments(postId); }
+            closeModal();
+          });
+          break;
+      }
+    });
   } catch {
     section.innerHTML = '<p style="font-size:12px;color:var(--md-error);padding:8px 0">加载失败，点击重试</p>';
     section.style.cursor = 'pointer';
@@ -542,141 +573,33 @@ function renderCommentImages(imageUrlStr) {
 }
 
 function renderForumComment(c, postId, childMap) {
-  const avatarLetter = (c.author_name || '?')[0].toUpperCase();
+  const nickname = c.author_name || '匿名';
   const children = childMap[c.id] || [];
   const likeKey = `c${c.id}`;
   const like = _forumLikeState[likeKey] || { liked: false, count: 0 };
-  const previewChildren = children.slice(-2);
-  const hiddenCount = children.length - previewChildren.length;
-  const isExpanded = _forumExpandedReplies[c.id];
 
-  return `
-    <div class="forum-reply-row" id="forum-comment-${c.id}">
-      <div>
-        ${c.author_avatar_url
-          ? `<img class="forum-reply-avatar" src="${c.author_avatar_url}" alt="" data-action="navigate-profile" data-user-id="${c.author_id}" style="cursor:pointer">`
-          : `<div class="forum-reply-avatar-letter" data-action="navigate-profile" data-user-id="${c.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
-        }
-      </div>
-      <div class="forum-reply-content">
-        <div class="forum-reply-header">
-          <div class="forum-reply-meta">
-            <button class="forum-reply-name" data-action="navigate-profile" data-user-id="${c.author_id}">${escHtml(c.author_name)}</button>
-            <span class="forum-reply-time">${formatTime(c.created_at)}</span>
-          </div>
-          <div class="forum-reply-like">
-            <button class="forum-like-btn${like.liked ? ' liked' : ''}" data-action="like" data-like-key="${likeKey}" style="padding:2px">
-              <span class="mi" style="font-size:14px;pointer-events:none">${like.liked ? 'favorite' : 'favorite_border'}</span>
-            </button>
-            <span class="forum-like-count" style="font-size:11px">${like.count}</span>
-          </div>
-        </div>
-        <p class="forum-reply-text">${escHtml(c.content || '')}</p>
-        ${renderCommentImages(c.image_url)}
-        <div class="forum-reply-actions">
-          <button class="forum-action-btn" data-action="reply-comment" data-post-id="${postId}" data-comment-id="${c.id}">
-            <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
-          </button>
-          ${window._currentUser && c.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="delete-comment" data-post-id="${postId}" data-comment-id="${c.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
-        </div>
-        <div id="forum-inline-comment-${c.id}"></div>
-        ${children.length > 0 ? `
-          ${isExpanded ? `
-            <div class="forum-nested-replies">
-              ${children.map(child => renderNestedReply(child, c.author_name, c.author_id, postId, childMap, 1)).join('')}
-            </div>
-            <button class="forum-view-replies" data-action="toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">
-              ── 收起回复 🔼
-            </button>
-          ` : `
-            ${previewChildren.length > 0 ? `
-              <div class="forum-nested-replies">
-                ${previewChildren.map(child => renderNestedReply(child, c.author_name, c.author_id, postId, childMap, 1)).join('')}
-              </div>
-            ` : ''}
-            ${hiddenCount > 0 ? `
-              <button class="forum-view-replies" data-action="toggle-replies" data-comment-id="${c.id}" data-post-id="${postId}">
-                ── 查看更多 ${hiddenCount} 条回复 🔽
-              </button>
-            ` : ''}
-          `}
-        ` : ''}
-      </div>
-    </div>
-  `;
+  // Mount replies tree for renderTkComment
+  function attachReplies(comment) {
+    const kids = childMap[comment.id] || [];
+    kids.forEach(attachReplies);
+    comment.replies = kids;
+    comment.reply_count = kids.length;
+  }
+  c.replies = children;
+  c.reply_count = children.length;
+  children.forEach(attachReplies);
+
+  // Override like display with our existing like state
+  const origLike = c.like_count;
+  c.like_count = like.count;
+  const html = renderTkComment(c, postId, 0, {
+    deleteAction: 'forum-delete-comment',
+    replyAction: 'forum-reply',
+    likedSet: null
+  });
+  c.like_count = origLike;
+  return html;
 }
-
-function renderNestedReply(child, parentAuthorName, parentAuthorId, postId, childMap, depth) {
-  const avatarLetter = (child.author_name || '?')[0].toUpperCase();
-  const likeKey = `c${child.id}`;
-  const like = _forumLikeState[likeKey] || { liked: false, count: 0 };
-  const children = (childMap || {})[child.id] || [];
-  const curDepth = depth || 0;
-  const maxPreview = curDepth >= 3 ? 0 : 2;
-  const previewChildren = children.slice(-maxPreview);
-  const hiddenCount = children.length - previewChildren.length;
-  const isExpanded = _forumExpandedReplies[child.id];
-
-  return `
-    <div class="forum-nested-reply">
-      <div>
-        ${child.author_avatar_url
-          ? `<img class="forum-reply-avatar" src="${child.author_avatar_url}" alt="" data-action="navigate-profile" data-user-id="${child.author_id}" style="cursor:pointer">`
-          : `<div class="forum-reply-avatar-letter" data-action="navigate-profile" data-user-id="${child.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
-        }
-      </div>
-      <div class="forum-reply-content">
-        <div class="forum-reply-header">
-          <div class="forum-reply-meta">
-            <button class="forum-reply-name" data-action="navigate-profile" data-user-id="${child.author_id}">${escHtml(child.author_name)}</button>
-            <span class="forum-reply-to">
-              回复 <button class="forum-reply-link" data-action="navigate-profile" data-user-id="${parentAuthorId}">${escHtml(parentAuthorName || '')}</button>
-            </span>
-            <span class="forum-reply-time">${formatTime(child.created_at)}</span>
-          </div>
-          <div class="forum-reply-like">
-            <button class="forum-like-btn${like.liked ? ' liked' : ''}" data-action="like" data-like-key="${likeKey}" style="padding:2px">
-              <span class="mi" style="font-size:14px;pointer-events:none">${like.liked ? 'favorite' : 'favorite_border'}</span>
-            </button>
-            <span class="forum-like-count" style="font-size:11px">${like.count}</span>
-          </div>
-        </div>
-        <p class="forum-reply-text">${escHtml(child.content || '')}</p>
-        ${renderCommentImages(child.image_url)}
-        <div class="forum-reply-actions">
-          <button class="forum-action-btn" data-action="reply-nested" data-post-id="${postId}" data-comment-id="${child.id}">
-            <span class="mi" style="font-size:14px">chat_bubble_outline</span> 回复
-          </button>
-          ${window._currentUser && child.author_id === window._currentUser.id ? `<button class="forum-action-btn" data-action="delete-comment" data-post-id="${postId}" data-comment-id="${child.id}" style="color:var(--md-error)"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
-        </div>
-        <div id="forum-inline-comment-${child.id}"></div>
-        ${children.length > 0 ? `
-          ${isExpanded ? `
-            <div class="forum-nested-replies">
-              ${children.map(c => renderNestedReply(c, child.author_name, child.author_id, postId, childMap, curDepth + 1)).join('')}
-            </div>
-            <button class="forum-view-replies" data-action="toggle-replies" data-comment-id="${child.id}" data-post-id="${postId}">
-              ── 收起回复 🔼
-            </button>
-          ` : `
-            ${previewChildren.length > 0 ? `
-              <div class="forum-nested-replies">
-                ${previewChildren.map(c => renderNestedReply(c, child.author_name, child.author_id, postId, childMap, curDepth + 1)).join('')}
-              </div>
-            ` : ''}
-            ${hiddenCount > 0 ? `
-              <button class="forum-view-replies" data-action="toggle-replies" data-comment-id="${child.id}" data-post-id="${postId}">
-                ── 查看更多 ${hiddenCount} 条回复 🔽
-              </button>
-            ` : ''}
-          `}
-        ` : ''}
-      </div>
-    </div>
-  `;
-}
-
-/* ---- 楼中楼展开/收起 ---- */
 
 export async function toggleForumReplies(commentId, postId) {
   _forumExpandedReplies[commentId] = !_forumExpandedReplies[commentId];
@@ -882,7 +805,39 @@ export function removeForumReplyImage(ctxKey, index) {
   renderForumImagePreviews(ctxKey);
 }
 
-/* ---- 发布回复（防刷流控） ---- */
+/* ---- 发布回复（tk-* 标准，用于评论区行内回复） ---- */
+
+async function submitForumTkReply(postId, parentCommentId) {
+  const input = document.getElementById(`inline-reply-input-${parentCommentId}`);
+  const content = input?.value?.trim();
+  const state = getTkReplyImages(parentCommentId);
+  if (!content && state.files.length === 0) return;
+
+  try {
+    let res;
+    if (state.files.length > 0) {
+      const formData = new FormData();
+      formData.append('content', content || '');
+      formData.append('parent_id', parentCommentId);
+      state.files.forEach((f, i) => formData.append(i === 0 ? 'image' : 'images', f));
+      const token = localStorage.getItem('kedazi_token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const fetchRes = await fetch(`/api/courses/posts/${postId}/comments`, { method: 'POST', headers, body: formData });
+      res = await fetchRes.json();
+    } else {
+      res = await apiPost(`/api/courses/posts/${postId}/comments`, { content, parent_id: parentCommentId });
+    }
+    if (res.error) { showToast(res.error); return; }
+    clearTkReplyImages(parentCommentId);
+    renderTkReplyPreviews(parentCommentId);
+    _forumCommentsCache[postId] = null;
+    if (_forumExpandedComments[postId]) refreshForumComments(postId);
+    showToast('回复成功');
+  } catch { showToast('发送失败'); }
+}
+
+/* ---- 发布回复（防刷流控，保留用于 compose bar） ---- */
 
 export async function submitForumReply(postId, parentCommentId, ctxKey) {
   const textarea = document.getElementById(`forum-textarea-${ctxKey}`);

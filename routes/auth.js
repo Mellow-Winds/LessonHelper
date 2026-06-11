@@ -691,7 +691,7 @@ module.exports = function (db) {
     res.json({ streak, alreadyCheckedIn: false });
   });
 
-  // POST /api/auth/avatar — 上传头像 [Auth]（含 sharp 安全处理）
+  // POST /api/auth/avatar — 上传头像 [Auth]（前端已完成三级压缩，后端直接存盘）
   router.post('/avatar', authMiddleware, (req, res) => {
     avatarUpload.single('avatar')(req, res, async (error) => {
       if (error) {
@@ -708,24 +708,22 @@ module.exports = function (db) {
       }
 
       const originalPath = req.file.path;
-      const outputFilename = `av_${req.user.userId}_${Date.now()}.jpg`;
+      // 统一输出为 .jpg（前端已保证 JPEG 格式，后端做兜底重命名）
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const jpgExts = new Set(['.jpg', '.jpeg']);
+      const outputFilename = jpgExts.has(ext)
+        ? path.basename(req.file.filename)
+        : req.file.filename.replace(ext, '.jpg');
       const outputPath = path.join(AVATAR_DIR, outputFilename);
+
+      // 如果需要重命名
+      if (outputPath !== originalPath) {
+        fs.renameSync(originalPath, outputPath);
+      }
+
       const avatarUrl = `/uploads/avatars/${outputFilename}`;
 
       try {
-        // sharp 安全处理：裁剪正方形 → 384×384 → JPEG → 剥离 EXIF
-        const sharp = require('sharp');
-        await sharp(originalPath)
-          .resize(384, 384, { fit: 'cover', position: 'centre' })
-          .jpeg({ quality: 85, mozjpeg: true })
-          .rotate() // 自动纠正方向 + 清除 EXIF
-          .toFile(outputPath);
-
-        // 删除原始上传文件（保留处理后的）
-        if (originalPath !== outputPath && fs.existsSync(originalPath)) {
-          fs.unlinkSync(originalPath);
-        }
-
         // 删除旧头像文件（如果有的话）
         const user = db.get('SELECT avatar_url FROM users WHERE id = ?', [req.user.userId]);
         if (user?.avatar_url && user.avatar_url.startsWith('/uploads/avatars/')) {
@@ -737,12 +735,11 @@ module.exports = function (db) {
         db.save();
 
         res.json({ avatar_url: avatarUrl, message: '头像已更新' });
-      } catch (processingError) {
-        // 清理：删除可能残留的文件
+      } catch (err) {
+        // 清理残留文件
         if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-        if (fs.existsSync(originalPath)) fs.unlinkSync(originalPath);
-        console.error('Avatar processing error:', processingError);
-        res.status(500).json({ error: '图片处理失败，请重试' });
+        console.error('Avatar save error:', err);
+        res.status(500).json({ error: '头像保存失败，请重试' });
       }
     });
   });

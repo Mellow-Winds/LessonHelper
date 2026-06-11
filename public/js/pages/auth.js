@@ -365,12 +365,8 @@ export async function handleLogin(e) {
   _loginStudentId = studentId;
   _loginPassword = password;
 
-  // 显示 Turnstile 验证框
-  const turnstileWrapper = document.getElementById('login-turnstile-wrapper');
-  if (turnstileWrapper) {
-    turnstileWrapper.style.display = 'block';
-    loadLoginTurnstile();
-  }
+  // 本地测试：直接使用测试 token 调用登录 API，跳过 Turnstile 显示
+  onLoginTurnstileSuccess('test-token-' + Date.now());
 }
 
 // 加载 Turnstile（登录专用）
@@ -465,6 +461,7 @@ async function onLoginTurnstileSuccess(token) {
     refreshNotifBadge();
     if (!window._notifInterval) window._notifInterval = setInterval(refreshNotifBadge, 30000);
   } catch (e) {
+    console.error('[Login] API调用失败:', e);
     if (errEl) {
       errEl.textContent = '系统出现未知错误，请在看到此消息后及时反馈';
       errEl.style.display = 'block';
@@ -502,12 +499,9 @@ export async function handleForgotSendCode(e) {
   // 保存学号到状态
   authStudentId = studentId;
 
-  // 显示 Turnstile 验证框
-  const turnstileWrapper = document.getElementById('forgot-turnstile-wrapper');
-  if (turnstileWrapper) {
-    turnstileWrapper.style.display = 'block';
-    loadForgotTurnstile();
-  }
+  // 本地测试：跳过 Turnstile
+  onForgotTurnstileSuccess('test-token-' + Date.now());
+  return;
 }
 
 // 加载 Turnstile（忘记密码专用）
@@ -743,12 +737,8 @@ export async function handleSendCode() {
   authStudentId = studentId;
   authPassword = password;
 
-  // 显示 Turnstile 验证框
-  const turnstileWrapper = document.getElementById('turnstile-wrapper');
-  if (turnstileWrapper) {
-    turnstileWrapper.style.display = 'block';
-    loadTurnstile();
-  }
+  // 本地测试：跳过 Turnstile
+  onTurnstileSuccess('test-token-' + Date.now());
 }
 
 // Turnstile 验证成功后的回调
