@@ -5382,6 +5382,11 @@ input, textarea, select, button,
   margin-top: 24px;
 }
 
+.auth-buttons .btn-text,
+.auth-buttons .auth-next-btn {
+  white-space: nowrap;
+}
+
 .btn-text {
   color: var(--md-on-surface-variant);
   background: none;
