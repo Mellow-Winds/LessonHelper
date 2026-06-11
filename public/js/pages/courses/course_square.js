@@ -9,6 +9,7 @@
 import { apiGet, apiPost, apiPut, apiDelete, isLoggedIn, getToken } from '../../core/api.js';
 import { animIn, animStagger } from '../../core/router.js';
 import { showToast, openModal, closeModal, createMdInput, createMdSelect, createMdTextarea, escHtml, formatTime } from '../../components/ui.js';
+import { renderTkComment, renderTkInputArea, toggleLike, getLikedSet, bindTkCommentEvents, getTkImages, clearTkImages, getTkReplyImages, clearTkReplyImages, renderTkPreviews, renderTkReplyPreviews } from '../../components/tk-comments.js';
 
 /* =============================================
    Constants
@@ -430,370 +431,169 @@ function openCourseSquareEditModal(courseId, postId, prefix, postData) {
    评论系统（楼中楼 + 图片 + 软删除）
    ============================================= */
 
-function formatCsqRelativeTime(ts) {
-  if (!ts) return '';
-  const now = Date.now();
-  const diff = now - new Date(ts).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return '刚刚';
-  if (min < 60) return `${min} 分钟前`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} 小时前`;
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+const TK_CSQ_LIKE_KEY = 'coursesq_liked_comments';
+const _csqLikedSet = getLikedSet(TK_CSQ_LIKE_KEY);
+
+let _csqCommentsCache = {};  // key: `${prefix}-${postId}` → { comments, total }
+
+function getCsqCache(prefix, postId) {
+  const key = `${prefix}-${postId}`;
+  if (!_csqCommentsCache[key]) _csqCommentsCache[key] = { comments: [], total: 0 };
+  return _csqCommentsCache[key];
+}
+
+function clearCsqCache(prefix, postId) {
+  delete _csqCommentsCache[`${prefix}-${postId}`];
 }
 
 async function toggleCourseSquareComments(courseId, postId, prefix) {
-  const st = getState(prefix);
   const section = document.getElementById(`${prefix}-sq-comments-${postId}`);
   if (!section) return;
 
-  if (!st.loadedComments[postId]) {
-    section.innerHTML = renderCsqCommentSkeleton(prefix);
+  if (section.style.display === 'block') {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+
+  const cache = getCsqCache(prefix, postId);
+  if (!cache._loaded) {
+    section.innerHTML = '<p class="text-secondary" style="text-align:center;padding:24px;font-size:13px">加载中...</p>';
     try {
-      const data = await apiGet(`/api/courses/${courseId}/square-posts/${postId}/comments?page=1&pageSize=20`);
-      st.loadedComments[postId] = {
-        comments: data.comments || [],
-        total: data.total || 0,
-        page: 1,
-        hasMore: (data.comments || []).length < (data.total || 0)
-      };
-      renderCsqComments(section, courseId, postId, prefix);
+      const data = await apiGet(`/api/courses/${courseId}/square-posts/${postId}/comments?pageSize=50`);
+      cache.comments = data.comments || data.items || [];
+      cache.total = data.total || cache.comments.length;
+      cache._loaded = true;
+      renderCsqTkComments(section, courseId, postId, prefix);
     } catch {
-      section.innerHTML = '<div class="comment-error">加载失败，点击重试</div>';
-      section.querySelector('.comment-error')?.addEventListener('click', () => {
-        st.loadedComments[postId] = null;
-        toggleCourseSquareComments(courseId, postId, prefix);
-      });
+      section.innerHTML = '<p class="text-secondary" style="text-align:center;padding:24px;font-size:13px">加载失败，点击重试</p>';
+      section.style.cursor = 'pointer';
+      section.onclick = () => { section.onclick = null; clearCsqCache(prefix, postId); toggleCourseSquareComments(courseId, postId, prefix); };
     }
   } else {
-    renderCsqComments(section, courseId, postId, prefix);
+    renderCsqTkComments(section, courseId, postId, prefix);
   }
 }
 
-function renderCsqCommentSkeleton(prefix) {
-  return Array(3).fill('').map(() => `
-    <div class="comment-skeleton">
-      <div class="comment-skeleton-avatar"></div>
-      <div class="comment-skeleton-lines">
-        <div class="comment-skeleton-line short"></div>
-        <div class="comment-skeleton-line"></div>
-      </div>
-    </div>
-  `).join('');
-}
+function renderCsqTkComments(section, courseId, postId, prefix) {
+  const cache = getCsqCache(prefix, postId);
+  const allComments = cache.comments || [];
 
-function renderCsqComments(section, courseId, postId, prefix) {
-  const st = getState(prefix);
-  const data = st.loadedComments[postId] || { comments: [], total: 0, page: 1, hasMore: false };
-  const { comments, total, hasMore } = data;
-
-  const rootComments = comments.filter(c => !c.parent_id);
+  const topComments = allComments.filter(c => !c.parent_id);
   const childMap = {};
-  comments.forEach(c => {
+  allComments.forEach(c => {
     if (c.parent_id) {
       if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
       childMap[c.parent_id].push(c);
     }
   });
+  function attach(comment) {
+    const children = childMap[comment.id] || [];
+    children.forEach(attach);
+    comment.replies = children;
+    comment.reply_count = children.length;
+  }
+  topComments.forEach(attach);
 
   section.innerHTML = `
-    <div class="comment-list" id="${prefix}-sq-comment-list-${postId}">
-      ${rootComments.length === 0 && !hasMore
-        ? '<p class="text-secondary" style="text-align:center;padding:16px;font-size:var(--text-sm)">暂无回复</p>'
-        : rootComments.map((c, idx) => renderCsqSingleComment(c, idx + 1, courseId, postId, prefix, childMap, 0)).join('')
-      }
-      ${hasMore ? `<div class="comment-load-more" id="${prefix}-sq-load-more-${postId}">加载更多回复</div>` : ''}
-    </div>
-    ${isLoggedIn() ? renderCsqCommentInput(postId, prefix) : '<p class="text-secondary" style="margin-top:12px;font-size:var(--text-sm)"><a href="#" onclick="navigateTo(\'profile\')" style="color:var(--md-primary)">登录</a> 后参与讨论</p>'}
-  `;
-
-  bindCsqCommentEvents(section, courseId, postId, prefix);
-}
-
-function renderCsqSingleComment(comment, floorNum, courseId, postId, prefix, childMap, depth) {
-  const st = getState(prefix);
-  const isOwner = window._currentUser && comment.author_id === window._currentUser.id;
-  const children = childMap[comment.id] || [];
-  const maxDepth = 3;
-
-  return `
-    <div class="comment-item ${depth > 0 ? 'comment-nested' : ''}" data-comment-id="${comment.id}" data-depth="${depth}">
-      <div class="comment-header">
-        ${depth === 0 ? `<span class="comment-floor">${floorNum} 楼</span>` : ''}
-        ${comment.author_avatar_url
-          ? `<img class="comment-avatar" src="${escHtml(comment.author_avatar_url)}" alt="">`
-          : `<div class="comment-avatar-letter">${escHtml((comment.author_name || '?')[0])}</div>`
-        }
-        <div class="comment-meta">
-          <button class="user-profile-link" onclick="navigateTo('profile-user', ${comment.author_id})">
-            ${escHtml(comment.author_name)}
-          </button>
-          <span class="comment-time">${formatCsqRelativeTime(comment.created_at)}</span>
-        </div>
-      </div>
-      ${comment.parent_id && depth > 0 ? (() => {
-        const parent = (st.loadedComments[postId]?.comments || []).find(c => c.id === comment.parent_id);
-        return parent ? `<div class="comment-reply-ref">回复 @${escHtml(parent.author_name || '')}</div>` : '';
-      })() : ''}
-      <div class="comment-body">
-        <p class="comment-content">${escHtml(comment.content)}</p>
-        ${comment.image_url ? `<div class="comment-image-wrap"><img src="${escHtml(comment.image_url)}" alt="评论图片" class="comment-image" loading="lazy" onclick="window.open('${escHtml(comment.image_url)}', '_blank')"></div>` : ''}
-      </div>
-      <div class="comment-actions">
-        ${isLoggedIn() ? `<button class="comment-action-btn comment-reply-btn" data-comment-id="${comment.id}" data-author="${escHtml(comment.author_name)}"><span class="mi" style="font-size:14px">reply</span> 回复</button>` : ''}
-        ${isOwner ? `<button class="comment-action-btn comment-delete-btn" data-comment-id="${comment.id}" data-post-id="${postId}"><span class="mi" style="font-size:14px">delete</span> 删除</button>` : ''}
-      </div>
-      ${children.length > 0 && depth < maxDepth
-        ? children.map(c => renderCsqSingleComment(c, 0, courseId, postId, prefix, childMap, depth + 1)).join('')
-        : ''
-      }
-      ${children.length > 0 && depth >= maxDepth
-        ? `<button class="comment-load-more-replies" data-parent-id="${comment.id}" data-post-id="${postId}" data-course-id="${courseId}" data-prefix="${prefix}">查看更多回复 (${children.length})</button>`
-        : ''
+    <div class="comment-list" id="tk-comment-list-${postId}">
+      ${topComments.length === 0
+        ? '<p class="text-secondary" style="text-align:center;padding:24px;font-size:13px">暂无评论</p>'
+        : topComments.map(c => renderTkComment(c, postId, 0, {
+            deleteAction: 'csq-delete-comment',
+            replyAction: 'csq-reply',
+            likedSet: _csqLikedSet
+          })).join('')
       }
     </div>
+    ${isLoggedIn() ? renderTkInputArea(postId, '说点什么...') : '<p class="text-secondary" style="padding:12px 24px;font-size:12px;text-align:center"><a href="#" onclick="navigateTo(\'auth\');return false">登录</a> 后参与评论</p>'}
   `;
-}
 
-function renderCsqCommentInput(postId, prefix) {
-  const st = getState(prefix);
-  const replyRef = st.replyingTo[postId];
-  return `
-    <div class="comment-input-area" id="${prefix}-sq-input-area-${postId}">
-      ${replyRef ? `<div class="comment-reply-ref-bar">回复 @${escHtml(replyRef.author_name)}<button class="comment-cancel-reply" data-post-id="${postId}" data-prefix="${prefix}"><span class="mi" style="font-size:16px">close</span></button></div>` : ''}
-      <div class="comment-input-row">
-        <div class="comment-textarea-wrap">
-          <textarea class="comment-textarea" id="${prefix}-sq-textarea-${postId}" placeholder="写回复..." rows="2" maxlength="500"></textarea>
-          <span class="comment-char-count" id="${prefix}-sq-char-count-${postId}">0/500</span>
-        </div>
-        <div class="comment-input-actions">
-          <label class="comment-action-btn comment-upload-btn" title="上传图片">
-            <span class="mi" style="font-size:20px">add_photo_alternate</span>
-            <input type="file" accept=".jpg,.jpeg,.png" style="display:none" id="${prefix}-sq-img-input-${postId}">
-          </label>
-          <button class="btn btn-primary comment-send-btn" id="${prefix}-sq-send-btn-${postId}" disabled>
-            <span class="mi" style="font-size:18px">send</span>
-          </button>
-        </div>
-      </div>
-      <div class="comment-image-preview" id="${prefix}-sq-img-preview-${postId}" style="display:none">
-        <img id="${prefix}-sq-preview-img-${postId}" src="" alt="">
-        <button class="comment-remove-image" data-post-id="${postId}" data-prefix="${prefix}"><span class="mi" style="font-size:16px">close</span></button>
-      </div>
-      <div class="comment-tip">请遵守社区规范，禁止发布违规内容</div>
-    </div>
-  `;
-}
-
-function bindCsqCommentEvents(section, courseId, postId, prefix) {
-  const st = getState(prefix);
-
-  // 回复按钮
-  section.querySelectorAll('.comment-reply-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      st.replyingTo[postId] = { id: Number(btn.dataset.commentId), author_name: btn.dataset.author };
-      renderCsqComments(section, courseId, postId, prefix);
-      const textarea = document.getElementById(`${prefix}-sq-textarea-${postId}`);
-      if (textarea) { textarea.focus(); textarea.value = `@${btn.dataset.author} `; updateCsqCharCount(postId, prefix); }
-    });
+  bindTkCommentEvents(section, {
+    onSubmitReply: (ctxId, cid) => submitCsqTkReply(courseId, ctxId, cid, prefix, section),
+    onDelete: (ctxId, cid) => deleteCsqTkComment(courseId, ctxId, cid, prefix, section),
+    onLike: (cid) => toggleLike(cid, TK_CSQ_LIKE_KEY)
   });
 
-  // 取消回复
-  section.querySelectorAll('.comment-cancel-reply').forEach(btn => {
-    btn.addEventListener('click', () => {
-      delete st.replyingTo[postId];
-      renderCsqComments(section, courseId, postId, prefix);
-    });
-  });
-
-  // 删除按钮
-  section.querySelectorAll('.comment-delete-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      openModal('确认删除', `
-        <p style="margin-bottom:24px">确定要删除这条回复吗？删除后无法恢复</p>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-          <button class="btn btn-primary" id="${prefix}-confirm-delete-csq-comment" style="background:var(--md-error,#e53935)">删除</button>
-        </div>
-      `);
-      document.getElementById(`${prefix}-confirm-delete-csq-comment`)?.addEventListener('click', async () => {
-        const result = await apiDelete(`/api/courses/${courseId}/square-posts/${postId}/comments/${btn.dataset.commentId}`);
-        if (result.error) { showToast(result.error); return; }
-        closeModal();
-        st.loadedComments[postId] = null;
-        toggleCourseSquareComments(courseId, postId, prefix);
-        showToast('已删除');
-      });
-    });
-  });
-
-  // 加载更多
-  const loadMoreBtn = document.getElementById(`${prefix}-sq-load-more-${postId}`);
-  if (loadMoreBtn) {
-    loadMoreBtn.addEventListener('click', async () => {
-      loadMoreBtn.textContent = '加载中...';
-      loadMoreBtn.disabled = true;
-      const data = st.loadedComments[postId];
-      const nextPage = data.page + 1;
-      try {
-        const result = await apiGet(`/api/courses/${courseId}/square-posts/${postId}/comments?page=${nextPage}&pageSize=20`);
-        data.comments.push(...(result.comments || []));
-        data.page = nextPage;
-        data.hasMore = data.comments.length < data.total;
-        renderCsqComments(section, courseId, postId, prefix);
-      } catch {
-        loadMoreBtn.textContent = '加载失败，点击重试';
-        loadMoreBtn.disabled = false;
-      }
-    });
-  }
-
-  // 查看更多回复
-  section.querySelectorAll('.comment-load-more-replies').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const parentId = Number(btn.dataset.parentId);
-      btn.textContent = '加载中...';
-      try {
-        const replies = await apiGet(`/api/courses/${courseId}/square-posts/${postId}/comments/${parentId}/replies`);
-        const data = st.loadedComments[postId];
-        replies.forEach(r => {
-          if (!data.comments.find(c => c.id === r.id)) data.comments.push(r);
-        });
-        renderCsqComments(section, courseId, postId, prefix);
-      } catch {
-        btn.textContent = '加载失败';
-      }
-    });
-  });
-
-  // 文本输入
-  const textarea = document.getElementById(`${prefix}-sq-textarea-${postId}`);
-  if (textarea) {
-    textarea.addEventListener('input', () => updateCsqCharCount(postId, prefix));
-    textarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        submitCsqComment(courseId, postId, prefix, section);
-      }
-    });
-    textarea.focus();
-  }
-
-  // 发送按钮
-  const sendBtn = document.getElementById(`${prefix}-sq-send-btn-${postId}`);
-  if (sendBtn) {
-    sendBtn.addEventListener('click', () => submitCsqComment(courseId, postId, prefix, section));
-  }
-
-  // 图片上传
-  const imgInput = document.getElementById(`${prefix}-sq-img-input-${postId}`);
-  if (imgInput) {
-    imgInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (file.size > 1024 * 1024) { showToast('图片不能超过 1MB'); imgInput.value = ''; return; }
-      st.commentImageMap[postId] = file;
-      const preview = document.getElementById(`${prefix}-sq-img-preview-${postId}`);
-      const previewImg = document.getElementById(`${prefix}-sq-preview-img-${postId}`);
-      if (preview && previewImg) {
-        previewImg.src = URL.createObjectURL(file);
-        preview.style.display = 'block';
-      }
-      updateCsqSendBtn(postId, prefix);
-    });
-  }
-
-  // 移除图片
-  section.querySelectorAll('.comment-remove-image').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const pid = Number(btn.dataset.postId);
-      delete st.commentImageMap[pid];
-      const preview = document.getElementById(`${prefix}-sq-img-preview-${pid}`);
-      if (preview) preview.style.display = 'none';
-      const imgInputEl = document.getElementById(`${prefix}-sq-img-input-${pid}`);
-      if (imgInputEl) imgInputEl.value = '';
-      updateCsqSendBtn(pid, prefix);
-    });
-  });
+  const sendBtn = document.getElementById(`comment-send-btn-${postId}`);
+  const mainInput = document.getElementById(`comment-main-input-${postId}`);
+  sendBtn?.addEventListener('click', () => submitCsqTkMain(courseId, postId, prefix, section));
+  mainInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCsqTkMain(courseId, postId, prefix, section); });
 }
 
-function updateCsqCharCount(postId, prefix) {
-  const textarea = document.getElementById(`${prefix}-sq-textarea-${postId}`);
-  const counter = document.getElementById(`${prefix}-sq-char-count-${postId}`);
-  if (!textarea || !counter) return;
-  const len = textarea.value.length;
-  counter.textContent = `${len}/500`;
-  counter.classList.toggle('exceeded', len >= 500);
-  updateCsqSendBtn(postId, prefix);
-}
-
-function updateCsqSendBtn(postId, prefix) {
-  const st = getState(prefix);
-  const textarea = document.getElementById(`${prefix}-sq-textarea-${postId}`);
-  const sendBtn = document.getElementById(`${prefix}-sq-send-btn-${postId}`);
-  if (!textarea || !sendBtn) return;
-  const hasContent = textarea.value.trim().length > 0;
-  const hasImage = !!st.commentImageMap[postId];
-  const notExceeded = textarea.value.length <= 500;
-  sendBtn.disabled = !(hasContent || hasImage) || !notExceeded;
-}
-
-async function submitCsqComment(courseId, postId, prefix, section) {
-  const st = getState(prefix);
-  const textarea = document.getElementById(`${prefix}-sq-textarea-${postId}`);
-  const sendBtn = document.getElementById(`${prefix}-sq-send-btn-${postId}`);
-  if (!textarea || !sendBtn) return;
-
-  const content = textarea.value.trim();
-  const imageFile = st.commentImageMap[postId];
-  if (!content && !imageFile) return;
-  if (content.length > 500) { showToast('回复内容不能超过 500 字'); return; }
-
-  textarea.disabled = true;
-  sendBtn.disabled = true;
-  sendBtn.innerHTML = '<span class="mi" style="font-size:18px">hourglass_empty</span>';
+async function submitCsqTkMain(courseId, postId, prefix, section) {
+  const input = document.getElementById(`comment-main-input-${postId}`);
+  const content = input?.value?.trim();
+  const state = getTkImages(postId);
+  if (!content && state.files.length === 0) return;
 
   try {
-    const formData = new FormData();
-    formData.append('content', content);
-    if (st.replyingTo[postId]) formData.append('parent_id', st.replyingTo[postId].id);
-    if (imageFile) formData.append('image', imageFile);
-
-    const token = getToken();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const res = await fetch(`/api/courses/${courseId}/square-posts/${postId}/comments`, { method: 'POST', headers, body: formData });
-    const result = await res.json();
-
-    if (result.error) {
-      showToast(result.error);
-      textarea.disabled = false;
-      sendBtn.disabled = false;
-      sendBtn.innerHTML = '<span class="mi" style="font-size:18px">send</span>';
-      return;
+    let res;
+    if (state.files.length > 0) {
+      const formData = new FormData();
+      formData.append('content', content || '');
+      state.files.forEach((f, i) => formData.append(i === 0 ? 'image' : 'images', f));
+      const token = localStorage.getItem('kedazi_token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const fetchRes = await fetch(`/api/courses/${courseId}/square-posts/${postId}/comments`, { method: 'POST', headers, body: formData });
+      res = await fetchRes.json();
+    } else {
+      res = await apiPost(`/api/courses/${courseId}/square-posts/${postId}/comments`, { content });
     }
-
-    textarea.value = '';
-    delete st.commentImageMap[postId];
-    delete st.replyingTo[postId];
-    const preview = document.getElementById(`${prefix}-sq-img-preview-${postId}`);
-    if (preview) preview.style.display = 'none';
-    const imgInputEl = document.getElementById(`${prefix}-sq-img-input-${postId}`);
-    if (imgInputEl) imgInputEl.value = '';
-
-    st.loadedComments[postId] = null;
+    if (res.error) { showToast(res.error); return; }
+    if (input) input.value = '';
+    clearTkImages(postId);
+    renderTkPreviews(postId);
+    clearCsqCache(prefix, postId);
     toggleCourseSquareComments(courseId, postId, prefix);
-    setTimeout(() => {
-      const list = document.getElementById(`${prefix}-sq-comment-list-${postId}`);
-      if (list) list.scrollTop = list.scrollHeight;
-    }, 300);
-    showToast('回复成功');
-  } catch {
-    showToast('发送失败，请重试');
-    textarea.disabled = false;
-    sendBtn.disabled = false;
-    sendBtn.innerHTML = '<span class="mi" style="font-size:18px">send</span>';
-  }
+    showToast('评论成功');
+  } catch { showToast('发送失败'); }
 }
+
+async function submitCsqTkReply(courseId, postId, parentCommentId, prefix, section) {
+  const input = document.getElementById(`inline-reply-input-${parentCommentId}`);
+  const content = input?.value?.trim();
+  const state = getTkReplyImages(parentCommentId);
+  if (!content && state.files.length === 0) return;
+
+  try {
+    let res;
+    if (state.files.length > 0) {
+      const formData = new FormData();
+      formData.append('content', content || '');
+      formData.append('parent_id', parentCommentId);
+      state.files.forEach((f, i) => formData.append(i === 0 ? 'image' : 'images', f));
+      const token = localStorage.getItem('kedazi_token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const fetchRes = await fetch(`/api/courses/${courseId}/square-posts/${postId}/comments`, { method: 'POST', headers, body: formData });
+      res = await fetchRes.json();
+    } else {
+      res = await apiPost(`/api/courses/${courseId}/square-posts/${postId}/comments`, { content, parent_id: parentCommentId });
+    }
+    if (res.error) { showToast(res.error); return; }
+    clearTkReplyImages(parentCommentId);
+    renderTkReplyPreviews(parentCommentId);
+    clearCsqCache(prefix, postId);
+    toggleCourseSquareComments(courseId, postId, prefix);
+    showToast('回复成功');
+  } catch { showToast('发送失败'); }
+}
+
+async function deleteCsqTkComment(courseId, postId, commentId, prefix, section) {
+  openModal('确认删除', `
+    <p style="margin-bottom:24px">确定要删除这条评论吗？</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" id="confirm-del-cmt" style="background:var(--md-error)">删除</button>
+    </div>
+  `);
+  document.getElementById('confirm-del-cmt')?.addEventListener('click', async () => {
+    const result = await apiDelete(`/api/courses/${courseId}/square-posts/${postId}/comments/${commentId}`);
+    if (result.error) { showToast(result.error); } else { showToast('已删除'); clearCsqCache(prefix, postId); toggleCourseSquareComments(courseId, postId, prefix); }
+    closeModal();
+  });
+}
+
