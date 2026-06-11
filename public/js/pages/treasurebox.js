@@ -243,7 +243,7 @@ function renderDecide(activeTab = 'coin') {
 
 function renderCoin(result = null) {
   const showResult = result !== null;
-  const faces = { 0: ['正面', '🪙'], 1: ['反面', '🪙'], 2: ['立起来了！', '🪙'] };
+  const faces = { 0: ['正面', '🪙'], 1: ['反面', '🪙'], 2: ['立起来了！', '🎉'] };
   const [text, icon] = result !== null ? faces[result] : ['点击硬币抛一次', '🪙'];
   return `
     <div class="coin-area" id="coin-area">
@@ -276,7 +276,7 @@ function flipCoin() {
     else result = 2;
 
     visual.classList.remove('coin-flipping');
-    const faces = { 0: ['正面', '🪙'], 1: ['反面', '🪙'], 2: ['立起来了！', '🪙'] };
+    const faces = { 0: ['正面', '🪙'], 1: ['反面', '🪙'], 2: ['立起来了！', '🎉'] };
     resultEl.textContent = faces[result][0];
     visual.querySelector('.coin-inner').textContent = faces[result][1];
     if (btn) btn.disabled = false;
@@ -740,7 +740,6 @@ function renderTreasureBox() {
         百宝箱
       </h1>
     </div>
-    <p class="tb-page-desc">工具集合 · 多巴胺自动机 · 纯前端计算</p>
     <div class="tb-grid">
       ${renderPomodoro()}
       ${renderLuck()}

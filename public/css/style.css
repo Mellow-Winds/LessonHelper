@@ -5688,11 +5688,6 @@ input, textarea, select, button,
   border-radius: var(--radius-md);
   padding: var(--space-4);
   margin-top: var(--space-2);
-  transition: box-shadow var(--dur-normal) var(--ease-standard);
-}
-
-.explore-card:hover {
-  box-shadow: var(--shadow-1);
 }
 
 /* 卡片颜色：淡色背景 + 图标着色（探索页） */
@@ -5712,6 +5707,15 @@ input, textarea, select, button,
 .editor-card-embed[data-template="event_buddy"]     .editor-card-head i { color: #E85D75; }
 .editor-card-embed[data-template="skill_exchange"]  .editor-card-head i { color: #F59E0B; }
 .editor-card-embed[data-template="study_group"]     .editor-card-head i { color: #3B82F6; }
+
+/* 编辑器内嵌卡片：官方卡片背景色 + 边框强调色 */
+.editor-card-embed[data-template="book_sale"]       { background: #FDF6E8; border-color: #E8A838; --card-accent: #E8A838; }
+.editor-card-embed[data-template="study_invite"]    { background: #EBF3FC; border-color: #4A90D9; --card-accent: #4A90D9; }
+.editor-card-embed[data-template="social_buddy"]    { background: #F3EFFE; border-color: #7B61FF; --card-accent: #7B61FF; }
+.editor-card-embed[data-template="project_team"]    { background: #E8F8EF; border-color: #2EAD6B; --card-accent: #2EAD6B; }
+.editor-card-embed[data-template="event_buddy"]     { background: #FDEEF1; border-color: #E85D75; --card-accent: #E85D75; }
+.editor-card-embed[data-template="skill_exchange"]  { background: #FEF6E7; border-color: #F59E0B; --card-accent: #F59E0B; }
+.editor-card-embed[data-template="study_group"]     { background: #EBF3FC; border-color: #3B82F6; --card-accent: #3B82F6; }
 
 /* 右侧模板列表：仅图标着色 */
 .editor-template-item[data-template="book_sale"]      .editor-template-icon i { color: #E8A838; }
@@ -6269,7 +6273,6 @@ input, textarea, select, button,
 
 .editor-card-embed:hover {
   border-color: var(--md-primary);
-  box-shadow: var(--shadow-2);
 }
 
 .editor-card-embed.dragging {
@@ -6608,13 +6611,24 @@ input, textarea, select, button,
   flex-shrink: 0;
   font-size: var(--text-xs);
   font-weight: 500;
-  transition: box-shadow var(--dur-fast);
   white-space: nowrap;
   user-select: none;
+  position: relative;
+  overflow: hidden;
 }
 
-.collection-card:hover {
-  box-shadow: var(--shadow-sm);
+.collection-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0);
+  transition: background var(--dur-fast);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.collection-card:hover::after {
+  background: rgba(0,0,0,0.06);
 }
 
 .collection-card.dragging {
@@ -6692,14 +6706,27 @@ input, textarea, select, button,
   border-radius: var(--radius-md);
   border: 1px solid var(--md-outline-variant);
   cursor: grab;
-  transition: box-shadow var(--dur-fast), transform var(--dur-fast);
+  transition: transform var(--dur-fast);
   user-select: none;
   overflow: hidden;
 }
 
+.market-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0);
+  transition: background var(--dur-fast);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
 .market-card:hover {
-  box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
+}
+
+.market-card:hover::after {
+  background: rgba(0,0,0,0.06);
 }
 
 .market-card.dragging {
@@ -7085,6 +7112,22 @@ input, textarea, select, button,
   display: flex;
   flex-direction: column;
   padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.my-card-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0);
+  transition: background var(--dur-fast);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.my-card-item:hover::after {
+  background: rgba(0,0,0,0.06);
 }
 
 .my-card-header {
@@ -7984,8 +8027,6 @@ input, textarea, select, button,
   text-align: center;
   line-height: 1.5;
   padding: var(--space-4) var(--space-5);
-  background-color: var(--md-primary-container);
-  border-radius: var(--radius-md);
   min-width: 160px;
   animation: answer-text-in 0.6s var(--ease-spring);
 }

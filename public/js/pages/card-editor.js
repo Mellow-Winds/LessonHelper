@@ -402,7 +402,7 @@ function openModuleEditModal(index, container) {
   }
 
   openModal('编辑模块', `
-    <div class="card-edit-form" style="display:flex;flex-direction:column;gap:16px">
+    <div class="card-edit-form" style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
       ${createMdInput({ id: 'module-edit-label', label: '标签名', value: mod.label || '', placeholder: ' ' })}
       <div>
         <label class="card-edit-label" style="display:block;margin-bottom:8px">图标</label>

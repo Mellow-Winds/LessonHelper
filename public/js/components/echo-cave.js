@@ -89,7 +89,7 @@ function scrambleReveal(el, text, onDone) {
         // 阶段2：逐字解码
         decodeChunk();
       }
-    }, 50);
+    }, 35);
 
     function decodeChunk() {
       let decoded = 0;
@@ -100,9 +100,9 @@ function scrambleReveal(el, text, onDone) {
           clearInterval(decodeTimer);
           cursor = chunkEnd;
           // 段间短暂停顿，然后处理下一段
-          setTimeout(processChunk, 100);
+          setTimeout(processChunk, 60);
         }
-      }, 45);
+      }, 30);
     }
   }
 
