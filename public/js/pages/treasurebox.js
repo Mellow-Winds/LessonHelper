@@ -1,5 +1,5 @@
 /**
- * pages/treasurebox.js — 百宝箱：番茄时钟 / 运气值 / 替我抉择 / 薛定谔的待办 / 答案之书
+ * pages/treasurebox.js — 百宝箱：番茄时钟 / 运气值 / 替我抉择 / 薛定谔的待办 / 答案之书 / 祈福木鱼 / 今日摸鱼指南 / 吃了么
  * 纯前端工具，不使用后端 API
  */
 
@@ -729,6 +729,363 @@ function bindAnswerBook() {
 }
 
 /* ============================================
+   祈福木鱼
+   ============================================ */
+
+let _wfLastClick = 0;
+
+function playWoodenFishSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 280;
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.06);
+  } catch {}
+}
+
+function renderWoodenFish() {
+  return `
+    <div class="tb-card">
+      <div class="tb-card-title">
+        <svg class="mi-svg" viewBox="0 0 24 24" width="20" height="20"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm-1 15l-4-4 1.41-1.41L11 14.17l5.59-5.59L18 10l-7 7z" fill="var(--md-primary)"/></svg>
+        祈福木鱼
+      </div>
+      <div class="wf-area">
+        <div class="wf-icon" id="wf-icon">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <!-- 木鱼主体 -->
+            <ellipse cx="40" cy="44" rx="32" ry="22" fill="none" stroke="var(--md-primary)" stroke-width="2.5"/>
+            <ellipse cx="40" cy="44" rx="28" ry="18" fill="none" stroke="var(--md-primary)" stroke-width="1" opacity="0.4"/>
+            <!-- 木鱼开口 -->
+            <path d="M18 38 Q40 28 62 38" fill="none" stroke="var(--md-primary)" stroke-width="2"/>
+            <!-- 敲槌 -->
+            <line x1="48" y1="18" x2="54" y2="6" stroke="var(--md-primary)" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="55" cy="5" r="4" fill="none" stroke="var(--md-primary)" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function spawnFloatText(x, y, isSpecial) {
+  const el = document.createElement('div');
+  const SPECIAL_TEXTS = ['老师捞我', '考的都会', '蒙的全对', '期末必过'];
+  const text = isSpecial
+    ? SPECIAL_TEXTS[Math.floor(Math.random() * SPECIAL_TEXTS.length)]
+    : '功德 + 1';
+  el.textContent = text;
+  el.className = 'wf-float-text' + (isSpecial ? ' wf-float-text--gold' : '');
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  document.body.appendChild(el);
+  const duration = isSpecial ? 1200 : 800;
+  setTimeout(() => el.remove(), duration);
+}
+
+function bindWoodenFish() {
+  const icon = document.getElementById('wf-icon');
+  if (!icon) return;
+  icon.addEventListener('click', (e) => {
+    const now = Date.now();
+    if (now - _wfLastClick < 300) return;
+    _wfLastClick = now;
+
+    // 音效
+    playWoodenFishSound();
+
+    // 缩放动画
+    icon.classList.remove('wf-bumping');
+    void icon.offsetWidth; // reflow
+    icon.classList.add('wf-bumping');
+
+    // 浮动文字
+    const rect = icon.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2 - 30;
+    const cy = rect.top - 8;
+    const isSpecial = Math.random() < 0.05;
+    spawnFloatText(cx, cy, isSpecial);
+  });
+}
+
+/* ============================================
+   今日摸鱼指南
+   ============================================ */
+
+const FISH_GUIDES = [
+  '逛菜市场或者花鸟市场',
+  '坐公交车或者地铁随机下车',
+  '躺北大楼或者操场的草坪上',
+  '打卡你认为学校最好看的树',
+  '听一张完整的专辑',
+  '电影院包场看一部电影',
+  '和朋友打一场羽毛球',
+  '找一条没走过的路散步，每个路口向右转',
+  '吃饭时观察陌生人吃饭，猜测他们的专业和心情',
+  '去鱼嘴湿地公园吹风',
+  '翻学校论坛考古旧帖',
+  '操场夜跑',
+  '坐地铁最后一节车厢看隧道灯光后退',
+  '整理自己寝室里的东西',
+  '对窗外的景色写一段文字',
+  '去便利店买一种没喝过的饮料',
+  '挑一条公交线路背下沿途所有站名',
+  '找一首喜欢的诗背诵',
+  '用校园里的落叶或花瓣摆一个图案',
+  '夜爬紫金山看日出',
+  '从燕子矶公园骑自行车到中山码头',
+  '翻出中学时的日记或作文看',
+  '去蹭其他专业的课程听',
+  '马上去洗澡',
+  '在便利贴上抄一句读到的好句子',
+];
+
+function loadFishHistory() {
+  try {
+    return JSON.parse(localStorage.getItem('tb_fish_history') || '[]');
+  } catch { return []; }
+}
+
+function saveFishHistory(history) {
+  localStorage.setItem('tb_fish_history', JSON.stringify(history));
+}
+
+function pickFishGuide() {
+  const history = loadFishHistory();
+  // 排除最近最多 10 条，保证不重复
+  const excludeSet = new Set(history.slice(-10));
+  const candidates = FISH_GUIDES
+    .map((text, i) => ({ text, i }))
+    .filter(item => !excludeSet.has(item.i));
+  // 如果全部排除了（不太可能）就重置
+  const pool = candidates.length > 0 ? candidates : FISH_GUIDES.map((text, i) => ({ text, i }));
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  history.push(picked.i);
+  if (history.length > 20) history.splice(0, history.length - 20);
+  saveFishHistory(history);
+  return picked.text;
+}
+
+function renderFishGuide() {
+  const text = pickFishGuide();
+  return `
+    <div class="tb-card">
+      <div class="tb-card-title">
+        <svg class="mi-svg" viewBox="0 0 24 24" width="20" height="20"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10s10-4.5 10-10S17.5 2 12 2zm0 15c-.55 0-1-.45-1-1s.45-1 1-1s1 .45 1 1s-.45 1-1 1zm1-4h-2V7h2v6z" fill="var(--md-primary)"/></svg>
+        今日摸鱼指南
+      </div>
+      <div class="fg-area">
+        <div class="fg-content" id="fg-content">${escHtml(text)}</div>
+        <button class="btn btn-primary btn-sm" id="fg-refresh-btn" style="min-width:120px">再换一条</button>
+      </div>
+    </div>
+  `;
+}
+
+function bindFishGuide() {
+  const btn = document.getElementById('fg-refresh-btn');
+  const content = document.getElementById('fg-content');
+  if (!btn || !content) return;
+
+  btn.addEventListener('click', () => {
+    btn.textContent = '换一条...';
+    btn.disabled = true;
+    content.classList.add('fg-switching');
+
+    setTimeout(() => {
+      const text = pickFishGuide();
+      content.textContent = text;
+      content.classList.remove('fg-switching');
+      btn.textContent = '再换一条';
+      btn.disabled = false;
+    }, 200);
+  });
+}
+
+/* ============================================
+   吃了么（南大食堂盲盒）
+   ============================================ */
+
+const FOOD_DATA = {
+  gulou: [
+    '卓粤拉肠：艇仔粥、鲜虾肠粉、生菜',
+    '荣记潮汕牛肉火锅（中华路店）：牛肉',
+    '垛上渔夫·兴化菜馆：猪头肉、外婆长鱼饭',
+    '紫滇源云南生态菜',
+    '韵味居：糯米笋炒腊肉',
+    '摆川饭堂·豆花饭',
+    '味香鸭店：鸭子、素什锦',
+    '宜宾燃面：牛肉汤面、蒜泥白肉',
+    '仲氏过桥米线：肉酱米线',
+    '西北桥头拉面大王：凉皮、锅贴',
+    '百姓菜馆：双臭煲',
+    '大叔披萨：松露菌菇披萨、希腊沙拉',
+    '巴蜀鱼花：辣子鸡、脆皮小土豆',
+    '一味米线：酸菜肉片米线、番茄猪蹄米线',
+    '重庆鸡公煲：牛肉煲',
+    '丁丁精菜馆：酸菜黑鱼、京酱肉丝',
+    '锦州烧烤王：油边、爆炒方便面、鲫鱼',
+    '食物招领：咖喱小酥肉',
+    '云南烧烤：牛肉沫炒饭、黄牛肉串',
+    '月星酸菜鱼：特色酸菜鱼',
+    '江河叔叔：鬼金棒拉面',
+    '河狮园饭店',
+    '猪脚饭：烧鸭饭',
+    '广和生大排档：羊肉炉、清远鸡',
+    '小辣椒湖南米粉：麻辣鸡粉',
+    'La Mia Casa：披萨、千层面、蘑菇芝士烩饭',
+    '市井川菜：毛血旺',
+    '陕西面馆：油泼面',
+    '食肉兽：安格斯肥牛饭、咖喱猪排饭、烤鳗鱼',
+    '石锅拌饭：泡菜五花肉',
+    '泽厨记抓饭·羊排：羊排抓饭',
+    '成都娃娃：辣子鸡、豆花',
+    '丽哲韩式烧烤：泡菜饼、肉类',
+    '百谷茶餐厅：叉烧、油面筋',
+    '福桔：菜饭、芥末虾球',
+    '箪食记：水煮肉片、招牌红烧肉',
+    '眷江南之小蓝鲸：香芋排骨、红烧肉',
+    '觅炙海鲜粥火锅：海鲜粥、鲜活对虾、现切吊龙',
+    '肖记四川宜宾燃面：招牌燃面、白肉',
+    '兄弟砂锅 (陆家巷店)：三鲜土豆粉砂锅',
+    '馨罗冷面拌饭 (珠江路店)：荞麦冷面、无骨鸡块',
+    '广东阿生鱼捞·斑鱼海鲜粥火锅：斑鱼片、黑虎虾滑、绣球菌',
+    '水西门月升鸭子店：招牌烤鸭、盐水鸭、板鸭',
+    '芬记台湾无名小店：蚵仔煎、盐酥鸡、卤肉饭',
+    '老汪馄饨店：安庆馄饨、鲜肉锅贴、荠菜鲜肉小馄饨',
+    '熊猫餐馆：冰糖蹄膀、蛋炒饭、蚂蚁上树',
+    '福桔家庭厨房：无花果家烧猪小排、南京菜饭',
+    '罗家凉皮店：纯瘦肉夹馍、凉皮凉面面筋',
+    '四川小吃 (彩霞街店)：凉皮、卤牛肉、凉拌菜',
+    '潮粥馆：潮汕炸肉饼、腌虾、砂锅粥',
+    '花记台湾便当 (瑞金店)：台式排骨烩饭、冬瓜海带汤',
+    '梅姐麻辣烫：麻辣烫、三鲜炒面、老式炸串',
+    '大卫厨房·融合料理：泰式猪肉打抛饭、牛眼菌菇炒饭',
+    '蘑菇餐厅：芝士土豆泥、鸡茸蘑菇汤、芝士虾仁焗饭',
+    '红玫瑰：西餐/简餐、披萨、意面',
+    '怪味麻辣烫：金针菇、麻辣烫、冬瓜、海带',
+    '江宁肚包鸡：肚包鸡、鸡汤、配菜拼盘',
+    '七家湾牛肉锅贴：牛肉锅贴、牛肉馄饨、红烧牛肉粉丝汤',
+    '吉派东北烤肉：牛肉筋、东北酸菜蒸饺、牛上脑',
+    '南航粥店：海南清粥、黄桃牛奶燕麦粥',
+    '黑皮酸菜鱼 (三山街店)：酸菜鱼、肥肠鱼',
+    '小院冒菜 (金银街店)：香辣牛油冒、五香烤鸭冒',
+    '真火烧烤 (钱塘路店)：羊肉串、馒头片、蜜汁烤翅',
+    '六合腰肚面馆 (水西门大街店)：六合腰肚面、三鲜面',
+    '小粉桥猪蹄 (小粉桥店)：炖猪蹄、卤猪蹄',
+    '鲜满堂米线 (新街口店)：牛蛙米线、水煮腰片米线',
+    '山姐豆花：粉蒸肉、鸭血旺',
+    '二食五窗口：淮南牛肉汤',
+    '一食：铁板饭、滑蛋饭、干拌米线、盖浇饭、小馄饨、水饺',
+    '教工：15r 盒饭',
+    '南园餐车',
+    '三食：麻辣香锅、酸汤肉片面、生煎包、椰子鸡',
+  ],
+  xianlin: [
+    '沭阳药膳鸡：药膳鸡',
+    '寻鲜潮·海南糟粕醋火锅：对虾、文昌鸡',
+    '黑哥炭火烤肉：拌肉、酸菜',
+    '青春分食：炸猪排炒年糕',
+    '青州苗乡牛肉馆：带皮牛肉',
+    '今牛潮汕牛肉馆：牛肉粿条、干拌粿条、牛肉火锅',
+    '九号披萨店：梨子火腿奶酪披萨',
+    '土耳其多拿餐厅：烤肉拼盘',
+    '摊摊面皮·菜煎饼：双蛋菜煎饼',
+    '鑫花溪牛肉米粉：贵州特色酸汤牛天下',
+    '张氏砂锅私房菜：蒜香鸡翅、豉油黑鱼片',
+    '小熊罐罐云南菜：老奶洋芋、红三剁、番茄牛腩',
+    '鸡手王炭烤羊腿：烤冷面、蜜汁鸡翅',
+    '津津鸭血粉丝汤：招牌鸭血粉丝汤、炒饭',
+    '刚刚好小火锅：贵州酸汤锅底',
+    '多来韩国料理：牛肉汤、海鲜饼、炒年糕',
+    '十一食：砂锅、荷叶排骨饭、酱骨饭',
+    '十二食：烤鸭饭、牛肉粉丝汤',
+    '教一：排骨、鸡爪、大排、豆角、锅仔、玉米猪肉水饺、抄手',
+    '教二：酱骨饭、香煎鸡排饭、龙利鱼饭、菠萝鸡肉炒饭',
+    '民族餐厅：鸡块、鸭腿、鱼块、肉丸汤、烤鱼、牛肉拉面、牛肉冷面、清汤麻辣烫、黑椒牛肉炒饭',
+  ],
+};
+
+function loadFoodCampus() {
+  try { return localStorage.getItem('tb_food_campus') || 'xianlin'; }
+  catch { return 'xianlin'; }
+}
+
+function saveFoodCampus(campus) {
+  localStorage.setItem('tb_food_campus', campus);
+}
+
+function renderFoodPicker() {
+  const campus = loadFoodCampus();
+  return `
+    <div class="tb-card">
+      <div class="tb-card-title">
+        <svg class="mi-svg" viewBox="0 0 24 24" width="20" height="20"><path d="M8.1 13.34l2.83-2.83L3.91 3.5c-1.56 1.56-1.56 4.09 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z" fill="var(--md-primary)"/></svg>
+        吃了么
+      </div>
+      <div class="fp-area">
+        <div class="fp-campus-tabs" id="fp-campus-tabs">
+          <button class="fp-campus-tab${campus === 'gulou' ? ' active' : ''}" data-campus="gulou">鼓楼</button>
+          <button class="fp-campus-tab${campus === 'xianlin' ? ' active' : ''}" data-campus="xianlin">仙林</button>
+        </div>
+        <div class="fp-result" id="fp-result">点击下方按钮开始抽取</div>
+        <button class="btn btn-primary btn-sm" id="fp-pick-btn" style="min-width:140px">今天吃点啥？</button>
+      </div>
+    </div>
+  `;
+}
+
+let _fpLastResult = '';
+
+function bindFoodPicker() {
+  const tabs = document.getElementById('fp-campus-tabs');
+  const pickBtn = document.getElementById('fp-pick-btn');
+  const resultEl = document.getElementById('fp-result');
+
+  if (!tabs || !pickBtn || !resultEl) return;
+
+  tabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('[data-campus]');
+    if (!tab) return;
+    const campus = tab.dataset.campus;
+    tabs.querySelectorAll('.fp-campus-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    saveFoodCampus(campus);
+    _fpLastResult = '';
+    resultEl.textContent = '点击下方按钮开始抽取';
+    resultEl.classList.remove('fp-revealing');
+  });
+
+  pickBtn.addEventListener('click', () => {
+    const campus = loadFoodCampus();
+    const list = FOOD_DATA[campus] || FOOD_DATA.xianlin;
+    // 排除上次结果避免连续重复
+    const candidates = list.filter(item => item !== _fpLastResult);
+    const pool = candidates.length > 0 ? candidates : list;
+
+    pickBtn.textContent = '正在抽取...';
+    pickBtn.disabled = true;
+
+    setTimeout(() => {
+      const picked = pool[Math.floor(Math.random() * pool.length)];
+      _fpLastResult = picked;
+      resultEl.textContent = picked;
+      resultEl.classList.remove('fp-revealing');
+      void resultEl.offsetWidth;
+      resultEl.classList.add('fp-revealing');
+      pickBtn.textContent = '今天吃点啥？';
+      pickBtn.disabled = false;
+    }, 300);
+  });
+}
+
+/* ============================================
    组装 & 事件绑定
    ============================================ */
 
@@ -746,6 +1103,9 @@ function renderTreasureBox() {
       ${renderDecide('coin')}
       ${renderBlindBox()}
       ${renderAnswerBook()}
+      ${renderWoodenFish()}
+      ${renderFishGuide()}
+      ${renderFoodPicker()}
     </div>
   `;
 }
@@ -794,6 +1154,9 @@ registerPage('treasurebox', (container) => {
 
     bindBlindBox();
     bindAnswerBook();
+    bindWoodenFish();
+    bindFishGuide();
+    bindFoodPicker();
 
     const pState = loadPomodoroState();
     if (pState.running && pState.endAt) {
