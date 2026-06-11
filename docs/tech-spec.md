@@ -18,7 +18,7 @@
 
 ---
 
-## 数据库设计（21 张表）
+## 数据库设计（21 张表，实际 28 张详见 server.js）
 
 ### users
 
@@ -263,6 +263,40 @@ UNIQUE(user_id, post_id)
 | file_size | INTEGER | 0 | 文件大小（字节） |
 | created_at | DATETIME | CURRENT_TIMESTAMP | 上传时间 |
 
+### explore_posts
+
+| 列名 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| id | INTEGER PK | AUTO | 主键 |
+| creator_id | INTEGER | — | 发布者 ID |
+| title | TEXT | — | 标题 |
+| content | TEXT | — | 内容（JSON blocks 数组） |
+| created_at | DATETIME | CURRENT_TIMESTAMP | 发布时间 |
+| updated_at | DATETIME | CURRENT_TIMESTAMP | 更新时间 |
+
+### explore_comments
+
+| 列名 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| id | INTEGER PK | AUTO | 主键 |
+| post_id | INTEGER | — | 帖子 ID |
+| author_id | INTEGER | — | 评论者 ID |
+| content | TEXT | — | 内容 |
+| image_url | TEXT | '' | 评论图片 URL |
+| parent_id | INTEGER | NULL | 父评论 ID（楼中楼） |
+| like_count | INTEGER | 0 | 点赞数 |
+| created_at | DATETIME | CURRENT_TIMESTAMP | 评论时间 |
+
+### explore_cards
+
+| 列名 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| id | INTEGER PK | AUTO | 主键 |
+| post_id | INTEGER | — | 帖子 ID |
+| type | TEXT | — | 卡片类型 |
+| data | TEXT | — | 卡片数据（JSON） |
+| created_at | DATETIME | CURRENT_TIMESTAMP | 创建时间 |
+
 ---
 
 ## API 设计规范
@@ -293,9 +327,9 @@ UNIQUE(user_id, post_id)
 - 全局状态：`window._currentUser`
 - API 封装自动附加 Authorization header
 - 通知轮询：每 30 秒检查未读数
-- 样式遵循 [themerules](../themerules)
-- 测试框架：`node:test`，13 个测试文件在 `tests/` 目录
+- 样式遵循 [rules](../rules)
+- 测试框架：`node:test`，17 个测试文件在 `tests/` 目录
 
 ---
 
-> 最后更新：2026-06-02
+> 最后更新：2026-06-11

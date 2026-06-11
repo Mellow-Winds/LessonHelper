@@ -99,7 +99,7 @@
 ## ✅ MVP 6轮全部完成！
 
 > 当前进度：17/17 完成
-> 最后更新：2026-06-02
+> 最后更新：2026-06-11
 
 ---
 
@@ -373,3 +373,44 @@
 - [x] **个人空间性别标签移到昵称下面** — 查看/公开/编辑三模式重排
 - [x] **文档全面清理** — 删除重复/过时/空文档 14 个，更新 CLAUDE.md / README / api-spec
 - [x] 测试：新增 2 个通知路由测试通过，全 49 测试 44 通过（5 个已有失败与本次无关）
+
+---
+
+## 维护记录：2026-06-10 晚间 — 评论昵称修复 + 通知跳转 ✅
+
+**目标**：修复发现模块评论显示用户名而非昵称，通知中心点击跳转不生效
+
+- [x] **修复评论昵称显示** — 后端 explore_comments.js SQL 改为查询 `u.nickname AS author_name`
+- [x] **修复通知跳转** — 通知路由映射新增 `card` relatedType 跳转到发现页
+- [x] **前端昵称兜底** — explore.js 渲染评论时 `displayName = author_nickname || author_name || '匿名'`
+
+---
+
+## 维护记录：2026-06-10 深夜 — 头像上传三级压缩 ✅
+
+**目标**：优化头像上传，降低文件体积，提升加载速度
+
+- [x] **前端三级压缩管线** — 预压缩（≤2048px, q=0.9）→ 标准化（384×384, q=0.92）→ 自动降级（q=0.9→0.3 直到 ≤2MB）
+- [x] **前端阈值提升** — 原始文件检查从 2MB 提升到 30MB（极端容限）
+- [x] **后端精简** — 移除 sharp 处理，直接保存 Multer 文件，仅保留 2MB 限制和格式校验
+- [x] **上传进度** — XHR 替代 fetch，按钮显示百分比，上传期间取消按钮禁用
+- [x] **EXIF 方向修正** — 预压缩阶段使用 canvas 重绘修正旋转
+
+---
+
+## 维护记录：2026-06-11 — 评论区完全统一 + 登录按钮修复 ✅
+
+**目标**：消除 4 套评论区 UI 碎片化，统一为 tk-* 标准；修复登录页按钮折行
+
+- [x] **新增 `public/js/components/tk-comments.js`** — 共享评论工具模块（~280 行），导出 renderTkComment / renderTkInputArea / toggleLike / bindTkCommentEvents 等 16 个函数
+- [x] **课程论坛 detail.js 重构** — forum-* 类名全部替换为 tk-*，Material Icons 迁移到 Remix Icons，扁平化楼中楼，点赞从 Material `favorite` 改为 Remix `ri-heart-line/fill`
+- [x] **交友广场 square.js 重构** — 评论区 + 输入区改为 tk-* 标准，新增点赞功能（此前缺失）
+- [x] **课程搭子 course_square.js 重构** — 移除楼层号、移除 500 字限制、新增点赞、单行输入替代 textarea
+- [x] **我的课程 my_courses.js 重构** — 同步 course_square.js 的改动，移除字数限制、新增点赞
+- [x] **登录按钮修复** — `.auth-buttons .btn-text, .auth-buttons .auth-next-btn { white-space: nowrap }` 防止手机端折行
+- [x] **formatTimeAgo 提升** — 从 explore.js 提取到 `ui.js` 作为公共导出
+- [x] **代码净减 ~800 行** — 4 个评论区删除 ~1200 行重复代码，新增共享模块 +280 行
+- [x] 11 个文件变更，+1158 -1281，提交 `9d1975c`
+
+> 当前进度：全功能完成
+> 最后更新：2026-06-11

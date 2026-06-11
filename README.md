@@ -95,16 +95,16 @@ $env:RESEND_API_KEY="re_xxxxxx"
 | 前端 | 原生 JavaScript SPA + ES6 Modules |
 | 设计系统 | Material Design 3 |
 | Markdown | markdown-it |
-| 测试 | node:test（16 个测试文件，49 个测试用例） |
+| 测试 | node:test（17 个测试文件，49 个测试用例） |
 
 ## 项目结构
 
 详见 [CLAUDE.md](CLAUDE.md)。简要概览：
 
-- `routes/` — 12 个后端 API 路由文件
+- `routes/` — 14 个后端 API 路由文件
 - `public/js/pages/` — 15+ 个前端页面模块
-- `tests/` — 16 个自动化测试文件
-- `docs/` — 项目文档（需求/技术/设计/API/开发步骤/课程设计）
+- `tests/` — 17 个自动化测试文件
+- `docs/` — 项目文档（需求/技术/API/开发步骤/课程设计）
 - `todolist/` — 待规划功能清单
 - `devlog/` — 开发日志
 
@@ -115,7 +115,6 @@ $env:RESEND_API_KEY="re_xxxxxx"
 | 项目指南 | [CLAUDE.md](CLAUDE.md) |
 | 开发需求 | [docs/requirements.md](docs/requirements.md) |
 | 技术规范 | [docs/tech-spec.md](docs/tech-spec.md) |
-| 设计规范 | [docs/design-spec.md](docs/design-spec.md) |
 | 开发步骤 | [docs/development-steps.md](docs/development-steps.md) |
 | API 文档 | [docs/api-spec.md](docs/api-spec.md) |
 | 课程系统设计 | [docs/course.md](docs/course.md) |

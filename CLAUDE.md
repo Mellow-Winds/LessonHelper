@@ -17,7 +17,7 @@
 | 设计系统 | Material Design 3（自定义 CSS） |
 | Markdown | markdown-it（本地副本） |
 | 图标 | Material Icons + Remix Icon |
-| 测试 | node:test（16 个测试文件） |
+| 测试 | node:test（17 个测试文件） |
 
 ## 项目结构
 
@@ -35,15 +35,14 @@ Lessonhelper/
 ├── docs/                        # 📚 项目文档
 │   ├── requirements.md          #   开发需求文档
 │   ├── tech-spec.md             #   技术规范（数据库/API/安全）
-│   ├── design-spec.md           #   设计规范（页面布局/组件风格）
 │   ├── development-steps.md     #   分步开发计划（当前进度 + 待办）
 │   ├── api-spec.md              #   API 接口规范
 │   └── course.md                #   课程系统设计文档
 ├── devlog/                      # 📝 开发日志（每天一个文件）
 ├── todolist/                    # 📋 待规划功能清单
-├── tests/                       # 🧪 自动化测试（node:test，16 个文件）
+├── tests/                       # 🧪 自动化测试（node:test，17 个文件）
 ├── db/                          # SQLite 数据库文件
-├── routes/                      # 后端路由（12 个文件）
+├── routes/                      # 后端路由（14 个文件）
 │   ├── auth.js                  #   注册/登录/个人信息/签到/数据导出
 │   ├── courses.js               #   课程/帖子/评论/搭子帖/成员
 │   ├── user.js                  #   用户公开名片/关注/反馈/关注动态
@@ -53,7 +52,9 @@ Lessonhelper/
 │   ├── notifications.js         #   消息通知
 │   ├── search.js                #   全局搜索
 │   ├── square.js                #   交友广场
+│   ├── explore_posts.js         #   发现模块帖子 CRUD
 │   ├── explore_comments.js      #   发现模块评论（楼中楼 + 图片）
+│   ├── explore_cards.js         #   发现模块卡片（加入/审批/投票）
 │   ├── favorites.js             #   收藏（课程/帖子）
 │   ├── my_posts.js              #   我的发布
 │   └── middleware/
@@ -69,7 +70,9 @@ Lessonhelper/
 │       │   └── router.js        #   路由系统 + 动效引擎
 │       ├── components/
 │       │   ├── ui.js            #   MD3 组件工厂 + Toast + Modal
-│       │   └── card-renderer.js #   发现模块卡片渲染 + 计时器
+│       │   ├── tk-comments.js   #   统一评论区 UI 工具（tk-* 标准）
+│       │   ├── card-renderer.js #   发现模块卡片渲染 + 计时器
+│       │   └── echo-cave.js     #   回声洞（随机语录 + 用户投稿）
 │       └── pages/
 │           ├── auth.js          #   登录/注册 + 搜索页
 │           ├── profile.js       #   个人中心（三栖视角 + 签到 + 关注）
@@ -79,6 +82,10 @@ Lessonhelper/
 │           ├── my_posts.js      #   我的发布
 │           ├── notification_routes.mjs # 通知跳转路由映射
 │           ├── explore.js       #   发现页（帖子流 + 详情 + 论坛式评论 + 冷却）
+│           ├── post-editor.js   #   富文本帖子编辑器
+│           ├── card-editor.js   #   卡片编辑器
+│           ├── my-cards.js      #   我的卡片管理
+│           ├── treasurebox.js   #   百宝箱（番茄钟/运势/决策/盲盒）
 │           ├── explore/
 │           │   ├── invites.js   #   自习邀约
 │           │   ├── square.js    #   交友广场
@@ -87,7 +94,7 @@ Lessonhelper/
 │               ├── my_courses.js #   我的课程（导入/列表/详情）
 │               ├── all_courses.js#   课程广场（大课聚合）
 │               ├── detail.js    #   统一大课空间详情页
-│               ├── plaza.js     #   课程广场（非选课用户只读视图）
+│               ├── plaza.js     #   课程广场（只读视图，存量文件）
 │               ├── publish.js   #   发布（富文本+附件）
 │               ├── course_square.js # 课程搭子 Tab
 │               └── post_attachments.js # 帖子附件渲染工具
@@ -96,7 +103,7 @@ Lessonhelper/
     └── comment-images/          #   评论图片
 ```
 
-## 数据库表（19 张）
+## 数据库表（20 张）
 
 | 表名 | 说明 |
 |------|------|
@@ -127,7 +134,6 @@ Lessonhelper/
 |------|--------|
 | 产品要做什么功能 | [docs/requirements.md](docs/requirements.md) |
 | 数据库表结构、API规范 | [docs/tech-spec.md](docs/tech-spec.md) |
-| 页面长什么样 | [docs/design-spec.md](docs/design-spec.md) |
 | 开发到哪一步了 | [docs/development-steps.md](docs/development-steps.md) |
 | API怎么调用 | [docs/api-spec.md](docs/api-spec.md) |
 | 课程体系设计 | [docs/course.md](docs/course.md) |
@@ -170,4 +176,4 @@ npm run dev          # 启动服务器 http://localhost:3000
 
 ---
 
-> 创建于 2026-05-30 | 最后更新：2026-06-10（文档清理 + 冷却持久化 + 楼中楼修复）
+> 创建于 2026-05-30 | 最后更新：2026-06-11（文档清理 + 评论统一 + 头像压缩）
