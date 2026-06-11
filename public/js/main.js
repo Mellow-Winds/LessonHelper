@@ -93,7 +93,7 @@ import {
 import {
   registerProfilePages,
   openEditProfileModal, handleEditProfile, handlePrivacyChange,
-  handleCheckin, handleSaveProfile, handlePrivacyToggle, showFeedbackModal,
+  handleCheckin, handleSaveProfile, handlePrivacyToggle, showEchoCaveModal,
 } from './pages/profile.js';
 
 import './pages/my_posts.js';
@@ -130,6 +130,10 @@ import {
 
 import './pages/explore.js';
 import './pages/post-editor.js';
+import './pages/card-editor.js';
+import './pages/my-cards.js';
+import './pages/treasurebox.js';
+import { initEchoCave } from './components/echo-cave.js';
 import {
   refreshInvites, respondInvite, cancelInvite,
   switchMyTab,
@@ -237,7 +241,7 @@ Object.assign(window, {
   handleCheckin,
   handleSaveProfile,
   handlePrivacyToggle,
-  showFeedbackModal,
+  showEchoCaveModal,
   // my courses (list only)
   handleLeaveCourse,
   openCourseSearchModal,
@@ -311,6 +315,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 初始化路由系统：解析URL → 导航到对应页面
   initRouter(() => navigateTo('mycourse'));
+
+  // 初始化回声洞
+  initEchoCave();
 
   // 启动通知轮询
   if (window._currentUser) {

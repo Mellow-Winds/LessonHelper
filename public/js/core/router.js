@@ -84,6 +84,9 @@ const ROUTES = [
   { page: 'explore-post-detail', pattern: '/explore/post/:id', nav: 'explore' },
   { page: 'explore-tutorial',   pattern: '/explore/tutorial', nav: 'explore' },
   { page: 'explore-post-editor', pattern: '/explore/new',  nav: 'explore' },
+  { page: 'card-editor',   pattern: '/explore/new_card',        nav: 'explore' },
+  { page: 'card-editor',   pattern: '/explore/card/:id/edit',   nav: 'explore' },
+  { page: 'my-cards',      pattern: '/explore/cards/my',        nav: 'explore' },
   { page: 'explore-my-posts', pattern: '/explore/mine',    nav: 'explore' },
   { page: 'square-post',  pattern: '/explore/square/post/:id', nav: 'explore' },
   { page: 'square-my',    pattern: '/explore/square/my',  nav: 'explore' },
@@ -94,6 +97,7 @@ const ROUTES = [
   { page: 'notifications',pattern: '/notifications',       nav: 'notifications' },
   { page: 'favorites',    pattern: '/favorites',           nav: 'favorites' },
   { page: 'search',       pattern: '/search',              nav: 'search' },
+  { page: 'treasurebox',  pattern: '/treasurebox',          nav: 'treasurebox' },
 ];
 
 /**

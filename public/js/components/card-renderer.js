@@ -14,7 +14,11 @@ export function renderCard(card, opts = {}) {
   const components = Array.isArray(card.components) ? card.components : [];
 
   const templateAttr = card.template_id ? ` data-template="${card.template_id}"` : '';
-  let html = `<div class="explore-card" data-card-id="${card.id || ''}"${templateAttr}>`;
+  const styles = card.styles || {};
+  const styleAttr = (styles.bg || styles.accent)
+    ? ` style="background:${styles.bg || '#fff'};border-left:3px solid ${styles.accent || '#1565C0'}"`
+    : '';
+  let html = `<div class="explore-card" data-card-id="${card.id || ''}"${templateAttr}${styleAttr}>`;
 
   // 卡片标题
   if (card.title) {

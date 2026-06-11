@@ -319,6 +319,44 @@ async function start() {
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
+  // New table: echo_cave_quotes (回声洞语录)
+  db.run(`CREATE TABLE IF NOT EXISTS echo_cave_quotes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT NOT NULL,
+    author_id INTEGER,
+    source TEXT DEFAULT 'system',
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+  )`);
+
+  // Seed: 开发者自建回声洞语录（仅首次插入）
+  const echoSeeds = [
+    '世界上最遥远的距离，不是生与死，而是你在写作业，我在写另一个作业。',
+    '今天也是被DDL追着跑的一天呢。',
+    '学习不是为了考试，是为了在考试的时候不那么慌。',
+    '你以为的大学：自由、浪漫、探索。实际的大学：签到、作业、绩点。',
+    '不要害怕慢，你只是在蓄力。乌龟赢了兔子，你忘了？',
+    '今天不想学习？没关系，明天也不会想的。但还是得学。',
+    '人生就像一场考试，你永远不知道下一题会考什么。',
+    '如果学习让你感到痛苦，说明你正在走上坡路。',
+    '每个学霸背后，都有一个默默崩溃然后又默默振作的自己。',
+    '你有多努力，就有多幸运。这不是鸡汤，是概率。',
+    '休息是为了走更长的路，不是为了让路变短。',
+    '成功不是终点，失败也不是末日，重要的是继续前进的勇气。',
+    '代码跑通了就是对程序员最好的赞美。',
+    '生活不止眼前的bug，还有远方的bug。',
+    '你以为你在摸鱼，其实鱼也在摸你。',
+    '没有什么是一杯奶茶解决不了的，如果有，那就两杯。',
+    '做一个温柔的人，但不要做一个好欺负的人。',
+    '这个世界需要你去改变，哪怕只是一点点。',
+    '当你在凝视深渊的时候，深渊也在凝视你的ddl。',
+    '别看了，快去学习。这条回声来自一个小时前的你。'
+  ];
+  for (const seed of echoSeeds) {
+    db.run('INSERT OR IGNORE INTO echo_cave_quotes (content, source) VALUES (?, ?)', [seed, 'system']);
+  }
+
   db.run(`CREATE TABLE IF NOT EXISTS favorite_courses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -472,6 +510,13 @@ async function start() {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (creator_id) REFERENCES users(id)
   )`);
+
+  // Migration: add styles column (UGC card customization)
+  try {
+    db.run(`ALTER TABLE card_templates ADD COLUMN styles TEXT DEFAULT '{}'`);
+  } catch (e) {
+    // column already exists — ignore
+  }
 
   // 预置官方模板数据
   const templates = [
@@ -685,6 +730,7 @@ async function start() {
   const exploreCardsRouter = require('./routes/explore_cards')(db);
   const cardTemplatesRouter = require('./routes/card_templates')(db);
   const exploreCommentsRouter = require('./routes/explore_comments')(db);
+  const echoCaveRouter = require('./routes/echo_cave')(db);
 
   app.use('/api/courses', coursesRouter);
   app.use('/api/materials', materialsRouter);
@@ -701,6 +747,7 @@ async function start() {
   app.use('/api/explore/cards', exploreCardsRouter);
   app.use('/api/card-templates', cardTemplatesRouter);
   app.use('/api/explore/posts', exploreCommentsRouter); // comments nested under posts
+  app.use('/api/echo-cave', echoCaveRouter);
 
   // --- SPA Fallback ---
   app.get('*', (req, res) => {

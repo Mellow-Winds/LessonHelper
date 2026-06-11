@@ -432,7 +432,7 @@ function renderSettingsList() {
     { icon: 'edit',              title: '编辑资料',   desc: '修改昵称、专业、年级等个人信息',        page: 'profile-edit' },
     { icon: 'lock',              title: '隐私与安全', desc: '管理资料可见性、匹配权限',              page: 'profile-privacy' },
     { icon: 'storage',           title: '管理我的数据', desc: '查看数据概览、导出个人信息',          page: 'profile-data' },
-    { icon: 'bug_report',        title: '问题反馈',   desc: '遇到问题？向开发者提交反馈',            page: 'profile-feedback' },
+    { icon: 'edit_note',         title: '回声洞留言', desc: '留下一句话，或许会出现在侧栏的回声洞里',  page: 'profile-echocave' },
     { icon: 'preview',           title: '预览他人看我', desc: '切换到他人视角，检查隐私隐藏效果',     page: 'profile-preview' },
   ];
 
@@ -481,8 +481,8 @@ function bindProfileInteractions(container) {
       if (page === 'profile-preview') {
         previewMode = true;
         navigateTo('profile');
-      } else if (page === 'profile-feedback') {
-        showFeedbackModal();
+      } else if (page === 'profile-echocave') {
+        showEchoCaveModal();
       } else {
         navigateTo(page);
       }
@@ -1426,11 +1426,88 @@ function handleExportData() {
 }
 
 /* =============================================
-   子页面：问题反馈（模态框）
+   子页面：回声洞留言（模态框）
    ============================================= */
 
-// 反馈通过设置列表的 page='profile-feedback' 触发
+// 留言通过设置列表的 page='profile-echocave' 触发
 // 在 bindProfileInteractions 中处理
+
+export async function showEchoCaveModal() {
+  // 风控：检查今日是否已提交
+  const today = new Date().toISOString().slice(0, 10);
+  let alreadySubmitted = false;
+  try {
+    const saved = JSON.parse(localStorage.getItem('echo_last_submit'));
+    if (saved && saved.date === today) alreadySubmitted = true;
+  } catch { /* ignore */ }
+
+  const disabledAttr = alreadySubmitted ? 'disabled' : '';
+  const hintText = alreadySubmitted
+    ? '你今天已经留过言了，明天再来吧 ✨'
+    : '每天限留一条心声，它会随机出现在侧栏的回声洞里';
+
+  const html = `
+    <div class="profile-feedback-form">
+      <p class="echo-cave-daily-hint">${hintText}</p>
+      <div class="md-input-group">
+        <textarea class="md-input" id="echocave-content" placeholder=" " rows="4" maxlength="200" required style="resize:none" ${disabledAttr}>${disabledAttr ? '今天已留过言啦' : ''}</textarea>
+        <label class="md-label">你想对世界说什么？（5-200 字）</label>
+        <fieldset class="md-border" aria-hidden="true"><legend><span>你想对世界说什么？（5-200 字）</span></legend></fieldset>
+      </div>
+      <p class="echo-cave-char-count"><span id="echocave-char-count">0</span>/200</p>
+      <button class="btn btn-primary btn-full" id="echocave-submit-btn" ${disabledAttr}>
+        <span class="mi">edit_note</span>
+        投入回声洞
+      </button>
+    </div>
+  `;
+
+  openModal('回声洞留言', html);
+
+  // 如果今天已提交，直接返回不绑定事件
+  if (alreadySubmitted) return;
+
+  // 字符计数器
+  const textarea = document.getElementById('echocave-content');
+  const charCount = document.getElementById('echocave-char-count');
+  if (textarea && charCount) {
+    textarea.addEventListener('input', () => {
+      charCount.textContent = textarea.value.length;
+    });
+  }
+
+  // 提交
+  document.getElementById('echocave-submit-btn')?.addEventListener('click', async () => {
+    const content = textarea?.value?.trim();
+    if (!content) {
+      showToast('请填写内容');
+      return;
+    }
+    if (content.length < 5) {
+      showToast('内容至少 5 个字');
+      return;
+    }
+    if (content.length > 200) {
+      showToast('内容最多 200 个字');
+      return;
+    }
+
+    const btn = document.getElementById('echocave-submit-btn');
+    if (btn) btn.disabled = true;
+
+    const result = await apiPost('/api/echo-cave/quotes', { content });
+    if (result.error) {
+      showToast(result.error);
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    // 成功后记录日期
+    localStorage.setItem('echo_last_submit', JSON.stringify({ date: today }));
+    showToast('你的回声已投入洞中！');
+    closeModal();
+  });
+}
 
 /* =============================================
    头像上传
