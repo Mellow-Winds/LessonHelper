@@ -8146,6 +8146,149 @@ input, textarea, select, button,
 }
 
 /* ============================================
+   祈福木鱼
+   ============================================ */
+
+.wf-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 1;
+  justify-content: center;
+}
+
+.wf-icon {
+  width: 80px;
+  height: 80px;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-standard);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.wf-icon:active { transform: scale(0.9); }
+
+.wf-icon.wf-bumping {
+  animation: wf-bump 0.15s var(--ease-standard);
+}
+
+@keyframes wf-bump {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+.wf-float-text {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: wf-float-up 0.8s var(--ease-decelerate) forwards;
+}
+
+.wf-float-text--gold {
+  font-size: 20px;
+  color: #D4A020;
+  animation: wf-float-up 1.2s var(--ease-decelerate) forwards;
+}
+
+@keyframes wf-float-up {
+  0%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-36px); }
+}
+
+/* ============================================
+   今日摸鱼指南
+   ============================================ */
+
+.fg-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  flex: 1;
+  justify-content: center;
+}
+
+.fg-content {
+  font-size: var(--text-xl);
+  font-weight: 400;
+  color: var(--md-on-surface);
+  text-align: center;
+  line-height: 1.5;
+  max-height: 3em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.fg-content.fg-switching {
+  opacity: 0.4;
+  transform: scale(0.96);
+  transition: all 0.15s var(--ease-standard);
+}
+
+/* ============================================
+   吃了么（南大食堂盲盒）
+   ============================================ */
+
+.fp-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 1;
+  justify-content: center;
+}
+
+.fp-campus-tabs {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.fp-campus-tab {
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  background: transparent;
+  border: 1px solid var(--md-outline-variant);
+  cursor: pointer;
+  transition: all 0.2s var(--ease-standard);
+}
+
+.fp-campus-tab.active {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  border-color: var(--md-primary-container);
+}
+
+.fp-result {
+  font-size: var(--text-xl);
+  font-weight: 400;
+  color: var(--md-on-surface);
+  text-align: center;
+  line-height: 1.5;
+  min-height: 2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fp-result.fp-revealing {
+  animation: fp-reveal 0.35s var(--ease-spring);
+}
+
+@keyframes fp-reveal {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.94); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ============================================
    移动端响应式
    ============================================ */
 
@@ -8169,5 +8312,13 @@ input, textarea, select, button,
 
   .rand-area {
     max-width: 100%;
+  }
+
+  .fg-content {
+    font-size: var(--text-lg);
+  }
+
+  .fp-result {
+    font-size: var(--text-lg);
   }
 }
