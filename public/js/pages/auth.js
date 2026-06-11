@@ -365,8 +365,9 @@ export async function handleLogin(e) {
   _loginStudentId = studentId;
   _loginPassword = password;
 
-  // 本地测试：直接使用测试 token 调用登录 API，跳过 Turnstile 显示
-  onLoginTurnstileSuccess('test-token-' + Date.now());
+  // 显示 Turnstile 人机验证
+  document.getElementById('login-turnstile-wrapper').style.display = 'block';
+  loadLoginTurnstile();
 }
 
 // 加载 Turnstile（登录专用）
@@ -499,8 +500,9 @@ export async function handleForgotSendCode(e) {
   // 保存学号到状态
   authStudentId = studentId;
 
-  // 本地测试：跳过 Turnstile
-  onForgotTurnstileSuccess('test-token-' + Date.now());
+  // 显示 Turnstile 人机验证
+  document.getElementById('forgot-turnstile-wrapper').style.display = 'block';
+  loadForgotTurnstile();
   return;
 }
 
@@ -737,8 +739,9 @@ export async function handleSendCode() {
   authStudentId = studentId;
   authPassword = password;
 
-  // 本地测试：跳过 Turnstile
-  onTurnstileSuccess('test-token-' + Date.now());
+  // 显示 Turnstile 人机验证
+  document.getElementById('turnstile-wrapper').style.display = 'block';
+  loadTurnstile();
 }
 
 // Turnstile 验证成功后的回调
