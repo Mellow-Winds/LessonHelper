@@ -1,7 +1,8 @@
 import { apiGet, apiPost, apiDelete, isLoggedIn } from '../core/api.js';
 import { registerPage, navigateTo, animStagger, bindRipples } from '../core/router.js';
 import { showToast, escHtml, formatTime, renderLoginPrompt, bindLoginPrompt } from '../components/ui.js';
-import { renderAuth, navigateToCourseResult } from './auth.js';
+import { renderAuth } from './auth.js';
+import { navigateToCourseResult } from './search.js';
 
 export async function getFavoriteCourseIds() {
   if (!isLoggedIn()) return new Set();
