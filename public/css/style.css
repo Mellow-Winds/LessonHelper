@@ -1,6 +1,6 @@
 /* ========================================
    EduSpace - Design System
-   Material Design 3 · Fluid Rounded · Motion
+   Material Design 3 路 Fluid Rounded 路 Motion
    ======================================== */
 
 :root {
@@ -214,16 +214,17 @@ select::-ms-expand {
 }
 
 .brand-logo {
-  width: 50px;
-  height: 50px;
+  width: 42px;
+  height: 30px;
   flex: 0 0 auto;
   display: block;
+  object-fit: contain;
 }
 
 @media (min-width: 768px) {
   .brand-logo {
-    width: 46px;
-    height: 46px;
+    width: 40px;
+    height: 28px;
   }
 }
 
@@ -432,7 +433,7 @@ select::-ms-expand {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ---- MD3 Outlined Text Field — <fieldset> + <legend> Native Notch ---- */
+/* ---- MD3 Outlined Text Field 鈥?<fieldset> + <legend> Native Notch ---- */
 .md-input-group {
   position: relative;
   width: 100%;
@@ -440,7 +441,7 @@ select::-ms-expand {
   overflow: visible !important;
 }
 
-/* The real input — transparent, on top */
+/* The real input 鈥?transparent, on top */
 .md-input-group .md-input {
   width: 100%;
   height: 56px;
@@ -464,7 +465,7 @@ select::-ms-expand {
   -webkit-text-fill-color: var(--md-on-surface);
 }
 
-/* fieldset — the actual visible border */
+/* fieldset 鈥?the actual visible border */
 .md-input-group .md-border {
   position: absolute;
   top: -5px;
@@ -481,7 +482,7 @@ select::-ms-expand {
   transition: border-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* legend — invisible text, only used to physically push the border gap open */
+/* legend 鈥?invisible text, only used to physically push the border gap open */
 .md-input-group .md-border legend {
   display: block;
   width: auto;
@@ -497,7 +498,7 @@ select::-ms-expand {
     padding 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* The span inside legend is PURELY structural — never visible */
+/* The span inside legend is PURELY structural 鈥?never visible */
 .md-input-group .md-border legend span {
   opacity: 0 !important;
   visibility: hidden !important;
@@ -536,7 +537,7 @@ select::-ms-expand {
   border-width: 2px;
 }
 
-/* Legend notch opens — browser natively cuts the border gap */
+/* Legend notch opens 鈥?browser natively cuts the border gap */
 .md-input-group .md-input:focus ~ .md-border legend,
 .md-input-group .md-input:not(:placeholder-shown) ~ .md-border legend,
 .md-input-group .md-input:-webkit-autofill ~ .md-border legend,
@@ -973,7 +974,7 @@ select::-ms-expand {
   flex-direction: column;
 }
 
-/* 桌面端 -> 居中模态 */
+/* 妗岄潰绔?-> 灞呬腑妯℃€?*/
 @media (min-width: 768px) {
   .cropper-fullscreen {
     background: rgba(0, 0, 0, 0.6);
@@ -1059,7 +1060,7 @@ select::-ms-expand {
   max-width: none;
 }
 
-/* 圆形裁剪框 — 覆盖 Cropper.js 默认方形 + 主色调 #4A90D9 */
+/* 鍦嗗舰瑁佸壀妗?鈥?瑕嗙洊 Cropper.js 榛樿鏂瑰舰 + 涓昏壊璋?#4A90D9 */
 .cropper-view-box {
   border-radius: 50%;
   outline: 2px solid #4A90D9 !important;
@@ -1105,7 +1106,7 @@ select::-ms-expand {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* 上传旋转指示器 */
+/* 涓婁紶鏃嬭浆鎸囩ず鍣?*/
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -1799,7 +1800,7 @@ select::-ms-expand {
   --md-field-bg: var(--md-surface);
 }
 
-/* The actual editable area — generous breathing padding */
+/* The actual editable area 鈥?generous breathing padding */
 .rte-editor {
   width: 100%;
   min-height: 240px;
@@ -1825,7 +1826,7 @@ select::-ms-expand {
   display: block;
 }
 
-/* fieldset — visible border, mirrors .md-border */
+/* fieldset 鈥?visible border, mirrors .md-border */
 .rte-border {
   position: absolute;
   top: -5px;
@@ -1845,7 +1846,7 @@ select::-ms-expand {
     box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* legend — structural notch gap */
+/* legend 鈥?structural notch gap */
 .rte-border legend {
   display: block;
   width: auto;
@@ -1938,7 +1939,7 @@ select::-ms-expand {
 }
 
 /* ==========================================================================
-   Remix Icon 对齐规则：统一与 Material Icon 的视觉基准
+   Remix Icon 瀵归綈瑙勫垯锛氱粺涓€涓?Material Icon 鐨勮瑙夊熀鍑?
    ========================================================================== */
 
 .remix-align {
@@ -1952,7 +1953,7 @@ select::-ms-expand {
 }
 
 /* ==========================================================================
-   Profile Page — 个人空间仪表盘
+   Profile Page 鈥?涓汉绌洪棿浠〃鐩?
    ========================================================================== */
 
 /* ---- Layout ---- */
@@ -2032,7 +2033,7 @@ select::-ms-expand {
   color: var(--md-primary);
 }
 
-/* 可点击头像（本人） — 88×88px 触摸区域 */
+/* 鍙偣鍑诲ご鍍忥紙鏈汉锛?鈥?88脳88px 瑙︽懜鍖哄煙 */
 .profile-avatar-clickable {
   cursor: pointer;
   position: relative;
@@ -2051,7 +2052,7 @@ select::-ms-expand {
   transition: transform 0.1s var(--ease-standard);
 }
 
-/* 旧 class 兼容 */
+/* 鏃?class 鍏煎 */
 .profile-avatar-upload {
   cursor: pointer;
   position: relative;
@@ -2718,7 +2719,7 @@ input {
 }
 
 /* ==========================================================================
-   Explore — 探索板块 MD3 扁平选项卡
+   Explore 鈥?鎺㈢储鏉垮潡 MD3 鎵佸钩閫夐」鍗?
    ========================================================================== */
 
 .md-tabs {
@@ -2775,7 +2776,7 @@ input {
 }
 
 /* ==========================================================================
-   Explore Header Actions — 右上角操作栏
+   Explore Header Actions 鈥?鍙充笂瑙掓搷浣滄爮
    ========================================================================== */
 
 .explore-header-actions {
@@ -2785,7 +2786,7 @@ input {
 }
 
 /* ==========================================================================
-   Post Form — 发布面板
+   Post Form 鈥?鍙戝竷闈㈡澘
    ========================================================================== */
 
 .post-form-container {
@@ -2798,7 +2799,7 @@ input {
   gap: var(--space-5);
 }
 
-/* 确保发布面板内输入字体原生继承 */
+/* 纭繚鍙戝竷闈㈡澘鍐呰緭鍏ュ瓧浣撳師鐢熺户鎵?*/
 .post-form .md-input-group .md-input,
 .post-form input,
 .post-form textarea,
@@ -2808,7 +2809,7 @@ input {
 }
 
 /* ==========================================================================
-   Post Stepper — 需求人数 ±（复用 post-chips 容器风格）
+   Post Stepper 鈥?闇€姹備汉鏁?卤锛堝鐢?post-chips 瀹瑰櫒椋庢牸锛?
    ========================================================================== */
 
 .post-stepper-row {
@@ -2859,7 +2860,7 @@ input {
 }
 
 /* ==========================================================================
-   Post Chips — 标签胶囊输入系统
+   Post Chips 鈥?鏍囩鑳跺泭杈撳叆绯荤粺
    ========================================================================== */
 
 .post-field-group {
@@ -2968,7 +2969,7 @@ input {
 }
 
 /* ==========================================================================
-   Post Switch & Radio — 开关与单选
+   Post Switch & Radio 鈥?寮€鍏充笌鍗曢€?
    ========================================================================== */
 
 .post-switch-row {
@@ -3017,7 +3018,7 @@ input {
 }
 
 /* ==========================================================================
-   Sidebar Avatar — 侧边栏头像
+   Sidebar Avatar 鈥?渚ц竟鏍忓ご鍍?
    ========================================================================== */
 
 .sidebar-avatar-icon {
@@ -3037,7 +3038,7 @@ input {
 }
 
 /* ==========================================================================
-   My Posts — 我的创作
+   My Posts 鈥?鎴戠殑鍒涗綔
    ========================================================================== */
 
 .my-post-content {
@@ -3074,7 +3075,7 @@ input {
 }
 
 /* ==========================================================================
-   Sidebar Nav Sections — 分区导航
+   Sidebar Nav Sections 鈥?鍒嗗尯瀵艰埅
    ========================================================================== */
 
 .nav-section {
@@ -3100,7 +3101,7 @@ input {
 }
 
 /* ==========================================================================
-   Notifications Page — 通知中心
+   Notifications Page 鈥?閫氱煡涓績
    ========================================================================== */
 
 .notif-page-item {
@@ -3142,7 +3143,7 @@ input {
 }
 
 /* ==========================================================================
-   Following Feed — 关注动态
+   Following Feed 鈥?鍏虫敞鍔ㄦ€?
    ========================================================================== */
 
 .following-feed-item {
@@ -3258,10 +3259,10 @@ input {
 }
 
 /* ==========================================================================
-   双轨制课程系统 — 我的课程 + 课程广场
+   鍙岃建鍒惰绋嬬郴缁?鈥?鎴戠殑璇剧▼ + 璇剧▼骞垮満
    ========================================================================== */
 
-/* ---- MD3 药丸切换器（Pill Tabs）---- */
+/* ---- MD3 鑽父鍒囨崲鍣紙Pill Tabs锛?--- */
 
 .md-pills {
   display: flex;
@@ -3310,7 +3311,7 @@ input {
   box-shadow: var(--shadow-1);
 }
 
-/* ---- 课程广场分类标签 ---- */
+/* ---- 璇剧▼骞垮満鍒嗙被鏍囩 ---- */
 
 .plaza-category-chip {
   display: inline-block;
@@ -3322,7 +3323,7 @@ input {
   color: var(--md-on-primary-container);
 }
 
-/* ---- 课程广场出处追溯角标 ---- */
+/* ---- 璇剧▼骞垮満鍑哄杩芥函瑙掓爣 ---- */
 
 .plaza-origin-tag {
   display: inline-block;
@@ -3334,13 +3335,13 @@ input {
   color: var(--md-on-surface-variant);
 }
 
-/* ---- 课程广场帖子卡片 ---- */
+/* ---- 璇剧▼骞垮満甯栧瓙鍗＄墖 ---- */
 
 .plaza-post-card {
   transition: box-shadow 0.2s;
 }
 
-/* ---- 课程广场分类药丸栏 ---- */
+/* ---- 璇剧▼骞垮満鍒嗙被鑽父鏍?---- */
 
 .plaza-pill-bar {
   display: flex;
@@ -3378,13 +3379,13 @@ input {
   font-weight: 600;
 }
 
-/* ---- 发布表单：附件区域 ---- */
+/* ---- 鍙戝竷琛ㄥ崟锛氶檮浠跺尯鍩?---- */
 
 .publish-attach-section {
   margin-bottom: var(--space-4);
 }
 
-/* ---- 禁用态按钮 ---- */
+/* ---- 绂佺敤鎬佹寜閽?---- */
 
 .btn-disabled {
   background-color: var(--md-surface-container-high);
@@ -3399,9 +3400,9 @@ input {
   color: var(--md-on-surface-variant);
 }
 
-/* ---- 原生字体继承（绝杀视觉降级）---- */
+/* ---- 鍘熺敓瀛椾綋缁ф壙锛堢粷鏉€瑙嗚闄嶇骇锛?--- */
 
-/* 所有输入组件在聚焦或激活状态下强行锁死字体继承 */
+/* 鎵€鏈夎緭鍏ョ粍浠跺湪鑱氱劍鎴栨縺娲荤姸鎬佷笅寮鸿閿佹瀛椾綋缁ф壙 */
 input:focus,
 textarea:focus,
 select:focus,
@@ -3413,7 +3414,7 @@ select:focus,
   font-family: inherit !important;
 }
 
-/* 全局覆盖：确保所有表单元素继承 body 字体 */
+/* 鍏ㄥ眬瑕嗙洊锛氱‘淇濇墍鏈夎〃鍗曞厓绱犵户鎵?body 瀛椾綋 */
 input, textarea, select, button,
 .md-input, .md-select-trigger, .md-select-value,
 .post-chip-input,
@@ -3843,7 +3844,7 @@ input, textarea, select, button,
 
 /* ========================================
    Forum Flat Stream Layout
-   Avatar-Content Parallelism · Divider Architecture
+   Avatar-Content Parallelism 路 Divider Architecture
    ======================================== */
 
 /* ---- Stream Container ---- */
@@ -4158,7 +4159,7 @@ input, textarea, select, button,
   color: var(--md-primary);
 }
 
-/* ---- Reply-to indicator: "用户A 回复 用户B：" ---- */
+/* ---- Reply-to indicator: "鐢ㄦ埛A 鍥炲 鐢ㄦ埛B锛? ---- */
 .forum-reply-to {
   font-size: 12px;
   color: var(--md-on-surface-variant);
@@ -4496,7 +4497,7 @@ input, textarea, select, button,
 }
 
 /* ============================================================
-   响应式适配 — 底部 Tab 栏（默认隐藏，仅手机端显示）
+   鍝嶅簲寮忛€傞厤 鈥?搴曢儴 Tab 鏍忥紙榛樿闅愯棌锛屼粎鎵嬫満绔樉绀猴級
    ============================================================ */
 
 .bottom-tab-bar {
@@ -4504,11 +4505,11 @@ input, textarea, select, button,
 }
 
 /* ============================================================
-   平板端适配（≤1199px）
+   骞虫澘绔€傞厤锛堚墹1199px锛?
    ============================================================ */
 
 @media (max-width: 1199px) {
-  /* ---- 侧边栏压缩 ---- */
+  /* ---- 渚ц竟鏍忓帇缂?---- */
   .sidebar {
     width: 200px;
     padding: var(--space-3);
@@ -4524,18 +4525,18 @@ input, textarea, select, button,
     font-size: 13px;
   }
 
-  /* ---- 主内容区 ---- */
+  /* ---- 涓诲唴瀹瑰尯 ---- */
   .main-content {
     padding: var(--space-6);
   }
 
-  /* ---- 模态框 ---- */
+  /* ---- 妯℃€佹 ---- */
   .modal {
     width: 80%;
     max-width: 600px;
   }
 
-  /* ---- Pill Tabs 横向滚动 ---- */
+  /* ---- Pill Tabs 妯悜婊氬姩 ---- */
   .md-pills {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -4543,7 +4544,7 @@ input, textarea, select, button,
     flex-shrink: 0;
   }
 
-  /* ---- 页面头部换行 ---- */
+  /* ---- 椤甸潰澶撮儴鎹㈣ ---- */
   .page-header {
     flex-wrap: wrap;
     gap: var(--space-3);
@@ -4555,12 +4556,12 @@ input, textarea, select, button,
 }
 
 /* ============================================================
-   手机端适配（≤767px）
+   鎵嬫満绔€傞厤锛堚墹767px锛?
    ============================================================ */
 
 @media (max-width: 767px) {
 
-  /* ---- 基础布局 ---- */
+  /* ---- 鍩虹甯冨眬 ---- */
   body {
     flex-direction: column;
     overflow-x: hidden;
@@ -4571,12 +4572,12 @@ input, textarea, select, button,
     -webkit-overflow-scrolling: touch;
   }
 
-  /* ---- 侧边栏隐藏 ---- */
+  /* ---- 渚ц竟鏍忛殣钘?---- */
   .sidebar {
     display: none;
   }
 
-  /* ---- 底部 Tab 栏显示 ---- */
+  /* ---- 搴曢儴 Tab 鏍忔樉绀?---- */
   .bottom-tab-bar {
     display: flex;
     position: fixed;
@@ -4641,7 +4642,7 @@ input, textarea, select, button,
     border-radius: 8px;
   }
 
-  /* ---- 主内容区 ---- */
+  /* ---- 涓诲唴瀹瑰尯 ---- */
   .main-content {
     padding: var(--space-4);
     padding-bottom: 72px;
@@ -4650,7 +4651,7 @@ input, textarea, select, button,
     max-width: 100vw;
   }
 
-  /* ---- 通用排版 ---- */
+  /* ---- 閫氱敤鎺掔増 ---- */
   .page-title {
     font-size: var(--text-lg);
   }
@@ -4675,7 +4676,7 @@ input, textarea, select, button,
     justify-content: center;
   }
 
-  /* ---- 卡片 ---- */
+  /* ---- 鍗＄墖 ---- */
   .card {
     padding: var(--space-4);
     border-radius: var(--radius-md);
@@ -4685,7 +4686,7 @@ input, textarea, select, button,
     font-size: var(--text-base);
   }
 
-  /* ---- 按钮（搜索栏内的按钮除外） ---- */
+  /* ---- 鎸夐挳锛堟悳绱㈡爮鍐呯殑鎸夐挳闄ゅ锛?---- */
   .btn-primary {
     justify-content: center;
     height: 48px;
@@ -4702,7 +4703,7 @@ input, textarea, select, button,
     height: 44px;
   }
 
-  /* ---- 输入框（防 iOS 缩放） ---- */
+  /* ---- 杈撳叆妗嗭紙闃?iOS 缂╂斁锛?---- */
   .md-input,
   .md-input-group textarea.md-input,
   input[type="text"],
@@ -4728,7 +4729,7 @@ input, textarea, select, button,
     min-height: 36px;
   }
 
-  /* ---- Pill Tabs 横向滚动 ---- */
+  /* ---- Pill Tabs 妯悜婊氬姩 ---- */
   .md-pills {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -4751,7 +4752,7 @@ input, textarea, select, button,
     min-height: 44px;
   }
 
-  /* ---- Tab 标签栏 ---- */
+  /* ---- Tab 鏍囩鏍?---- */
   .md-tabs {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -4769,7 +4770,7 @@ input, textarea, select, button,
     min-height: 44px;
   }
 
-  /* ---- 模态框 → 居中弹窗（覆盖底部抽屉） ---- */
+  /* ---- 妯℃€佹 鈫?灞呬腑寮圭獥锛堣鐩栧簳閮ㄦ娊灞夛級 ---- */
   .modal-overlay {
     align-items: center;
     justify-content: center;
@@ -4801,7 +4802,7 @@ input, textarea, select, button,
     padding: 0 var(--space-4) var(--space-4);
   }
 
-  /* ---- 下拉选择器 → 原位向下展开（覆盖底部全屏） ---- */
+  /* ---- 涓嬫媺閫夋嫨鍣?鈫?鍘熶綅鍚戜笅灞曞紑锛堣鐩栧簳閮ㄥ叏灞忥級 ---- */
   .md-select-container.open .md-select-menu {
     position: absolute;
     top: calc(100% + 4px);
@@ -4827,7 +4828,7 @@ input, textarea, select, button,
     padding: 14px var(--space-4);
   }
 
-  /* ---- 并列下拉选择器 → 标准向下展开式 ---- */
+  /* ---- 骞跺垪涓嬫媺閫夋嫨鍣?鈫?鏍囧噯鍚戜笅灞曞紑寮?---- */
   .inline-selects .md-select-container.open .md-select-menu {
     position: absolute;
     top: calc(100% + 4px);
@@ -4866,7 +4867,7 @@ input, textarea, select, button,
     background: var(--md-primary-container);
   }
 
-  /* ---- 课表表格 → 垂直卡片布局 ---- */
+  /* ---- 璇捐〃琛ㄦ牸 鈫?鍨傜洿鍗＄墖甯冨眬 ---- */
   .schedule-table,
   .schedule-table thead,
   .schedule-table tbody,
@@ -4904,7 +4905,7 @@ input, textarea, select, button,
     font-size: var(--text-sm);
   }
 
-  /* ---- Toast 底部居中 ---- */
+  /* ---- Toast 搴曢儴灞呬腑 ---- */
   .toast {
     bottom: 72px;
     left: 50%;
@@ -4916,7 +4917,7 @@ input, textarea, select, button,
     border-radius: var(--radius-md);
   }
 
-  /* ---- 帖子图片网格 ---- */
+  /* ---- 甯栧瓙鍥剧墖缃戞牸 ---- */
   .post-image-grid,
   .forum-image-grid {
     max-width: 100%;
@@ -4927,7 +4928,7 @@ input, textarea, select, button,
     grid-template-columns: 1fr 1fr;
   }
 
-  /* ---- 评论缩进减小 ---- */
+  /* ---- 璇勮缂╄繘鍑忓皬 ---- */
   .comment-body,
   .forum-reply-body {
     padding-left: var(--space-4);
@@ -4938,14 +4939,14 @@ input, textarea, select, button,
     padding-left: var(--space-3);
   }
 
-  /* ---- 发布页 ---- */
+  /* ---- 鍙戝竷椤?---- */
   .post-form-container,
   .create-post-page {
     max-width: 100%;
     padding: 0;
   }
 
-  /* ---- 个人中心（增强已有规则） ---- */
+  /* ---- 涓汉涓績锛堝寮哄凡鏈夎鍒欙級 ---- */
   .profile-page {
     padding: var(--space-4) var(--space-2);
   }
@@ -4982,7 +4983,7 @@ input, textarea, select, button,
     grid-template-columns: repeat(3, 1fr);
   }
 
-  /* ---- 通知徽章 ---- */
+  /* ---- 閫氱煡寰界珷 ---- */
   .notif-badge {
     min-width: 16px;
     height: 16px;
@@ -4990,13 +4991,13 @@ input, textarea, select, button,
     font-size: 10px;
   }
 
-  /* ---- 搜索页 ---- */
+  /* ---- 鎼滅储椤?---- */
   #search-page-input,
   #plaza-search {
     width: 100%;
   }
 
-  /* ---- 表单按钮组 ---- */
+  /* ---- 琛ㄥ崟鎸夐挳缁?---- */
   .page-header {
     flex-direction: column;
     align-items: stretch;
@@ -5008,7 +5009,7 @@ input, textarea, select, button,
     padding-right: 0;
   }
 
-  /* 我的课程页按钮容器：垂直单列，撑满整行 */
+  /* 鎴戠殑璇剧▼椤垫寜閽鍣細鍨傜洿鍗曞垪锛屾拺婊℃暣琛?*/
   .page-header > div:last-child {
     display: flex;
     flex-direction: column;
@@ -5018,7 +5019,7 @@ input, textarea, select, button,
     padding: 0;
   }
 
-  /* 按钮基础：全宽，52px 高，16px 圆角，内容居中不截断 */
+  /* 鎸夐挳鍩虹锛氬叏瀹斤紝52px 楂橈紝16px 鍦嗚锛屽唴瀹瑰眳涓笉鎴柇 */
   .page-header > div:last-child .btn {
     width: 100%;
     height: 52px;
@@ -5036,33 +5037,33 @@ input, textarea, select, button,
     line-height: 1;
   }
 
-  /* Secondary 按钮：白底蓝字蓝边框 */
+  /* Secondary 鎸夐挳锛氱櫧搴曡摑瀛楄摑杈规 */
   .page-header > div:last-child .btn.btn-secondary {
     background: #ffffff;
     color: var(--md-primary);
     border: 1.5px solid var(--md-primary);
   }
 
-  /* Primary 按钮：蓝底白字 */
+  /* Primary 鎸夐挳锛氳摑搴曠櫧瀛?*/
   .page-header > div:last-child .btn.btn-primary {
     background: var(--md-primary);
     color: #ffffff;
     border: 1.5px solid var(--md-primary);
   }
 
-  /* 图标：固定尺寸，不压缩 */
+  /* 鍥炬爣锛氬浐瀹氬昂瀵革紝涓嶅帇缂?*/
   .page-header > div:last-child .btn .mi {
     font-size: 20px;
     flex-shrink: 0;
     line-height: 1;
   }
 
-  /* Primary 按钮图标白色 */
+  /* Primary 鎸夐挳鍥炬爣鐧借壊 */
   .page-header > div:last-child .btn.btn-primary .mi {
     color: #ffffff;
   }
 
-  /* ---- 资料筛选栏 ---- */
+  /* ---- 璧勬枡绛涢€夋爮 ---- */
   .material-filter-bar {
     flex-wrap: wrap;
     gap: 8px;
@@ -5079,7 +5080,7 @@ input, textarea, select, button,
     flex: 1;
   }
 
-  /* ---- 资料卡片操作按钮 ---- */
+  /* ---- 璧勬枡鍗＄墖鎿嶄綔鎸夐挳 ---- */
   .material-card .btn,
   .material-card-actions .btn {
     min-width: 44px;
@@ -5087,7 +5088,7 @@ input, textarea, select, button,
     padding: 8px 12px;
   }
 
-  /* ---- 预览横幅适配 ---- */
+  /* ---- 棰勮妯箙閫傞厤 ---- */
   .profile-preview-banner {
     bottom: 72px;
     padding: 12px var(--space-4);
@@ -5102,33 +5103,33 @@ input, textarea, select, button,
     font-size: 12px;
   }
 
-  /* ---- 邀约/广场卡片 ---- */
+  /* ---- 閭€绾?骞垮満鍗＄墖 ---- */
   .square-post-card,
   .invite-card,
   .my-post-card {
     padding: var(--space-4);
   }
 
-  /* ---- 通知列表 ---- */
+  /* ---- 閫氱煡鍒楄〃 ---- */
   .notification-card {
     padding: var(--space-3) var(--space-4);
   }
 
-  /* ---- 搜索栏 flex 行（输入框 + 按钮） ---- */
+  /* ---- 鎼滅储鏍?flex 琛岋紙杈撳叆妗?+ 鎸夐挳锛?---- */
   .search-bar-row {
     flex-wrap: nowrap;
     align-items: center;
     gap: 12px !important;
   }
 
-  /* 输入框容器：flex:1 占满剩余空间 */
+  /* 杈撳叆妗嗗鍣細flex:1 鍗犳弧鍓╀綑绌洪棿 */
   .search-bar-row > [style*="flex:1"] {
     flex: 1 1 0%;
     min-width: 0;
     overflow: hidden;
   }
 
-  /* 搜索按钮 */
+  /* 鎼滅储鎸夐挳 */
   .search-bar-row > .btn,
   .search-bar-row > button {
     flex-shrink: 0;
@@ -5136,7 +5137,7 @@ input, textarea, select, button,
     justify-content: center;
   }
 
-  /* ---- 确保所有可点击元素 ≥44px ---- */
+  /* ---- 纭繚鎵€鏈夊彲鐐瑰嚮鍏冪礌 鈮?4px ---- */
   .btn,
   .nav-item,
   .md-pill-btn,
@@ -5146,16 +5147,16 @@ input, textarea, select, button,
     min-height: 44px;
   }
 
-  /* ---- 安全区域适配 ---- */
+  /* ---- 瀹夊叏鍖哄煙閫傞厤 ---- */
   .bottom-tab-bar {
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   /* ============================================================
-     移动端显示优化（2026-06-04）
+     绉诲姩绔樉绀轰紭鍖栵紙2026-06-04锛?
      ============================================================ */
 
-  /* ---- 问题2：课表筛选行内选择框填满 ---- */
+  /* ---- 闂2锛氳琛ㄧ瓫閫夎鍐呴€夋嫨妗嗗～婊?---- */
   .form-row.inline-selects {
     width: 100% !important;
   }
@@ -5164,7 +5165,7 @@ input, textarea, select, button,
     min-width: 0;
   }
 
-  /* ---- 问题3/4：资料筛选栏按钮顺序 + 搜索按钮大小 ---- */
+  /* ---- 闂3/4锛氳祫鏂欑瓫閫夋爮鎸夐挳椤哄簭 + 鎼滅储鎸夐挳澶у皬 ---- */
   .material-filter-bar > .btn:first-of-type {
     flex: 0 0 48px;
     width: 48px;
@@ -5180,7 +5181,7 @@ input, textarea, select, button,
     order: 5;
   }
 
-  /* ---- 问题5：按钮组填满行 ---- */
+  /* ---- 闂5锛氭寜閽粍濉弧琛?---- */
   .inline-btn-group {
     display: flex;
     gap: 8px;
@@ -5191,23 +5192,23 @@ input, textarea, select, button,
     min-width: 0;
   }
 
-  /* ---- 手机端：隐藏特定按钮文字，只显示图标 ---- */
+  /* ---- 鎵嬫満绔細闅愯棌鐗瑰畾鎸夐挳鏂囧瓧锛屽彧鏄剧ず鍥炬爣 ---- */
   .btn-text {
     display: none;
   }
 
-  /* 登录/注册界面的按钮文字不隐藏 */
+  /* 鐧诲綍/娉ㄥ唽鐣岄潰鐨勬寜閽枃瀛椾笉闅愯棌 */
   .auth-buttons .btn-text {
     display: inline;
   }
 
-  /* ---- 课程卡片：右侧区域缩小间距 ---- */
+  /* ---- 璇剧▼鍗＄墖锛氬彸渚у尯鍩熺缉灏忛棿璺?---- */
   .course-card-right {
     margin-left: 8px;
     gap: 4px;
   }
 
-  /* ---- 问题6：收藏按钮紧凑 + 课程信息行不换行 ---- */
+  /* ---- 闂6锛氭敹钘忔寜閽揣鍑?+ 璇剧▼淇℃伅琛屼笉鎹㈣ ---- */
   .page-header .favorite-btn {
     width: auto !important;
     height: 32px !important;
@@ -5226,7 +5227,7 @@ input, textarea, select, button,
     min-width: 0;
   }
 
-  /* ---- 问题8：搜索栏输入框和按钮一致性 ---- */
+  /* ---- 闂8锛氭悳绱㈡爮杈撳叆妗嗗拰鎸夐挳涓€鑷存€?---- */
   .search-bar-row .md-input-group {
     margin-bottom: 0;
   }
@@ -5234,7 +5235,7 @@ input, textarea, select, button,
     flex-shrink: 0;
   }
 
-  /* ---- 问题9：并列选择框换行支持 ---- */
+  /* ---- 闂9锛氬苟鍒楅€夋嫨妗嗘崲琛屾敮鎸?---- */
   .inline-selects {
     flex-wrap: wrap;
   }
@@ -5245,7 +5246,7 @@ input, textarea, select, button,
 }
 
 /* ============================================================
-   登录/注册页面样式（仿 Google 极简扁平风）
+   鐧诲綍/娉ㄥ唽椤甸潰鏍峰紡锛堜豢 Google 鏋佺畝鎵佸钩椋庯級
    ============================================================ */
 
 .auth-wrapper {
@@ -5283,7 +5284,7 @@ input, textarea, select, button,
   box-shadow: var(--shadow-2);
 }
 
-/* 学号输入框行（输入框 + 后缀） */
+/* 瀛﹀彿杈撳叆妗嗚锛堣緭鍏ユ + 鍚庣紑锛?*/
 .auth-input-row {
   margin-bottom: 16px;
 }
@@ -5307,7 +5308,7 @@ input, textarea, select, button,
   white-space: nowrap;
 }
 
-/* 密码输入框（带眼睛按钮） */
+/* 瀵嗙爜杈撳叆妗嗭紙甯︾溂鐫涙寜閽級 */
 .md-input-group {
   position: relative;
   margin-bottom: 16px;
@@ -5336,7 +5337,7 @@ input, textarea, select, button,
   pointer-events: auto;
 }
 
-/* 隐藏浏览器原生密码显示按钮 */
+/* 闅愯棌娴忚鍣ㄥ師鐢熷瘑鐮佹樉绀烘寜閽?*/
 .auth-password-input::-ms-reveal,
 .auth-password-input::-webkit-credentials-auto-fill-button {
   display: none !important;
@@ -5346,14 +5347,14 @@ input, textarea, select, button,
   background-color: var(--md-surface-container);
 }
 
-/* 验证码输入框 */
+/* 楠岃瘉鐮佽緭鍏ユ */
 .auth-code-input {
   text-align: center;
   font-size: var(--text-xl);
   letter-spacing: 8px;
 }
 
-/* 验证码行（输入框 + 获取验证码按钮） */
+/* 楠岃瘉鐮佽锛堣緭鍏ユ + 鑾峰彇楠岃瘉鐮佹寜閽級 */
 .auth-code-row {
   display: flex;
   gap: 12px;
@@ -5371,7 +5372,7 @@ input, textarea, select, button,
   flex-shrink: 0;
 }
 
-/* Turnstile 包装器 */
+/* Turnstile 鍖呰鍣?*/
 .auth-turnstile-wrapper {
   margin-bottom: 16px;
   padding: 12px;
@@ -5379,7 +5380,7 @@ input, textarea, select, button,
   border-radius: var(--radius-sm);
 }
 
-/* 错误提示 */
+/* 閿欒鎻愮ず */
 .form-error {
   color: var(--md-error);
   font-size: var(--text-sm);
@@ -5387,7 +5388,7 @@ input, textarea, select, button,
   padding: 0 4px;
 }
 
-/* 按钮区域 */
+/* 鎸夐挳鍖哄煙 */
 .auth-buttons {
   display: flex;
   justify-content: flex-end;
@@ -5427,7 +5428,7 @@ input, textarea, select, button,
   justify-content: center;
 }
 
-/* 隐私声明 */
+/* 闅愮澹版槑 */
 .auth-privacy-text {
   margin-top: 24px;
   font-size: var(--text-xs);
@@ -5446,7 +5447,7 @@ input, textarea, select, button,
   opacity: 0.8;
 }
 
-/* 验证码页面信息 */
+/* 楠岃瘉鐮侀〉闈俊鎭?*/
 .auth-verify-info {
   text-align: center;
   color: var(--md-on-surface-variant);
@@ -5457,14 +5458,14 @@ input, textarea, select, button,
   border-radius: var(--radius-sm);
 }
 
-/* Turnstile 容器 */
+/* Turnstile 瀹瑰櫒 */
 .auth-turnstile-container {
   display: flex;
   justify-content: center;
   margin-top: 16px;
 }
 
-/* 错误提示（登录/注册页面专用） */
+/* 閿欒鎻愮ず锛堢櫥褰?娉ㄥ唽椤甸潰涓撶敤锛?*/
 #login-error,
 #register-error,
 #verify-error {
@@ -5476,7 +5477,7 @@ input, textarea, select, button,
   margin-bottom: 16px;
 }
 
-/* 隐私协议弹窗 */
+/* 闅愮鍗忚寮圭獥 */
 .auth-privacy-modal {
   max-width: 600px;
   max-height: 80vh;
@@ -5519,7 +5520,7 @@ input, textarea, select, button,
   flex: 1;
 }
 
-/* Markdown 渲染样式 */
+/* Markdown 娓叉煋鏍峰紡 */
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3 {
@@ -5576,7 +5577,7 @@ input, textarea, select, button,
   max-width: 480px;
 }
 
-/* 移动端适配 */
+/* 绉诲姩绔€傞厤 */
 @media (max-width: 767px) {
   .auth-wrapper {
     padding: 32px 16px;
@@ -5598,10 +5599,10 @@ input, textarea, select, button,
 }
 
 /* ========================================
-   探索模块：组件化卡片系统
+   鎺㈢储妯″潡锛氱粍浠跺寲鍗＄墖绯荤粺
    ======================================== */
 
-/* ---- 搜索栏 ---- */
+/* ---- 鎼滅储鏍?---- */
 .explore-search-bar {
   margin-bottom: var(--space-4);
 }
@@ -5626,7 +5627,7 @@ input, textarea, select, button,
   border-color: var(--md-primary);
 }
 
-/* ---- 探索页三栏瀑布流（桌面端） ---- */
+/* ---- 鎺㈢储椤典笁鏍忕€戝竷娴侊紙妗岄潰绔級 ---- */
 @media (min-width: 768px) {
   .explore-posts-grid {
     columns: 3;
@@ -5639,7 +5640,7 @@ input, textarea, select, button,
   }
 }
 
-/* ---- 帖子卡片（列表视图） ---- */
+/* ---- 甯栧瓙鍗＄墖锛堝垪琛ㄨ鍥撅級 ---- */
 .explore-post-card {
   padding: var(--space-6);
 }
@@ -5686,7 +5687,7 @@ input, textarea, select, button,
   vertical-align: -1px;
 }
 
-/* ---- 卡片缩略（列表中的卡片预览） ---- */
+/* ---- 鍗＄墖缂╃暐锛堝垪琛ㄤ腑鐨勫崱鐗囬瑙堬級 ---- */
 .post-card-previews {
   display: flex;
   flex-direction: column;
@@ -5700,7 +5701,7 @@ input, textarea, select, button,
   padding: var(--space-1) 0;
 }
 
-/* ---- 卡片组件（详情/完整视图） ---- */
+/* ---- 鍗＄墖缁勪欢锛堣鎯?瀹屾暣瑙嗗浘锛?---- */
 .explore-card {
   background: var(--md-surface-container-lowest);
   border: 1px solid var(--md-outline-variant);
@@ -5709,7 +5710,7 @@ input, textarea, select, button,
   margin-top: var(--space-2);
 }
 
-/* 卡片颜色：淡色背景 + 图标着色（探索页） */
+/* 鍗＄墖棰滆壊锛氭贰鑹茶儗鏅?+ 鍥炬爣鐫€鑹诧紙鎺㈢储椤碉級 */
 .explore-card[data-template="book_sale"]    { background: #FDF6E8; }
 .explore-card[data-template="study_invite"] { background: #EBF3FC; }
 .explore-card[data-template="social_buddy"] { background: #F3EFFE; }
@@ -5718,7 +5719,7 @@ input, textarea, select, button,
 .explore-card[data-template="skill_exchange"]{ background: #FEF6E7; }
 .explore-card[data-template="study_group"]  { background: #EBF3FC; }
 
-/* 编辑器内嵌卡片：仅图标着色 */
+/* 缂栬緫鍣ㄥ唴宓屽崱鐗囷細浠呭浘鏍囩潃鑹?*/
 .editor-card-embed[data-template="book_sale"]       .editor-card-head i { color: #E8A838; }
 .editor-card-embed[data-template="study_invite"]    .editor-card-head i { color: #4A90D9; }
 .editor-card-embed[data-template="social_buddy"]    .editor-card-head i { color: #7B61FF; }
@@ -5727,7 +5728,7 @@ input, textarea, select, button,
 .editor-card-embed[data-template="skill_exchange"]  .editor-card-head i { color: #F59E0B; }
 .editor-card-embed[data-template="study_group"]     .editor-card-head i { color: #3B82F6; }
 
-/* 编辑器内嵌卡片：官方卡片背景色 + 边框强调色 */
+/* 缂栬緫鍣ㄥ唴宓屽崱鐗囷細瀹樻柟鍗＄墖鑳屾櫙鑹?+ 杈规寮鸿皟鑹?*/
 .editor-card-embed[data-template="book_sale"]       { background: #FDF6E8; border-color: #E8A838; --card-accent: #E8A838; }
 .editor-card-embed[data-template="study_invite"]    { background: #EBF3FC; border-color: #4A90D9; --card-accent: #4A90D9; }
 .editor-card-embed[data-template="social_buddy"]    { background: #F3EFFE; border-color: #7B61FF; --card-accent: #7B61FF; }
@@ -5736,7 +5737,7 @@ input, textarea, select, button,
 .editor-card-embed[data-template="skill_exchange"]  { background: #FEF6E7; border-color: #F59E0B; --card-accent: #F59E0B; }
 .editor-card-embed[data-template="study_group"]     { background: #EBF3FC; border-color: #3B82F6; --card-accent: #3B82F6; }
 
-/* 右侧模板列表：仅图标着色 */
+/* 鍙充晶妯℃澘鍒楄〃锛氫粎鍥炬爣鐫€鑹?*/
 .editor-template-item[data-template="book_sale"]      .editor-template-icon i { color: #E8A838; }
 .editor-template-item[data-template="study_invite"]   .editor-template-icon i { color: #4A90D9; }
 .editor-template-item[data-template="social_buddy"]   .editor-template-icon i { color: #7B61FF; }
@@ -5770,7 +5771,7 @@ input, textarea, select, button,
   border-top: 1px solid var(--md-outline-variant);
 }
 
-/* ---- 模块行 ---- */
+/* ---- 妯″潡琛?---- */
 .explore-card-modules {
   display: flex;
   flex-direction: column;
@@ -5863,7 +5864,7 @@ input, textarea, select, button,
   font-style: italic;
 }
 
-/* ---- 投票模块 ---- */
+/* ---- 鎶曠エ妯″潡 ---- */
 .module-vote {
   background: var(--md-surface-container-low);
   border-radius: var(--radius-sm);
@@ -5943,7 +5944,7 @@ input, textarea, select, button,
   font-size: var(--text-xs);
 }
 
-/* ---- 倒计时模块 ---- */
+/* ---- 鍊掕鏃舵ā鍧?---- */
 .module-timer {
   display: flex;
   align-items: center;
@@ -5977,7 +5978,7 @@ input, textarea, select, button,
   color: var(--md-on-surface-variant);
 }
 
-/* ---- 倒数日模块 ---- */
+/* ---- 鍊掓暟鏃ユā鍧?---- */
 .module-days-matter {
   display: flex;
   align-items: center;
@@ -6010,7 +6011,7 @@ input, textarea, select, button,
   margin-top: var(--space-1);
 }
 
-/* ---- 参与者区域 ---- */
+/* ---- 鍙備笌鑰呭尯鍩?---- */
 .module-participants {
   display: flex;
   align-items: center;
@@ -6028,7 +6029,7 @@ input, textarea, select, button,
   color: var(--md-on-surface-variant);
 }
 
-/* ---- 分类筛选栏 ---- */
+/* ---- 鍒嗙被绛涢€夋爮 ---- */
 .explore-filter-pills {
   display: flex;
   flex-wrap: wrap;
@@ -6059,7 +6060,7 @@ input, textarea, select, button,
   font-weight: 600;
 }
 
-/* ---- 空状态 ---- */
+/* ---- 绌虹姸鎬?---- */
 .explore-empty {
   text-align: center;
   padding: var(--space-16) var(--space-4);
@@ -6082,7 +6083,7 @@ input, textarea, select, button,
   color: var(--md-outline);
 }
 
-/* ---- 移动端适配 ---- */
+/* ---- 绉诲姩绔€傞厤 ---- */
 @media (max-width: 767px) {
   .explore-search-bar {
     flex-direction: column;
@@ -6115,10 +6116,10 @@ input, textarea, select, button,
 }
 
 /* ========================================
-   发布编辑器：左右分栏流式编辑器
+   鍙戝竷缂栬緫鍣細宸﹀彸鍒嗘爮娴佸紡缂栬緫鍣?
    ======================================== */
 
-/* ---- 探索页浮动发布按钮 ---- */
+/* ---- 鎺㈢储椤垫诞鍔ㄥ彂甯冩寜閽?---- */
 .explore-fab {
   position: fixed;
   bottom: 32px;
@@ -6158,7 +6159,7 @@ input, textarea, select, button,
   }
 }
 
-/* ---- 分栏容器 ---- */
+/* ---- 鍒嗘爮瀹瑰櫒 ---- */
 .editor-split {
   display: flex;
   gap: var(--space-4);
@@ -6187,7 +6188,7 @@ input, textarea, select, button,
   overflow: hidden;
 }
 
-/* ---- 工具栏 ---- */
+/* ---- 宸ュ叿鏍?---- */
 .editor-toolbar {
   display: flex;
   align-items: center;
@@ -6254,7 +6255,7 @@ input, textarea, select, button,
   padding-right: var(--space-2);
 }
 
-/* ---- 编辑区（contentEditable） ---- */
+/* ---- 缂栬緫鍖猴紙contentEditable锛?---- */
 .editor-canvas {
   flex: 1;
   padding: var(--space-6);
@@ -6268,7 +6269,7 @@ input, textarea, select, button,
 }
 
 .editor-canvas:empty::before {
-  content: '在这里输入内容，从右侧拖入卡片...';
+  content: '鍦ㄨ繖閲岃緭鍏ュ唴瀹癸紝浠庡彸渚ф嫋鍏ュ崱鐗?..';
   color: var(--md-outline);
   pointer-events: none;
 }
@@ -6277,7 +6278,7 @@ input, textarea, select, button,
   background: var(--md-surface-container-lowest);
 }
 
-/* ---- 编辑区内嵌卡片 ---- */
+/* ---- 缂栬緫鍖哄唴宓屽崱鐗?---- */
 .editor-card-embed {
   display: block;
   margin: var(--space-4) 0;
@@ -6330,7 +6331,7 @@ input, textarea, select, button,
   border-top: 1px solid var(--md-outline-variant);
 }
 
-/* × 删除按钮 */
+/* 脳 鍒犻櫎鎸夐挳 */
 .editor-card-close {
   position: absolute;
   top: 6px;
@@ -6359,7 +6360,7 @@ input, textarea, select, button,
   background: var(--md-error);
 }
 
-/* ---- 拖拽指示线 ---- */
+/* ---- 鎷栨嫿鎸囩ず绾?---- */
 .editor-drop-indicator {
   height: 3px;
   background: var(--md-primary);
@@ -6374,7 +6375,7 @@ input, textarea, select, button,
   50% { opacity: 1; }
 }
 
-/* ---- 右栏模板列表 ---- */
+/* ---- 鍙虫爮妯℃澘鍒楄〃 ---- */
 .editor-right-header {
   padding: var(--space-3) var(--space-4);
   font-weight: 600;
@@ -6467,7 +6468,7 @@ input, textarea, select, button,
   border-color: var(--md-primary);
 }
 
-/* ---- 模板选择 modal ---- */
+/* ---- 妯℃澘閫夋嫨 modal ---- */
 .editor-modal-template-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -6502,14 +6503,14 @@ input, textarea, select, button,
   font-weight: 500;
 }
 
-/* ---- 卡片编辑 modal ---- */
+/* ---- 鍗＄墖缂栬緫 modal ---- */
 .card-edit-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
-/* 防止 modal 中第一个 MD3 输入框被裁剪 */
+/* 闃叉 modal 涓涓€涓?MD3 杈撳叆妗嗚瑁佸壀 */
 .card-edit-form {
   padding-top: 12px;
 }
@@ -6564,7 +6565,7 @@ input, textarea, select, button,
   border-top: 1px solid var(--md-outline-variant);
 }
 
-/* ---- 详情页文字块 ---- */
+/* ---- 璇︽儏椤垫枃瀛楀潡 ---- */
 .post-text-block {
   margin-bottom: var(--space-4);
   line-height: 1.7;
@@ -6577,10 +6578,10 @@ input, textarea, select, button,
 }
 
 /* ========================================
-   UGC 卡片系统 — 三区布局 / 卡片市场 / 收藏面板 / 卡片编辑器
+   UGC 鍗＄墖绯荤粺 鈥?涓夊尯甯冨眬 / 鍗＄墖甯傚満 / 鏀惰棌闈㈡澘 / 鍗＄墖缂栬緫鍣?
    ======================================== */
 
-/* ---- 卡片收藏面板（右侧） ---- */
+/* ---- 鍗＄墖鏀惰棌闈㈡澘锛堝彸渚э級 ---- */
 .editor-collection {
   flex: 1;
   display: flex;
@@ -6658,7 +6659,7 @@ input, textarea, select, button,
   font-size: 16px;
 }
 
-/* ---- 卡片市场（下方独立圆角模块，跨全宽） ---- */
+/* ---- 鍗＄墖甯傚満锛堜笅鏂圭嫭绔嬪渾瑙掓ā鍧楋紝璺ㄥ叏瀹斤級 ---- */
 .editor-market-section {
   margin-top: 16px;
   border: 1px solid var(--md-outline-variant);
@@ -6828,7 +6829,7 @@ input, textarea, select, button,
   font-weight: 500;
 }
 
-/* ---- 卡片编辑器 ---- */
+/* ---- 鍗＄墖缂栬緫鍣?---- */
 .card-editor-meta {
   display: flex;
   gap: 12px;
@@ -6989,7 +6990,7 @@ input, textarea, select, button,
   opacity: 1;
 }
 
-/* ---- 元素选择（右栏） ---- */
+/* ---- 鍏冪礌閫夋嫨锛堝彸鏍忥級 ---- */
 .card-editor-elements {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -7035,7 +7036,7 @@ input, textarea, select, button,
   color: var(--md-on-surface-variant);
 }
 
-/* ---- 图标选择器 ---- */
+/* ---- 鍥炬爣閫夋嫨鍣?---- */
 .card-editor-icon-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -7066,7 +7067,7 @@ input, textarea, select, button,
   background: var(--md-primary-container);
 }
 
-/* ---- 类型选择 modal ---- */
+/* ---- 绫诲瀷閫夋嫨 modal ---- */
 .card-editor-type-list {
   display: flex;
   flex-direction: column;
@@ -7104,7 +7105,7 @@ input, textarea, select, button,
   color: var(--md-on-surface-variant);
 }
 
-/* ---- 卡片编辑器预览 ---- */
+/* ---- 鍗＄墖缂栬緫鍣ㄩ瑙?---- */
 .card-editor-preview {
   margin-top: 20px;
   padding: 0 4px;
@@ -7119,7 +7120,7 @@ input, textarea, select, button,
   margin-bottom: 8px;
 }
 
-/* ---- 我的卡片页 ---- */
+/* ---- 鎴戠殑鍗＄墖椤?---- */
 .my-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -7170,7 +7171,7 @@ input, textarea, select, button,
   border-top: 1px solid var(--md-outline-variant);
 }
 
-/* ---- 移动端适配 ---- */
+/* ---- 绉诲姩绔€傞厤 ---- */
 @media (max-width: 767px) {
   .editor-meta-row {
     flex-direction: column;
@@ -7205,7 +7206,7 @@ input, textarea, select, button,
   }
 }
 
-/* ---- 教程弹窗内容 ---- */
+/* ---- 鏁欑▼寮圭獥鍐呭 ---- */
 .editor-tutorial-content {
   max-height: 400px;
   overflow-y: auto;
@@ -7240,7 +7241,7 @@ input, textarea, select, button,
 }
 
 /* ========================================
-   帖子详情页：左右分栏布局
+   甯栧瓙璇︽儏椤碉細宸﹀彸鍒嗘爮甯冨眬
    ======================================== */
 
 .explore-detail-layout {
@@ -7251,7 +7252,7 @@ input, textarea, select, button,
   overflow: hidden;
 }
 
-/* ---- 帖子内容区（flex:7） ---- */
+/* ---- 甯栧瓙鍐呭鍖猴紙flex:7锛?---- */
 .post-section {
   flex: 7;
   min-width: 0;
@@ -7330,7 +7331,7 @@ input, textarea, select, button,
   margin-bottom: var(--space-4);
 }
 
-/* ---- 评论区（flex:3） ---- */
+/* ---- 璇勮鍖猴紙flex:3锛?---- */
 .comment-section {
   flex: 3;
   min-width: 0;
@@ -7369,7 +7370,7 @@ input, textarea, select, button,
   border-radius: 2px;
 }
 
-/* ---- 评论项 ---- */
+/* ---- 璇勮椤?---- */
 .comment-item {
   display: flex;
   gap: var(--space-3);
@@ -7447,7 +7448,7 @@ input, textarea, select, button,
   margin-top: 4px !important;
 }
 
-/* ---- 点赞动效 ---- */
+/* ---- 鐐硅禐鍔ㄦ晥 ---- */
 .comment-like-btn i {
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -7463,7 +7464,7 @@ input, textarea, select, button,
   100% { transform: scale(1); }
 }
 
-/* ---- 评论操作按钮 ---- */
+/* ---- 璇勮鎿嶄綔鎸夐挳 ---- */
 .comment-actions {
   display: flex;
   gap: var(--space-3);
@@ -7497,7 +7498,7 @@ input, textarea, select, button,
   font-size: var(--text-xs);
 }
 
-/* 点赞按钮 — TikTok 风格：靠右，大图标 */
+/* 鐐硅禐鎸夐挳 鈥?TikTok 椋庢牸锛氶潬鍙筹紝澶у浘鏍?*/
 .comment-like-btn {
   display: flex;
   align-items: center;
@@ -7530,7 +7531,7 @@ input, textarea, select, button,
   color: var(--md-error);
 }
 
-/* ---- 行内回复框 ---- */
+/* ---- 琛屽唴鍥炲妗?---- */
 .inline-reply-box {
   display: none;
   margin-top: var(--space-3);
@@ -7618,13 +7619,13 @@ input, textarea, select, button,
   margin-right: var(--space-1);
 }
 
-/* 根评论不缩进 */
+/* 鏍硅瘎璁轰笉缂╄繘 */
 .comment-flat-item.depth-0 { margin-left: 0; }
 
-/* 第一层子回复，对齐父级头像右侧 */
+/* 绗竴灞傚瓙鍥炲锛屽榻愮埗绾уご鍍忓彸渚?*/
 .comment-flat-item.depth-1 { margin-left: 36px; }
 
-/* 第二层及以上，不再继续向右缩进，加左边框表示层级 */
+/* 绗簩灞傚強浠ヤ笂锛屼笉鍐嶇户缁悜鍙崇缉杩涳紝鍔犲乏杈规琛ㄧず灞傜骇 */
 .comment-flat-item.depth-2-plus {
   margin-left: 0;
   padding-left: 12px;
@@ -7632,9 +7633,9 @@ input, textarea, select, button,
   margin-top: 8px;
 }
 
-/* ---- 终结无限缩进套娃 ---- */
-/* 深层回复嵌套在 comment-body 内，父级头像(32px)+间距(12px)=44px。
-   利用负边距把第三层以上容器强制向左拉回，与第一层子回复绝对左对齐 */
+/* ---- 缁堢粨鏃犻檺缂╄繘濂楀▋ ---- */
+/* 娣卞眰鍥炲宓屽鍦?comment-body 鍐咃紝鐖剁骇澶村儚(32px)+闂磋窛(12px)=44px銆?
+   鍒╃敤璐熻竟璺濇妸绗笁灞備互涓婂鍣ㄥ己鍒跺悜宸︽媺鍥烇紝涓庣涓€灞傚瓙鍥炲缁濆宸﹀榻?*/
 .sub-list .sub-list {
   margin-left: -44px;
 }
@@ -7643,7 +7644,7 @@ input, textarea, select, button,
   .comment-flat-item.depth-1 { margin-left: 24px; }
 }
 
-/* ---- 平级评论项（所有评论在该列表内平级渲染） ---- */
+/* ---- 骞崇骇璇勮椤癸紙鎵€鏈夎瘎璁哄湪璇ュ垪琛ㄥ唴骞崇骇娓叉煋锛?---- */
 .comment-flat-item {
   display: flex;
   gap: var(--space-3);
@@ -7661,7 +7662,7 @@ input, textarea, select, button,
   min-width: 0;
 }
 
-/* ---- 底部主输入栏 ---- */
+/* ---- 搴曢儴涓昏緭鍏ユ爮 ---- */
 .comment-input-area {
   padding: var(--space-3) var(--space-6);
   border-top: 1px solid var(--md-outline-variant);
@@ -7726,7 +7727,7 @@ input, textarea, select, button,
   cursor: not-allowed;
 }
 
-/* ---- 移动端适配 ---- */
+/* ---- 绉诲姩绔€傞厤 ---- */
 @media (max-width: 767px) {
   .explore-detail-layout {
     flex-direction: column !important;
@@ -7752,17 +7753,17 @@ input, textarea, select, button,
    ========================================================= */
 
 .tk-comment-item { display: flex; gap: 10px; margin-bottom: 20px; }
-.tk-sub-item { margin-top: 16px; margin-bottom: 0; } /* 子回复靠紧 */
+.tk-sub-item { margin-top: 16px; margin-bottom: 0; } /* 瀛愬洖澶嶉潬绱?*/
 
-/* 左侧头像区：锁死大小，不参与拉伸压缩 */
+/* 宸︿晶澶村儚鍖猴細閿佹澶у皬锛屼笉鍙備笌鎷変几鍘嬬缉 */
 .tk-avatar-col { flex-shrink: 0; }
 .tk-avatar { border-radius: 50%; object-fit: cover; border: 1px solid var(--md-surface-container-high); }
 .tk-avatar-letter { border-radius: 50%; background: var(--md-surface-container-high); color: var(--md-on-surface-variant); display: flex; align-items: center; justify-content: center; font-weight: 600; }
 
-/* 右侧内容区：弹性占满 */
+/* 鍙充晶鍐呭鍖猴細寮规€у崰婊?*/
 .tk-content-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
-/* 文本排版 */
+/* 鏂囨湰鎺掔増 */
 .tk-username { font-size: 13px; font-weight: 600; color: var(--md-on-surface-variant); margin-bottom: 4px; }
 .tk-text { font-size: 15px; color: var(--md-on-surface); line-height: 1.5; word-break: break-word; }
 .tk-reply-to { color: var(--md-on-surface-variant); }
@@ -7770,26 +7771,26 @@ input, textarea, select, button,
 
 .tk-comment-img { max-width: 180px; border-radius: 8px; margin-top: 8px; border: 1px solid var(--md-outline-variant); cursor: pointer; object-fit: cover;}
 
-/* 底部操作栏 */
+/* 搴曢儴鎿嶄綔鏍?*/
 .tk-meta-row { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
 .tk-time { font-size: 13px; color: var(--md-on-surface-variant); }
 .tk-action-btn { font-size: 13px; color: var(--md-on-surface-variant); font-weight: 600; cursor: pointer; transition: color 0.2s; white-space: nowrap; }
 .tk-action-btn:hover { color: var(--md-on-surface); }
 .tk-action-btn.tk-danger:hover { color: var(--md-error); }
 
-/* 点赞按钮 (利用 margin-left: auto 自动挤到最右边) */
+/* 鐐硅禐鎸夐挳 (鍒╃敤 margin-left: auto 鑷姩鎸ゅ埌鏈€鍙宠竟) */
 .tk-like-container { display: flex; align-items: center; gap: 4px; margin-left: auto; color: var(--md-on-surface-variant); cursor: pointer; font-size: 13px; transition: transform 0.2s, color 0.2s; white-space: nowrap; flex-shrink: 0;}
 .tk-like-container i { font-size: 18px; }
 .tk-like-container:active { transform: scale(0.9); }
 .tk-like-container.liked, .tk-like-container.liked i { color: var(--md-error); }
 
-/* TikTok 风展开回复 */
+/* TikTok 椋庡睍寮€鍥炲 */
 .tk-replies-container { margin-top: 4px; }
 .tk-view-more-replies { display: inline-flex; align-items: center; gap: 12px; margin-top: 12px; cursor: pointer; color: var(--md-on-surface-variant); font-size: 13px; font-weight: 600; transition: color 0.2s; }
 .tk-view-more-replies:hover { color: var(--md-on-surface); }
 .tk-view-more-line { width: 24px; height: 1px; background: var(--md-outline-variant); }
 
-/* 重构的极简回复框 */
+/* 閲嶆瀯鐨勬瀬绠€鍥炲妗?*/
 .inline-reply-box { display: none; margin-top: 8px; }
 .inline-reply-box.open { display: block; }
 .tk-inline-input-row { display: flex; align-items: center; gap: 8px; }
@@ -7800,7 +7801,7 @@ input, textarea, select, button,
 .tk-inline-send-btn { background: var(--md-primary); color: #fff; border: none; height: 32px; padding: 0 16px; border-radius: 16px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 
 /* ============================================
-   百宝箱 (Treasure Box) — 实验室
+   鐧惧疂绠?(Treasure Box) 鈥?瀹為獙瀹?
    ============================================ */
 
 .tb-page-desc { font-size: var(--text-sm); color: var(--md-on-surface-variant); margin-bottom: var(--space-6); }
@@ -7834,7 +7835,7 @@ input, textarea, select, button,
 
 .tb-card-title .mi-svg { color: var(--md-primary); flex-shrink: 0; }
 
-/* --- 番茄时钟 --- */
+/* --- 鐣寗鏃堕挓 --- */
 
 .pomodoro-ring {
   position: relative;
@@ -7865,7 +7866,7 @@ input, textarea, select, button,
   gap: var(--space-3);
 }
 
-/* --- 今日运气值 --- */
+/* --- 浠婃棩杩愭皵鍊?--- */
 
 .luck-display {
   display: flex;
@@ -7887,7 +7888,7 @@ input, textarea, select, button,
   color: var(--md-on-surface-variant);
 }
 
-/* --- 替我抉择 --- */
+/* --- 鏇挎垜鎶夋嫨 --- */
 
 .decision-tabs { margin-bottom: var(--space-2); }
 
@@ -7900,7 +7901,7 @@ input, textarea, select, button,
   justify-content: center;
 }
 
-/* 硬币 */
+/* 纭竵 */
 .coin-area {
   display: flex;
   flex-direction: column;
@@ -7936,7 +7937,7 @@ input, textarea, select, button,
   min-height: 28px;
 }
 
-/* 骰子 */
+/* 楠板瓙 */
 .dice-area {
   display: flex;
   flex-direction: column;
@@ -7967,7 +7968,7 @@ input, textarea, select, button,
   line-height: 1;
 }
 
-/* 随机数 */
+/* 闅忔満鏁?*/
 .rand-area {
   display: flex;
   flex-direction: column;
@@ -7986,7 +7987,7 @@ input, textarea, select, button,
   align-items: center;
 }
 
-/* --- 薛定谔的待办 --- */
+/* --- 钖涘畾璋旂殑寰呭姙 --- */
 
 .blindbox-sealed {
   display: flex;
@@ -8013,7 +8014,7 @@ input, textarea, select, button,
   line-height: 1.6;
 }
 
-/* --- 答案之书 --- */
+/* --- 绛旀涔嬩功 --- */
 
 .answerbook-sealed {
   display: flex;
@@ -8068,7 +8069,7 @@ input, textarea, select, button,
 }
 
 /* ============================================
-   回声洞 (Echo Cave) — 侧栏底部
+   鍥炲０娲?(Echo Cave) 鈥?渚ф爮搴曢儴
    ============================================ */
 
 .echo-cave {
@@ -8113,7 +8114,7 @@ input, textarea, select, button,
   word-break: break-word;
 }
 
-/* --- 回声洞留言表单（profile 模态框内） --- */
+/* --- 鍥炲０娲炵暀瑷€琛ㄥ崟锛坧rofile 妯℃€佹鍐咃級 --- */
 
 .echo-cave-daily-hint {
   font-size: var(--text-xs);
@@ -8130,7 +8131,7 @@ input, textarea, select, button,
 }
 
 /* ============================================
-   动画 (Keyframes)
+   鍔ㄧ敾 (Keyframes)
    ============================================ */
 
 @keyframes coin-flip {
@@ -8160,7 +8161,7 @@ input, textarea, select, button,
 }
 
 /* ============================================
-   祈福木鱼
+   绁堢鏈ㄩ奔
    ============================================ */
 
 .wf-area {
@@ -8214,7 +8215,7 @@ input, textarea, select, button,
 }
 
 /* ============================================
-   今日摸鱼指南
+   浠婃棩鎽搁奔鎸囧崡
    ============================================ */
 
 .fg-area {
@@ -8246,7 +8247,7 @@ input, textarea, select, button,
 }
 
 /* ============================================
-   吃了么（南大食堂盲盒）
+   鍚冧簡涔堬紙鍗楀ぇ椋熷爞鐩茬洅锛?
    ============================================ */
 
 .fp-area {
@@ -8303,7 +8304,7 @@ input, textarea, select, button,
 }
 
 /* ============================================
-   移动端响应式
+   绉诲姩绔搷搴斿紡
    ============================================ */
 
 @media (max-width: 767px) {
@@ -8338,10 +8339,10 @@ input, textarea, select, button,
 }
 
 /* ============================================
-   百宝箱 — 紧凑卡片 + 展开动画
+   鐧惧疂绠?鈥?绱у噾鍗＄墖 + 灞曞紑鍔ㄧ敾
    ============================================ */
 
-/* ---- 紧凑迷你卡片 ---- */
+/* ---- 绱у噾杩蜂綘鍗＄墖 ---- */
 .tb-card--compact {
   min-height: 120px;
   padding: var(--space-4);
@@ -8393,7 +8394,7 @@ input, textarea, select, button,
   max-width: 100%;
 }
 
-/* ---- 展开态全宽卡片 ---- */
+/* ---- 灞曞紑鎬佸叏瀹藉崱鐗?---- */
 .tb-card--expanded {
   grid-column: 1 / -1;
   min-height: auto;
@@ -8408,7 +8409,7 @@ input, textarea, select, button,
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* ---- 展开卡片关闭按钮 ---- */
+/* ---- 灞曞紑鍗＄墖鍏抽棴鎸夐挳 ---- */
 .tb-expand-close {
   position: absolute;
   top: var(--space-3);
@@ -8437,7 +8438,7 @@ input, textarea, select, button,
   transform: scale(0.9);
 }
 
-/* ---- 遮罩层 ---- */
+/* ---- 閬僵灞?---- */
 .tb-backdrop {
   position: fixed;
   inset: 0;
@@ -8452,13 +8453,13 @@ input, textarea, select, button,
   pointer-events: auto;
 }
 
-/* ---- 未展开卡片变暗 ---- */
+/* ---- 鏈睍寮€鍗＄墖鍙樻殫 ---- */
 .tb-card--compact.tb-card--dimmed {
   opacity: 0.35;
   pointer-events: none;
 }
 
-/* ---- 移动端响应式补充 ---- */
+/* ---- 绉诲姩绔搷搴斿紡琛ュ厖 ---- */
 @media (max-width: 767px) {
   .tb-card--compact {
     min-height: 100px;
@@ -8476,7 +8477,7 @@ input, textarea, select, button,
 }
 
 /* ============================================
-   Home — Apple-style minimal scrolling page
+   Home 鈥?Apple-style minimal scrolling page
    ============================================ */
 
 /* ---- Hero: full viewport, left text + right image ---- */
