@@ -70,6 +70,7 @@ export function renderMarkdown(text) {
    ============================================= */
 
 const ROUTES = [
+  { page: 'home',           pattern: '/home',                  nav: 'home' },
   { page: 'mycourse',       pattern: '/mycourse',              nav: 'mycourse' },
   { page: 'course-detail',  pattern: '/course/:id',            nav: null },
   { page: 'allcourse',      pattern: '/allcourse',             nav: 'allcourse' },
