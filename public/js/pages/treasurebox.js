@@ -74,26 +74,6 @@ function renderPomodoro() {
   `;
 }
 
-function renderPomodoroCompact() {
-  const state = loadPomodoroState();
-  let preview = '25 分钟专注计时';
-  if (state.running && state.endAt) {
-    const remaining = Math.max(0, Math.round((state.endAt - Date.now()) / 1000));
-    const min = Math.floor(remaining / 60);
-    const sec = remaining % 60;
-    preview = `剩余 ${pad(min)}:${pad(sec)}`;
-  }
-  return `
-    <div class="tb-card tb-card--compact" data-tb-widget="pomodoro">
-      <div class="tb-card-icon">
-        <svg class="mi-svg" viewBox="0 0 24 24" width="28" height="28"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10s10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8zm.5-13H11v6l5.2 3.2l.8-1.3l-4.5-2.7V7z"/></svg>
-      </div>
-      <div class="tb-card-label">番茄时钟</div>
-      <div class="tb-card-preview">${preview}</div>
-    </div>
-  `;
-}
-
 function startPomodoroTick() {
   if (_pomodoroTimer) clearInterval(_pomodoroTimer);
   _pomodoroTimer = setInterval(() => {
@@ -122,17 +102,11 @@ function startPomodoroTick() {
         new Notification('番茄时钟', { body: '25 分钟到！休息一下吧' });
       }
       showToast('番茄时钟结束！休息一下吧');
-      const card = document.querySelector('[data-tb-widget="pomodoro"].tb-card--expanded');
-      if (card) {
-        let html = renderPomodoro();
-        if (card.classList.contains('tb-card--expanded')) {
-          html = buildExpandedHTML('pomodoro', html);
-        }
-        card.outerHTML = html;
+      const grid = document.querySelector('.tb-grid');
+      if (grid) {
+        const card = grid.querySelector('.tb-card:first-child');
+        if (card) card.outerHTML = renderPomodoro();
         bindPomodoro();
-        if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'pomodoro') {
-          _currentExpandedCard = document.querySelector('[data-tb-widget="pomodoro"].tb-card--expanded');
-        }
       }
     }
   }, 1000);
@@ -159,17 +133,11 @@ function bindPomodoro() {
     if (_pomodoroTimer) { clearInterval(_pomodoroTimer); _pomodoroTimer = null; }
     savePomodoroState({ endAt: null, running: false });
     document.title = '课搭子';
-    const card = document.querySelector('[data-tb-widget="pomodoro"].tb-card--expanded');
-    if (card) {
-      let html = renderPomodoro();
-      if (card.classList.contains('tb-card--expanded')) {
-        html = buildExpandedHTML('pomodoro', html);
-      }
-      card.outerHTML = html;
+    const grid = document.querySelector('.tb-grid');
+    if (grid) {
+      const card = grid.querySelector('.tb-card:first-child');
+      if (card) card.outerHTML = renderPomodoro();
       bindPomodoro();
-      if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'pomodoro') {
-        _currentExpandedCard = document.querySelector('[data-tb-widget="pomodoro"].tb-card--expanded');
-      }
     }
   });
 }
@@ -212,18 +180,6 @@ function renderLuck() {
         </button>
         <div class="luck-label" id="luck-label"></div>
       </div>
-    </div>
-  `;
-}
-
-function renderLuckCompact() {
-  return `
-    <div class="tb-card tb-card--compact" data-tb-widget="luck">
-      <div class="tb-card-icon">
-        <svg class="mi-svg" viewBox="0 0 24 24" width="28" height="28"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87l1.18 6.88L12 17.77l-6.18 3.25L7 14.14L2 9.27l6.91-1.01L12 2z"/></svg>
-      </div>
-      <div class="tb-card-label">今日运气值</div>
-      <div class="tb-card-preview">点击查看今日运气</div>
     </div>
   `;
 }
@@ -279,20 +235,6 @@ function renderDecide(activeTab = 'coin') {
       <div class="decision-content" id="decide-content">
         ${activeTab === 'coin' ? renderCoin() : activeTab === 'dice' ? renderDice() : renderRand()}
       </div>
-    </div>
-  `;
-}
-
-/* --- 抛硬币 --- */
-
-function renderDecideCompact() {
-  return `
-    <div class="tb-card tb-card--compact" data-tb-widget="decide">
-      <div class="tb-card-icon">
-        <svg class="mi-svg" viewBox="0 0 24 24" width="28" height="28"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
-      </div>
-      <div class="tb-card-label">替我抉择</div>
-      <div class="tb-card-preview">抛硬币 / 掷骰子 / 随机数</div>
     </div>
   `;
 }
@@ -628,18 +570,6 @@ function renderBlindBox(revealedIdx = null) {
   `;
 }
 
-function renderBlindBoxCompact() {
-  return `
-    <div class="tb-card tb-card--compact" data-tb-widget="blindbox">
-      <div class="tb-card-icon">
-        <svg class="mi-svg" viewBox="0 0 24 24" width="28" height="28"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-      </div>
-      <div class="tb-card-label">薛定谔的待办</div>
-      <div class="tb-card-preview">打开盲盒，抽取今日待办</div>
-    </div>
-  `;
-}
-
 function openBlindBox() {
   const sealed = document.getElementById('blindbox-sealed');
   if (!sealed) return;
@@ -652,17 +582,8 @@ function openBlindBox() {
 
   setTimeout(() => {
     const card = sealed.closest('.tb-card');
-    if (!card) return;
-    let html = renderBlindBox(idx);
-    if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('blindbox', html);
-    }
-    card.outerHTML = html;
+    if (card) card.outerHTML = renderBlindBox(idx);
     bindBlindBox();
-    // 更新展开卡片引用
-    if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'blindbox') {
-      _currentExpandedCard = document.querySelector('[data-tb-widget="blindbox"].tb-card--expanded');
-    }
   }, 400);
 }
 
@@ -678,16 +599,8 @@ function retryBlindBox() {
   card.style.opacity = '0.5';
 
   setTimeout(() => {
-    let html = renderBlindBox(idx);
-    if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('blindbox', html);
-    }
-    card.outerHTML = html;
+    card.outerHTML = renderBlindBox(idx);
     bindBlindBox();
-    // 更新展开卡片引用
-    if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'blindbox') {
-      _currentExpandedCard = document.querySelector('[data-tb-widget="blindbox"].tb-card--expanded');
-    }
   }, 250);
 }
 
@@ -765,18 +678,6 @@ function renderAnswerBook(revealedAnswer = null) {
   `;
 }
 
-function renderAnswerBookCompact() {
-  return `
-    <div class="tb-card tb-card--compact" data-tb-widget="answerbook">
-      <div class="tb-card-icon">
-        <svg class="mi-svg" viewBox="0 0 24 24" width="28" height="28"><path d="M21 5c-1.11-.35-2.33-.5-3.5-.5c-1.95 0-4.05.4-5.5 1.5c-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5c.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5c1.35-.85 3.8-1.5 5.5-1.5c1.65 0 3.35.3 4.75 1.05c.1.05.15.05.25.05c.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5c-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5c1.2 0 2.4.15 3.5.5v11.5z"/></svg>
-      </div>
-      <div class="tb-card-label">答案之书</div>
-      <div class="tb-card-preview">翻开书本，寻找答案</div>
-    </div>
-  `;
-}
-
 function drawAnswer() {
   const sealed = document.getElementById('answerbook-sealed');
   if (!sealed) return;
@@ -790,17 +691,8 @@ function drawAnswer() {
 
   setTimeout(() => {
     const card = sealed.closest('.tb-card');
-    if (!card) return;
-    let html = renderAnswerBook(answer);
-    if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('answerbook', html);
-    }
-    card.outerHTML = html;
+    if (card) card.outerHTML = renderAnswerBook(answer);
     bindAnswerBook();
-    // 更新展开卡片引用
-    if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'answerbook') {
-      _currentExpandedCard = document.querySelector('[data-tb-widget="answerbook"].tb-card--expanded');
-    }
   }, 400);
 }
 
@@ -816,16 +708,8 @@ function retryAnswerBook() {
   card.style.opacity = '0.5';
 
   setTimeout(() => {
-    let html = renderAnswerBook(answer);
-    if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('answerbook', html);
-    }
-    card.outerHTML = html;
+    card.outerHTML = renderAnswerBook(answer);
     bindAnswerBook();
-    // 更新展开卡片引用
-    if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'answerbook') {
-      _currentExpandedCard = document.querySelector('[data-tb-widget="answerbook"].tb-card--expanded');
-    }
   }, 250);
 }
 
@@ -886,18 +770,6 @@ function renderWoodenFish() {
           </svg>
         </div>
       </div>
-    </div>
-  `;
-}
-
-function renderWoodenFishCompact() {
-  return `
-    <div class="tb-card tb-card--compact" data-tb-widget="woodenfish">
-      <div class="tb-card-icon">
-        <svg class="mi-svg" viewBox="0 0 24 24" width="28" height="28"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm-1 15l-4-4 1.41-1.41L11 14.17l5.59-5.59L18 10l-7 7z"/></svg>
-      </div>
-      <div class="tb-card-label">祈福木鱼</div>
-      <div class="tb-card-preview">敲击木鱼，积攒功德</div>
     </div>
   `;
 }
@@ -1012,25 +884,6 @@ function renderFishGuide() {
         <div class="fg-content" id="fg-content">${escHtml(text)}</div>
         <button class="btn btn-primary btn-sm" id="fg-refresh-btn" style="min-width:120px">再换一条</button>
       </div>
-    </div>
-  `;
-}
-
-function renderFishGuideCompact() {
-  // 显示最近一条摸鱼建议，静态不消耗历史
-  const history = loadFishHistory();
-  let preview = '点击查看摸鱼建议';
-  if (history.length > 0) {
-    const lastIdx = history[history.length - 1];
-    preview = FISH_GUIDES[lastIdx] || preview;
-  }
-  return `
-    <div class="tb-card tb-card--compact" data-tb-widget="fishguide">
-      <div class="tb-card-icon">
-        <svg class="mi-svg" viewBox="0 0 24 24" width="28" height="28"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10s10-4.5 10-10S17.5 2 12 2zm0 15c-.55 0-1-.45-1-1s.45-1 1-1s1 .45 1 1s-.45 1-1 1zm1-4h-2V7h2v6z"/></svg>
-      </div>
-      <div class="tb-card-label">今日摸鱼指南</div>
-      <div class="tb-card-preview">${escHtml(preview)}</div>
     </div>
   `;
 }
@@ -1190,21 +1043,6 @@ function renderFoodPicker() {
 
 let _fpLastResult = '';
 
-function renderFoodPickerCompact() {
-  const campus = loadFoodCampus();
-  const campusLabel = campus === 'gulou' ? '鼓楼' : '仙林';
-  let preview = _fpLastResult || '点击抽取今日美食';
-  return `
-    <div class="tb-card tb-card--compact" data-tb-widget="foodpicker">
-      <div class="tb-card-icon">
-        <svg class="mi-svg" viewBox="0 0 24 24" width="28" height="28"><path d="M8.1 13.34l2.83-2.83L3.91 3.5c-1.56 1.56-1.56 4.09 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z"/></svg>
-      </div>
-      <div class="tb-card-label">吃了么</div>
-      <div class="tb-card-preview">${escHtml(preview)} · ${campusLabel}</div>
-    </div>
-  `;
-}
-
 function bindFoodPicker() {
   const tabs = document.getElementById('fp-campus-tabs');
   const pickBtn = document.getElementById('fp-pick-btn');
@@ -1251,252 +1089,6 @@ function bindFoodPicker() {
    组装 & 事件绑定
    ============================================ */
 
-// ---- FLIP 展开引擎 ----
-
-let _isExpanding = false;
-let _currentExpandedCard = null;
-let _backdropEl = null;
-
-const WIDGET_RENDERERS = {
-  pomodoro:    { render: renderPomodoro,    bind: bindPomodoro,    compact: renderPomodoroCompact },
-  luck:        { render: renderLuck,        bind: bindLuck,        compact: renderLuckCompact },
-  decide:      { render: () => renderDecide('coin'), bind: bindDecideAll, compact: renderDecideCompact },
-  blindbox:    { render: () => renderBlindBox(),     bind: bindBlindBox,    compact: renderBlindBoxCompact },
-  answerbook:  { render: () => renderAnswerBook(),   bind: bindAnswerBook,  compact: renderAnswerBookCompact },
-  woodenfish:  { render: renderWoodenFish,  bind: bindWoodenFish,  compact: renderWoodenFishCompact },
-  fishguide:   { render: renderFishGuide,   bind: bindFishGuide,   compact: renderFishGuideCompact },
-  foodpicker:  { render: renderFoodPicker,  bind: bindFoodPicker,  compact: renderFoodPickerCompact },
-};
-
-function ensureBackdrop() {
-  if (_backdropEl) return _backdropEl;
-  _backdropEl = document.createElement('div');
-  _backdropEl.className = 'tb-backdrop';
-  _backdropEl.addEventListener('click', () => {
-    if (_currentExpandedCard) collapseWidget(_currentExpandedCard, true);
-  });
-  document.body.appendChild(_backdropEl);
-  return _backdropEl;
-}
-
-function buildExpandedHTML(widgetType, fullHTML) {
-  // 给展开卡片注入关闭按钮 + expanded 类
-  const closeBtn = `<button class="tb-expand-close" aria-label="关闭"><svg class="mi-svg" viewBox="0 0 24 24" width="20" height="20"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>`;
-  return fullHTML.replace(
-    '<div class="tb-card">',
-    `<div class="tb-card tb-card--expanded" data-tb-widget="${widgetType}">${closeBtn}`
-  );
-}
-
-function collapseWidget(expandedCardEl, animate = true) {
-  if (_isExpanding && animate) return;
-  if (!expandedCardEl) return;
-
-  const widgetType = expandedCardEl.dataset.tbWidget;
-  if (!widgetType || !WIDGET_RENDERERS[widgetType]) return;
-
-  const compactHTML = WIDGET_RENDERERS[widgetType].compact();
-
-  if (!animate) {
-    expandedCardEl.outerHTML = compactHTML;
-    cleanupAfterCollapse();
-    return;
-  }
-
-  _isExpanding = true;
-
-  const firstRect = expandedCardEl.getBoundingClientRect();
-
-  expandedCardEl.outerHTML = compactHTML;
-  const grid = document.querySelector('.tb-grid');
-  const newCard = grid?.querySelector(`[data-tb-widget="${widgetType}"]`);
-
-  if (!newCard) {
-    _isExpanding = false;
-    cleanupAfterCollapse();
-    return;
-  }
-
-  const lastRect = newCard.getBoundingClientRect();
-  const dx = firstRect.left - lastRect.left;
-  const dy = firstRect.top - lastRect.top;
-  const dsx = firstRect.width / lastRect.width;
-  const dsy = firstRect.height / lastRect.height;
-
-  newCard.style.transformOrigin = 'top left';
-  newCard.style.transform = `translate(${dx}px, ${dy}px) scale(${dsx}, ${dsy})`;
-  newCard.style.transition = 'none';
-  newCard.style.willChange = 'transform';
-
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      newCard.style.transition = 'transform 0.35s var(--ease-spring)';
-      newCard.style.transform = 'translate(0, 0) scale(1, 1)';
-    });
-  });
-
-  newCard.addEventListener('transitionend', function onEnd() {
-    newCard.removeEventListener('transitionend', onEnd);
-    newCard.style.transform = '';
-    newCard.style.transition = '';
-    newCard.style.willChange = '';
-    newCard.style.transformOrigin = '';
-    _isExpanding = false;
-  }, { once: true });
-
-  cleanupAfterCollapse();
-}
-
-function cleanupAfterCollapse() {
-  _currentExpandedCard = null;
-  if (_backdropEl) {
-    _backdropEl.classList.remove('active');
-  }
-  // 取消变暗
-  document.querySelectorAll('.tb-card--dimmed').forEach(c => c.classList.remove('tb-card--dimmed'));
-  // 清除番茄钟紧凑预览更新定时器
-  if (_pomodoroCompactTimer) {
-    clearInterval(_pomodoroCompactTimer);
-    _pomodoroCompactTimer = null;
-  }
-}
-
-let _pomodoroCompactTimer = null;
-
-function updateCompactPomodoroPreview() {
-  const card = document.querySelector('[data-tb-widget="pomodoro"].tb-card--compact');
-  if (!card) {
-    if (_pomodoroCompactTimer) { clearInterval(_pomodoroCompactTimer); _pomodoroCompactTimer = null; }
-    return;
-  }
-  const state = loadPomodoroState();
-  const previewEl = card.querySelector('.tb-card-preview');
-  if (!previewEl) return;
-  if (state.running && state.endAt) {
-    const remaining = Math.max(0, Math.round((state.endAt - Date.now()) / 1000));
-    if (remaining <= 0) {
-      previewEl.textContent = '25 分钟专注计时';
-      if (_pomodoroCompactTimer) { clearInterval(_pomodoroCompactTimer); _pomodoroCompactTimer = null; }
-      return;
-    }
-    const min = Math.floor(remaining / 60);
-    const sec = remaining % 60;
-    previewEl.textContent = `剩余 ${pad(min)}:${pad(sec)}`;
-  } else {
-    previewEl.textContent = '25 分钟专注计时';
-    if (_pomodoroCompactTimer) { clearInterval(_pomodoroCompactTimer); _pomodoroCompactTimer = null; }
-  }
-}
-
-function expandWidget(compactCardEl) {
-  if (_isExpanding) return;
-  if (!compactCardEl) return;
-
-  const widgetType = compactCardEl.dataset.tbWidget;
-  if (!widgetType || !WIDGET_RENDERERS[widgetType]) return;
-
-  // 如果已展开同一组件，忽略
-  if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === widgetType) return;
-
-  // 如果不同组件已展开，先瞬间收起
-  if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget !== widgetType) {
-    collapseWidget(_currentExpandedCard, false);
-  }
-
-  _isExpanding = true;
-
-  const firstRect = compactCardEl.getBoundingClientRect();
-
-  const fullHTML = WIDGET_RENDERERS[widgetType].render();
-  const expandedHTML = buildExpandedHTML(widgetType, fullHTML);
-
-  compactCardEl.outerHTML = expandedHTML;
-
-  const grid = document.querySelector('.tb-grid');
-  const expandedCard = grid?.querySelector(`[data-tb-widget="${widgetType}"].tb-card--expanded`);
-
-  if (!expandedCard) {
-    _isExpanding = false;
-    return;
-  }
-
-  // 绑定事件 & 启动番茄钟（如果是番茄钟）
-  WIDGET_RENDERERS[widgetType].bind();
-  if (widgetType === 'pomodoro') {
-    const pState = loadPomodoroState();
-    if (pState.running && pState.endAt) {
-      startPomodoroTick();
-    }
-  }
-
-  const lastRect = expandedCard.getBoundingClientRect();
-  const dx = firstRect.left - lastRect.left;
-  const dy = firstRect.top - lastRect.top;
-  const dsx = firstRect.width / lastRect.width;
-  const dsy = firstRect.height / lastRect.height;
-
-  expandedCard.style.transformOrigin = 'top left';
-  expandedCard.style.transform = `translate(${dx}px, ${dy}px) scale(${dsx}, ${dsy})`;
-  expandedCard.style.transition = 'none';
-  expandedCard.style.willChange = 'transform';
-
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      expandedCard.style.transition = 'transform 0.35s var(--ease-spring)';
-      expandedCard.style.transform = 'translate(0, 0) scale(1, 1)';
-    });
-  });
-
-  expandedCard.addEventListener('transitionend', function onEnd() {
-    expandedCard.removeEventListener('transitionend', onEnd);
-    expandedCard.style.transform = '';
-    expandedCard.style.transition = '';
-    expandedCard.style.willChange = '';
-    expandedCard.style.transformOrigin = '';
-    _currentExpandedCard = expandedCard;
-    _isExpanding = false;
-
-    // 滚动到可见区域
-    expandedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, { once: true });
-
-  // 显示遮罩 + 变暗其他卡片
-  const backdrop = ensureBackdrop();
-  backdrop.classList.add('active');
-  document.querySelectorAll('.tb-card--compact').forEach(c => c.classList.add('tb-card--dimmed'));
-
-  // 番茄钟紧凑预览停止更新
-  if (_pomodoroCompactTimer) {
-    clearInterval(_pomodoroCompactTimer);
-    _pomodoroCompactTimer = null;
-  }
-}
-
-function bindTreasureBoxGrid(container) {
-  const grid = container.querySelector('.tb-grid');
-  if (!grid) return;
-
-  grid.addEventListener('click', (e) => {
-    // 关闭按钮
-    const closeBtn = e.target.closest('.tb-expand-close');
-    if (closeBtn) {
-      if (_currentExpandedCard) collapseWidget(_currentExpandedCard, true);
-      return;
-    }
-    // 紧凑卡片点击 → 展开
-    const compactCard = e.target.closest('.tb-card--compact');
-    if (compactCard) {
-      expandWidget(compactCard);
-    }
-  });
-}
-
-function bindDecideAll() {
-  const decideCard = document.querySelector('.decision-tabs');
-  if (decideCard) bindDecideTabs(decideCard);
-  bindDecideActions();
-}
-
 function renderTreasureBox() {
   return `
     <div class="page-header">
@@ -1506,14 +1098,14 @@ function renderTreasureBox() {
       </h1>
     </div>
     <div class="tb-grid">
-      ${renderPomodoroCompact()}
-      ${renderLuckCompact()}
-      ${renderDecideCompact()}
-      ${renderBlindBoxCompact()}
-      ${renderAnswerBookCompact()}
-      ${renderWoodenFishCompact()}
-      ${renderFishGuideCompact()}
-      ${renderFoodPickerCompact()}
+      ${renderPomodoro()}
+      ${renderLuck()}
+      ${renderDecide('coin')}
+      ${renderBlindBox()}
+      ${renderAnswerBook()}
+      ${renderWoodenFish()}
+      ${renderFishGuide()}
+      ${renderFoodPicker()}
     </div>
   `;
 }
@@ -1551,35 +1143,26 @@ function escHtml(str) {
 }
 
 registerPage('treasurebox', (container) => {
-  // 重置模块级状态（重新进入页面时）
-  _isExpanding = false;
-  _currentExpandedCard = null;
-  if (_backdropEl) {
-    _backdropEl.classList.remove('active');
-  }
-
   container.innerHTML = renderTreasureBox();
-
   setTimeout(() => {
-    // 事件委托：紧凑卡片点击 → 展开
-    bindTreasureBoxGrid(container);
+    bindPomodoro();
+    bindLuck();
 
-    // 番茄钟运行时 → 启动紧凑预览更新
+    const decideCard = document.querySelector('.decision-tabs');
+    if (decideCard) bindDecideTabs(decideCard);
+    bindDecideActions();
+
+    bindBlindBox();
+    bindAnswerBook();
+    bindWoodenFish();
+    bindFishGuide();
+    bindFoodPicker();
+
     const pState = loadPomodoroState();
     if (pState.running && pState.endAt) {
       startPomodoroTick();
-      // 每 1 秒更新紧凑卡片的预览文字
-      updateCompactPomodoroPreview();
-      _pomodoroCompactTimer = setInterval(updateCompactPomodoroPreview, 1000);
     }
   }, 0);
-});
-
-// Escape 键关闭展开卡片
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && _currentExpandedCard) {
-    collapseWidget(_currentExpandedCard, true);
-  }
 });
 
 export { renderTreasureBox };
