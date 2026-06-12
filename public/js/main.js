@@ -129,6 +129,7 @@ import {
 } from './pages/courses/publish.js';
 
 import './pages/explore.js';
+import './pages/home.js';
 import './pages/post-editor.js';
 import './pages/card-editor.js';
 import './pages/my-cards.js';
@@ -314,7 +315,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // 初始化路由系统：解析URL → 导航到对应页面
-  initRouter(() => navigateTo('mycourse'));
+  initRouter(() => navigateTo('home'));
 
   // 初始化回声洞
   initEchoCave();
