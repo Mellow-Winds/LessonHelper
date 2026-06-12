@@ -358,8 +358,9 @@ export async function executeSearch(type) {
     await animateHeroToResults(q, activeTab);
   }
 
-  // Update URL
-  navigateTo('search', { q, type: activeTab }, { pushState: true });
+  // Update URL silently (no page re-render to avoid infinite loop)
+  const url = `/search?q=${encodeURIComponent(q)}&type=${activeTab}`;
+  history.replaceState({ page: 'search', data: { q, type: activeTab } }, '', url);
 
   // Show loading
   const resultsEl = document.getElementById('search-results');
@@ -408,8 +409,9 @@ export async function executeAISearch() {
     await animateHeroToResults(q, 'all');
   }
 
-  // Update URL
-  navigateTo('search', { q, type: 'all' }, { pushState: true });
+  // Update URL silently
+  const url = `/search?q=${encodeURIComponent(q)}&type=all`;
+  history.replaceState({ page: 'search', data: { q, type: 'all' } }, '', url);
 
   // Update active pill to "all"
   document.querySelectorAll('#search-pills .md-pill-btn').forEach(el => {
