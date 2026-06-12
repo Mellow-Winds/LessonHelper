@@ -87,8 +87,12 @@ import { showToast } from './components/ui.js';
 import {
   switchAuthView, handleLogin, handleRegister, handleSendCode, handleResendCode,
   refreshNotifBadge,
-  handleSearchPageKey, executeSearch, switchSearchTab, navigateToCourseResult,
 } from './pages/auth.js';
+
+import {
+  handleSearchPageKey, executeSearch, executeAISearch, switchSearchTab,
+  navigateToCourseResult, clearSearchInput, cancelAISearch,
+} from './pages/search.js';
 
 import {
   registerProfilePages,
@@ -130,6 +134,7 @@ import {
 
 import './pages/explore.js';
 import './pages/home.js';
+import './pages/search.js';
 import './pages/post-editor.js';
 import './pages/card-editor.js';
 import './pages/my-cards.js';
@@ -231,8 +236,11 @@ Object.assign(window, {
   // search
   handleSearchPageKey,
   executeSearch,
+  executeAISearch,
   switchSearchTab,
   navigateToCourseResult,
+  clearSearchInput,
+  cancelAISearch,
   toggleCourseFavorite,
   togglePostFavorite,
   // profile
