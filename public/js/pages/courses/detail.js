@@ -133,6 +133,11 @@ export async function switchDetailTab(tab, courseId) {
 
   const { enrolled } = window._courseDetail;
 
+  // 平滑切换：先淡出再加载再淡入
+  contentEl.style.transition = 'opacity 0.12s var(--ease-standard)';
+  contentEl.style.opacity = '0';
+  await new Promise(r => setTimeout(r, 120));
+
   switch (tab) {
     case 'forum':
       await renderForumTab(contentEl, courseId, enrolled);
@@ -144,6 +149,8 @@ export async function switchDetailTab(tab, courseId) {
       if (enrolled) await renderCourseSquareTab(contentEl, courseId, 'dc');
       break;
   }
+
+  contentEl.style.opacity = '1';
 }
 
 /* =============================================

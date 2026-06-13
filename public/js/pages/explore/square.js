@@ -280,6 +280,9 @@ async function loadSquareMyPosts(type) {
         </div>
       `;
     }).join('');
+    // 列表出现时做交错入场动画
+    var cards = listEl.querySelectorAll('.square-post-card');
+    if (cards.length > 0) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });
   } catch {
     listEl.innerHTML = '<div class="card"><p class="text-secondary">加载失败</p></div>';
   }
