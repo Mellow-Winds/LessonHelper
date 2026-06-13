@@ -115,7 +115,7 @@ function buildPath(pageName, data) {
 
   // 替换 :id 参数
   if (path.includes(':id')) {
-    const id = (typeof data === 'number' || typeof data === 'string') ? data : data?.id;
+    const id = (typeof data === 'number' || typeof data === 'string') ? data : (data?.id || data?.courseId);
     if (id) path = path.replace(':id', id);
     else return '/mycourse'; // 无ID则回退
   }

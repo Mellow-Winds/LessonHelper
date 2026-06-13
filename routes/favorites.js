@@ -9,14 +9,33 @@ module.exports = function (db) {
     const { type } = req.query;
 
     if (type === 'courses') {
-      return res.json(db.all(`
-        SELECT c.*, fc.created_at AS favorited_at,
-          (SELECT COUNT(*) FROM user_courses uc WHERE uc.course_id = c.id) AS enrollment_count
+      const courses = db.all(`
+        SELECT c.*, fc.created_at AS favorited_at
         FROM favorite_courses fc
         JOIN courses c ON c.id = fc.course_id
         WHERE fc.user_id = ?
         ORDER BY fc.created_at DESC, fc.id DESC
-      `, [userId]));
+      `, [userId]);
+
+      // 修正选课人数：大课跨子课程聚合，小课直接计数
+      for (const course of courses) {
+        const isBig = !course.big_course_id && (!course.description || course.description === '');
+        if (isBig) {
+          const row = db.get(
+            'SELECT COUNT(*) AS cnt FROM user_courses uc JOIN courses c2 ON uc.course_id = c2.id WHERE c2.big_course_id = ?',
+            [course.id]
+          );
+          course.enrollment_count = row ? row.cnt : 0;
+        } else {
+          const row = db.get(
+            'SELECT COUNT(*) AS cnt FROM user_courses WHERE course_id = ?',
+            [course.id]
+          );
+          course.enrollment_count = row ? row.cnt : 0;
+        }
+      }
+
+      return res.json(courses);
     }
 
     if (type === 'posts') {

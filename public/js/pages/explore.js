@@ -182,6 +182,9 @@ async function loadPosts(container) {
    ============================================= */
 
 registerPage('explore-post-detail', async (container, postId) => {
+  const actualPostId = typeof postId === 'object' ? postId.id : postId;
+  const scrollToCommentId = typeof postId === 'object' ? (postId.commentId || 0) : 0;
+
   if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
 
   container.innerHTML = `
@@ -197,7 +200,7 @@ registerPage('explore-post-detail', async (container, postId) => {
   container.querySelector('#detail-back-btn')?.addEventListener('click', () => navigateTo('explore'));
 
   try {
-    const post = await apiGet(`/api/explore/posts/${postId}`);
+    const post = await apiGet(`/api/explore/posts/${actualPostId}`);
     if (post.error) {
       container.querySelector('#detail-content').innerHTML = `<div class="card"><p class="text-secondary">${post.error}</p></div>`;
       return;
@@ -238,6 +241,10 @@ registerPage('explore-post-detail', async (container, postId) => {
     }
 
     renderPostDetail(container.querySelector('#detail-content'), post);
+
+    if (scrollToCommentId) {
+      scrollToTkComment(scrollToCommentId);
+    }
   } catch (e) {
     container.querySelector('#detail-content').innerHTML = `<div class="card"><p class="text-secondary">加载失败</p></div>`;
   }
@@ -329,6 +336,23 @@ function renderPostDetail(el, post) {
       el._tkComments = tkComments;
     }
   }
+}
+
+function scrollToTkComment(commentId) {
+  const tryScroll = (retries = 0) => {
+    const el = document.getElementById(`tk-comment-${commentId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.background = 'var(--md-primary-container)';
+      el.style.transition = 'background 0.3s';
+      setTimeout(() => { el.style.background = ''; }, 2000);
+    } else if (retries < 10) {
+      setTimeout(() => tryScroll(retries + 1), 300);
+    } else {
+      showToast('该评论已被删除或移除');
+    }
+  };
+  setTimeout(() => tryScroll(), 500);
 }
 
 /* ---- 卡片编辑弹窗 ---- */
