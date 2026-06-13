@@ -79,8 +79,6 @@ function observeSections(container) {
 /* ---- Render ---- */
 
 function renderHero() {
-  const name = window._currentUser?.nickname || '同学';
-  const ft = isLoggedIn() ? `${name}，欢迎回来` : '登录后可同步课表与收藏资料';
   return `
     <section class="home-hero">
       <div class="home-hero-text">
@@ -90,10 +88,7 @@ function renderHero() {
         </div>
         <h1>在这里，选一门课，<br>遇见一些人。</h1>
         <div class="home-hero-actions">
-          <button class="btn btn-primary" data-jump="mycourse">进入我的课程</button>
-          <button class="btn btn-secondary" data-jump="allcourse">逛逛课程广场</button>
         </div>
-        <p class="home-hero-footer">${ft}</p>
       </div>
       <div class="home-hero-image">
         <img src="/images/home-hero-campus.png" alt="">

@@ -8738,6 +8738,22 @@ input, textarea, select, button,
   .home-nav-grid { grid-template-columns: 1fr 1fr; }
 }
 
+/* ---- Results summary ---- */
+.search-results-summary {
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.search-results-summary strong {
+  font-weight: 700;
+}
+
 /* ========================================
    Search Hero (Google-style centered)
    ======================================== */
@@ -8986,8 +9002,19 @@ input, textarea, select, button,
   transition: color var(--dur-normal) var(--ease-standard);
 }
 
-.search-ai-step.done {
+.search-ai-step.done,
+.search-ai-step--done {
   color: var(--md-on-surface);
+}
+
+/* Active step (with bouncing dot) */
+.search-ai-step--active {
+  color: var(--md-on-surface);
+  font-weight: 500;
+}
+
+.search-ai-step--active .search-ai-step-text {
+  min-width: 170px;
 }
 
 .search-ai-step-indicator {
