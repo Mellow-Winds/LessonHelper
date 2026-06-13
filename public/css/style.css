@@ -8393,9 +8393,10 @@ input, textarea, select, button,
   max-width: 100%;
 }
 
-/* ---- 展开态全宽卡片 ---- */
+/* ---- 展开态 2×2 卡片 ---- */
 .tb-card--expanded {
-  grid-column: 1 / -1;
+  grid-column: span 2;
+  grid-row: span 2;
   min-height: auto;
   padding: var(--space-6);
   box-shadow: var(--shadow-3);
@@ -8437,26 +8438,6 @@ input, textarea, select, button,
   transform: scale(0.9);
 }
 
-/* ---- 遮罩层 ---- */
-.tb-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0);
-  z-index: 5;
-  pointer-events: none;
-  transition: background-color var(--dur-slow) var(--ease-standard);
-}
-
-.tb-backdrop.active {
-  background-color: rgba(0, 0, 0, 0.24);
-  pointer-events: auto;
-}
-
-/* ---- 未展开卡片变暗 ---- */
-.tb-card--compact.tb-card--dimmed {
-  opacity: 0.35;
-  pointer-events: none;
-}
 
 /* ---- 移动端响应式补充 ---- */
 @media (max-width: 767px) {
@@ -8467,6 +8448,7 @@ input, textarea, select, button,
 
   .tb-card--expanded {
     grid-column: 1;
+    grid-row: span 1;
   }
 
   .tb-expand-close {

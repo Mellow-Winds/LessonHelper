@@ -126,7 +126,7 @@ function startPomodoroTick() {
       if (card) {
         let html = renderPomodoro();
         if (card.classList.contains('tb-card--expanded')) {
-          html = buildExpandedHTML('pomodoro', html);
+          html = buildExpandedHTML('pomodoro', html, card.style.gridColumn || undefined, card.style.gridRow || undefined);
         }
         card.outerHTML = html;
         bindPomodoro();
@@ -163,7 +163,7 @@ function bindPomodoro() {
     if (card) {
       let html = renderPomodoro();
       if (card.classList.contains('tb-card--expanded')) {
-        html = buildExpandedHTML('pomodoro', html);
+        html = buildExpandedHTML('pomodoro', html, card.style.gridColumn || undefined, card.style.gridRow || undefined);
       }
       card.outerHTML = html;
       bindPomodoro();
@@ -655,7 +655,7 @@ function openBlindBox() {
     if (!card) return;
     let html = renderBlindBox(idx);
     if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('blindbox', html);
+      html = buildExpandedHTML('blindbox', html, card.style.gridColumn || undefined, card.style.gridRow || undefined);
     }
     card.outerHTML = html;
     bindBlindBox();
@@ -679,7 +679,7 @@ function retryBlindBox() {
   setTimeout(() => {
     let html = renderBlindBox(idx);
     if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('blindbox', html);
+      html = buildExpandedHTML('blindbox', html, card.style.gridColumn || undefined, card.style.gridRow || undefined);
     }
     card.outerHTML = html;
     bindBlindBox();
@@ -791,7 +791,7 @@ function drawAnswer() {
     if (!card) return;
     let html = renderAnswerBook(answer);
     if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('answerbook', html);
+      html = buildExpandedHTML('answerbook', html, card.style.gridColumn || undefined, card.style.gridRow || undefined);
     }
     card.outerHTML = html;
     bindAnswerBook();
@@ -815,7 +815,7 @@ function retryAnswerBook() {
   setTimeout(() => {
     let html = renderAnswerBook(answer);
     if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('answerbook', html);
+      html = buildExpandedHTML('answerbook', html, card.style.gridColumn || undefined, card.style.gridRow || undefined);
     }
     card.outerHTML = html;
     bindAnswerBook();
@@ -1251,7 +1251,6 @@ function bindFoodPicker() {
 
 let _isExpanding = false;
 let _currentExpandedCard = null;
-let _backdropEl = null;
 
 const WIDGET_RENDERERS = {
   pomodoro:    { render: renderPomodoro,    bind: bindPomodoro,    compact: renderPomodoroCompact },
@@ -1264,22 +1263,81 @@ const WIDGET_RENDERERS = {
   foodpicker:  { render: renderFoodPicker,  bind: bindFoodPicker,  compact: renderFoodPickerCompact },
 };
 
-function ensureBackdrop() {
-  if (_backdropEl) return _backdropEl;
-  _backdropEl = document.createElement('div');
-  _backdropEl.className = 'tb-backdrop';
-  _backdropEl.addEventListener('click', () => {
-    if (_currentExpandedCard) collapseWidget(_currentExpandedCard, true);
-  });
-  document.body.appendChild(_backdropEl);
-  return _backdropEl;
+function captureCardRects(grid) {
+  var map = {};
+  var cards = grid.querySelectorAll('.tb-card[data-tb-widget]');
+  for (var i = 0; i < cards.length; i++) {
+    map[cards[i].dataset.tbWidget] = cards[i].getBoundingClientRect();
+  }
+  return map;
 }
 
-function buildExpandedHTML(widgetType, fullHTML) {
+function flipGridCards(grid, beforeMap, onAllDone) {
+  var cards = grid.querySelectorAll('.tb-card[data-tb-widget]');
+  var pending = 0;
+
+  function checkDone() {
+    if (pending === 0 && onAllDone) {
+      onAllDone();
+      onAllDone = null;
+    }
+  }
+
+  for (var i = 0; i < cards.length; i++) {
+    var card = cards[i];
+    var widget = card.dataset.tbWidget;
+    var beforeRect = beforeMap[widget];
+    if (!beforeRect) continue;
+    var afterRect = card.getBoundingClientRect();
+    var dx = beforeRect.left - afterRect.left;
+    var dy = beforeRect.top - afterRect.top;
+    var sx = beforeRect.width / afterRect.width;
+    var sy = beforeRect.height / afterRect.height;
+
+    // 无显著变化则跳过
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) continue;
+
+    pending++;
+    card.style.transformOrigin = 'top left';
+    card.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')';
+    card.style.transition = 'none';
+    card.style.willChange = 'transform';
+
+    (function(c) {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          c.style.transition = 'transform 0.75s var(--ease-spring)';
+          c.style.transform = 'translate(0, 0) scale(1, 1)';
+        });
+      });
+    })(card);
+
+    card.addEventListener('transitionend', function cleanup() {
+      card.removeEventListener('transitionend', cleanup);
+      card.style.transform = '';
+      card.style.transition = '';
+      card.style.willChange = '';
+      card.style.transformOrigin = '';
+      pending--;
+      checkDone();
+    }, { once: true });
+  }
+
+  // 无动画时异步回调
+  if (pending === 0) {
+    setTimeout(checkDone, 16);
+  }
+}
+
+function buildExpandedHTML(widgetType, fullHTML, gridColumn, gridRow) {
   const closeBtn = '<button class="tb-expand-close" aria-label="关闭"><svg class="mi-svg" viewBox="0 0 24 24" width="20" height="20"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>';
+  var parts = [];
+  if (gridColumn) parts.push('grid-column:' + gridColumn);
+  if (gridRow) parts.push('grid-row:' + gridRow);
+  var styleAttr = parts.length > 0 ? ' style="' + parts.join(';') + '"' : '';
   return fullHTML.replace(
     '<div class="tb-card">',
-    '<div class="tb-card tb-card--expanded" data-tb-widget="' + widgetType + '">' + closeBtn
+    '<div class="tb-card tb-card--expanded" data-tb-widget="' + widgetType + '"' + styleAttr + '>' + closeBtn
   );
 }
 
@@ -1301,47 +1359,29 @@ function collapseWidget(expandedCardEl, animate) {
 
   _isExpanding = true;
 
-  var firstRect = expandedCardEl.getBoundingClientRect();
+  var grid = expandedCardEl.closest('.tb-grid');
+  if (!grid) { _isExpanding = false; cleanupAfterCollapse(); return; }
+
+  var beforeMap = captureCardRects(grid);
   expandedCardEl.outerHTML = compactHTML;
-  var grid = document.querySelector('.tb-grid');
-  var newCard = grid && grid.querySelector('[data-tb-widget="' + widgetType + '"]');
 
-  if (!newCard) {
+  flipGridCards(grid, beforeMap, function() {
     _isExpanding = false;
-    cleanupAfterCollapse();
-    return;
-  }
-
-  var lastRect = newCard.getBoundingClientRect();
-  newCard.style.transformOrigin = 'top left';
-  newCard.style.transform = 'translate(' + (firstRect.left - lastRect.left) + 'px, ' + (firstRect.top - lastRect.top) + 'px) scale(' + (firstRect.width / lastRect.width) + ', ' + (firstRect.height / lastRect.height) + ')';
-  newCard.style.transition = 'none';
-  newCard.style.willChange = 'transform';
-
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      newCard.style.transition = 'transform 0.35s var(--ease-spring)';
-      newCard.style.transform = 'translate(0, 0) scale(1, 1)';
-    });
+    // 番茄钟运行时恢复紧凑预览倒计时
+    if (widgetType === 'pomodoro') {
+      var pState = loadPomodoroState();
+      if (pState.running && pState.endAt) {
+        updateCompactPomodoroPreview();
+        _pomodoroCompactTimer = setInterval(updateCompactPomodoroPreview, 1000);
+      }
+    }
   });
-
-  newCard.addEventListener('transitionend', function onEnd() {
-    newCard.removeEventListener('transitionend', onEnd);
-    newCard.style.transform = '';
-    newCard.style.transition = '';
-    newCard.style.willChange = '';
-    newCard.style.transformOrigin = '';
-    _isExpanding = false;
-  }, { once: true });
 
   cleanupAfterCollapse();
 }
 
 function cleanupAfterCollapse() {
   _currentExpandedCard = null;
-  if (_backdropEl) { _backdropEl.classList.remove('active'); }
-  var dimmed = document.querySelectorAll('.tb-card--dimmed');
-  for (var i = 0; i < dimmed.length; i++) { dimmed[i].classList.remove('tb-card--dimmed'); }
   if (_pomodoroCompactTimer) {
     clearInterval(_pomodoroCompactTimer);
     _pomodoroCompactTimer = null;
@@ -1381,63 +1421,58 @@ function expandWidget(compactCardEl) {
   if (!widgetType || !WIDGET_RENDERERS[widgetType]) return;
   if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === widgetType) return;
 
+  // 先瞬间收起已展开的不同卡片
   if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget !== widgetType) {
     collapseWidget(_currentExpandedCard, false);
   }
 
   _isExpanding = true;
 
-  var firstRect = compactCardEl.getBoundingClientRect();
-  var fullHTML = WIDGET_RENDERERS[widgetType].render();
-  var expandedHTML = buildExpandedHTML(widgetType, fullHTML);
-  compactCardEl.outerHTML = expandedHTML;
+  var grid = compactCardEl.closest('.tb-grid');
+  if (!grid) { _isExpanding = false; return; }
 
-  var grid = document.querySelector('.tb-grid');
-  var expandedCard = grid && grid.querySelector('[data-tb-widget="' + widgetType + '"].tb-card--expanded');
+  var beforeMap = captureCardRects(grid);
 
-  if (!expandedCard) {
-    _isExpanding = false;
-    return;
+  // 计算紧凑卡片在第几列（0=左, 1=中, 2=右），右侧卡片向左展开并锁定行
+  var siblings = Array.from(grid.children);
+  var idx = siblings.indexOf(compactCardEl);
+  var col = idx % 3;
+  var gridCol, gridRow;
+  if (col === 2) {
+    // 右列：向左跨 2 列，锁定在原行避免被中间卡片阻挡
+    gridCol = '2 / 4';
+    gridRow = (Math.floor(idx / 3) + 1) + ' / ' + (Math.floor(idx / 3) + 3);
+  } else {
+    gridCol = 'span 2';
+    gridRow = null;
   }
 
+  // 替换紧凑卡片为展开版
+  var fullHTML = WIDGET_RENDERERS[widgetType].render();
+  var expandedHTML = buildExpandedHTML(widgetType, fullHTML, gridCol, gridRow);
+  compactCardEl.outerHTML = expandedHTML;
+
+  // 绑定组件事件
   WIDGET_RENDERERS[widgetType].bind();
   if (widgetType === 'pomodoro') {
     var pState = loadPomodoroState();
     if (pState.running && pState.endAt) { startPomodoroTick(); }
   }
 
-  var lastRect = expandedCard.getBoundingClientRect();
-  expandedCard.style.transformOrigin = 'top left';
-  expandedCard.style.transform = 'translate(' + (firstRect.left - lastRect.left) + 'px, ' + (firstRect.top - lastRect.top) + 'px) scale(' + (firstRect.width / lastRect.width) + ', ' + (firstRect.height / lastRect.height) + ')';
-  expandedCard.style.transition = 'none';
-  expandedCard.style.willChange = 'transform';
-
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      expandedCard.style.transition = 'transform 0.35s var(--ease-spring)';
-      expandedCard.style.transform = 'translate(0, 0) scale(1, 1)';
-    });
-  });
-
-  expandedCard.addEventListener('transitionend', function onEnd() {
-    expandedCard.removeEventListener('transitionend', onEnd);
-    expandedCard.style.transform = '';
-    expandedCard.style.transition = '';
-    expandedCard.style.willChange = '';
-    expandedCard.style.transformOrigin = '';
-    _currentExpandedCard = expandedCard;
-    _isExpanding = false;
-    expandedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, { once: true });
-
-  ensureBackdrop().classList.add('active');
-  var compacts = document.querySelectorAll('.tb-card--compact');
-  for (var i = 0; i < compacts.length; i++) { compacts[i].classList.add('tb-card--dimmed'); }
-
+  // 停止紧凑番茄钟预览
   if (_pomodoroCompactTimer) {
     clearInterval(_pomodoroCompactTimer);
     _pomodoroCompactTimer = null;
   }
+
+  // FLIP 动画 —— 展开卡片 + 周围卡片全部参与
+  flipGridCards(grid, beforeMap, function() {
+    _currentExpandedCard = grid.querySelector('[data-tb-widget="' + widgetType + '"].tb-card--expanded');
+    _isExpanding = false;
+    if (_currentExpandedCard) {
+      _currentExpandedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  });
 }
 
 function bindTreasureBoxGrid(container) {
@@ -1500,7 +1535,6 @@ function escHtml(str) {
 registerPage('treasurebox', function(container) {
   _isExpanding = false;
   _currentExpandedCard = null;
-  if (_backdropEl) { _backdropEl.classList.remove('active'); }
   container.innerHTML = renderTreasureBox();
   setTimeout(function() {
     bindTreasureBoxGrid(container);
