@@ -363,15 +363,13 @@ async function renderPlazaMaterialsTab(contentEl, courseIds) {
         <div class="material-card-body">
           <div class="material-card-title">${escHtml(m.title)}</div>
           ${m.description ? `<div class="material-card-desc">${escHtml(m.description)}</div>` : ''}
-          <div style="margin-top:8px">
-            <div class="material-meta-row">
-              ${m._sourceTitle ? `<span class="material-meta-item"><span class="mi">school</span> ${escHtml(m._sourceTitle)}</span>` : ''}
-              <span class="material-meta-item"><span class="mi">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.uploader_id})">${escHtml(m.uploader_name)}</button></span>
-            </div>
-            <div class="material-meta-row">
-              <span class="material-meta-item"><span class="mi">straighten</span> ${formatFileSize(m.file_size)}</span>
-              <span class="material-meta-item"><span class="mi">download</span> ${m.download_count}</span>
-            </div>
+          <div class="material-meta-row">
+            ${m._sourceTitle ? `<span class="material-meta-item"><span class="mi">school</span> ${escHtml(m._sourceTitle)}</span>` : ''}
+            <span class="material-meta-item"><span class="mi">person</span> <button class="user-profile-link" onclick="navigateTo('profile-user', ${m.uploader_id})">${escHtml(m.uploader_name)}</button></span>
+          </div>
+          <div class="material-meta-row">
+            <span class="material-meta-item"><span class="mi">straighten</span> ${formatFileSize(m.file_size)}</span>
+            <span class="material-meta-item"><span class="mi">download</span> ${m.download_count}</span>
           </div>
         </div>
         <div class="material-card-actions">

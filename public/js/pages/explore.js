@@ -7,6 +7,7 @@ import { registerPage, navigateTo, animIn, animStagger, bindRipples, renderMarkd
 import { apiGet, apiPost, apiDelete, isLoggedIn, getToken } from '../core/api.js';
 import { showToast, openModal, closeModal, renderLoginPrompt, createMdInput } from '../components/ui.js';
 import { renderCard, renderPostCard, renderModule, startTimers, bindCardActions } from '../components/card-renderer.js';
+import { TkComments } from '../components/tk-comments.js';
 
 /* =============================================
    状态
@@ -291,26 +292,8 @@ function renderPostDetail(el, post) {
         <h2 class="explore-post-title">${escHtml(post.title)}</h2>
         <div class="explore-detail-content">${contentHtml}</div>
       </div>
-      <div class="comment-section">
-        <div class="comment-section-header">共 ${post.comment_count || 0} 条评论</div>
-        <div class="comment-list" id="comment-list-${post.id}">
-          <p class="text-secondary" style="text-align:center;padding:24px;font-size:13px">加载中...</p>
-        </div>
-        ${isLoggedIn() ? `
-          <div class="comment-input-area" style="flex-direction:column;align-items:stretch">
-            <div style="display:flex;align-items:center;gap:var(--space-3)">
-              <div class="comment-input-wrapper" style="flex:1">
-                <input type="text" class="comment-main-input" id="comment-main-input-${post.id}" placeholder="说点什么...">
-                <label class="comment-input-img-btn" title="选择图片">
-                  <i class="ri-image-line"></i>
-                  <input type="file" style="position:absolute;width:0;height:0;opacity:0;overflow:hidden" accept="image/*" multiple id="comment-img-input-${post.id}" onchange="window._commentHandleFiles(this,${post.id})">
-                </label>
-              </div>
-              <button class="comment-send-btn" id="comment-send-btn-${post.id}">发送</button>
-            </div>
-            <div class="forum-editor-previews" id="comment-previews-${post.id}"></div>
-          </div>
-        ` : `<p class="text-secondary" style="padding:12px 24px;font-size:12px;text-align:center"><a href="#" onclick="navigateTo('auth');return false">登录</a> 后参与评论</p>`}
+      <div class="comment-section" id="tk-comments-container-${post.id}">
+        ${isLoggedIn() ? '' : `<p class="text-secondary" style="padding:12px 24px;font-size:12px;text-align:center"><a href="#" onclick="navigateTo('auth');return false">登录</a> 后参与评论</p>`}
       </div>
     </div>
   `;
@@ -328,8 +311,24 @@ function renderPostDetail(el, post) {
     }
   });
 
-  loadCommentsNew(post.id);
-  bindCommentEvents(el, post.id);
+  // 初始化统一评论区
+  if (isLoggedIn()) {
+    const commentContainer = el.querySelector('.comment-section');
+    if (commentContainer) {
+      const tkComments = new TkComments({
+        apiBase: '/api/explore/posts',
+        ctxId: post.id,
+        container: commentContainer,
+        layout: 'sidebar',
+        onNavigateProfile: (username) => {
+          navigateTo('profile-user', username);
+        }
+      });
+      tkComments.init();
+      // 保存引用以便销毁
+      el._tkComments = tkComments;
+    }
+  }
 }
 
 /* ---- 卡片编辑弹窗 ---- */
@@ -376,380 +375,6 @@ function openCardEditModal(post, blocks, blockIndex, detailEl) {
     renderPostDetail(detailEl, { ...post, blocks });
     closeModal();
     showToast('卡片已更新');
-  });
-}
-
-/* ---- 评论图片预览状态 ---- */
-const _commentImages = {};  // { postId: { files: File[], urls: string[] } }
-
-function getCommentImages(postId) {
-  if (!_commentImages[postId]) _commentImages[postId] = { files: [], urls: [] };
-  return _commentImages[postId];
-}
-
-/* =============================================
-   新版评论系统
-   ============================================= */
-
-async function loadCommentsNew(postId) {
-  const listEl = document.getElementById(`comment-list-${postId}`);
-  if (!listEl) return;
-  try {
-    const data = await apiGet(`/api/explore/posts/${postId}/comments`);
-    const topComments = data.items || [];
-    if (topComments.length === 0) {
-      listEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:24px;font-size:13px">暂无评论</p>';
-      return;
-    }
-    // 主评论渲染，子回复内嵌但平级（可展开/折叠）
-    listEl.innerHTML = topComments.map(c => renderCommentWithReplies(c, postId)).join('');
-  } catch (e) {
-    listEl.innerHTML = '<p class="text-secondary" style="text-align:center;padding:24px;font-size:13px">加载失败</p>';
-  }
-}
-
-// 核心：彻底把树状回复拍平成一维数组
-function flattenReplies(replies, parentAuthorName = '') {
-  let flatList = [];
-  for (const r of replies) {
-    r.replyToName = parentAuthorName;
-    flatList.push(r);
-    if (r.replies && r.replies.length > 0) {
-      const authorName = r.author_nickname || r.author_name || '匿名';
-      flatList = flatList.concat(flattenReplies(r.replies, authorName));
-    }
-  }
-  return flatList;
-}
-
-// 采用 TikTok 级 UI 架构重写渲染
-function renderCommentWithReplies(c, postId, depth = 0, parentAuthorName = '') {
-  const nickname = c.author_nickname || c.author_name || '匿名';
-  const avatarLetter = (nickname || '?')[0].toUpperCase();
-  const timeStr = c.created_at ? formatTimeAgo(c.created_at) : '';
-  const liked = likedComments.has(c.id);
-  const replies = c.replies || [];
-  const replyCount = c.reply_count || replies.length;
-
-  // depth > 0 即为子回复
-  const isSub = depth > 0;
-  const avatarSize = isSub ? 24 : 32;
-
-  // "回复 @某人" 的灰色高亮逻辑
-  const replyToHtml = isSub && parentAuthorName && parentAuthorName !== nickname
-    ? `<span class="tk-reply-to">回复 <span class="tk-reply-user">${escHtml(parentAuthorName)}</span>：</span>`
-    : '';
-
-  return `
-    <div class="tk-comment-item ${isSub ? 'tk-sub-item' : ''}" id="comment-${c.id}">
-      <div class="tk-avatar-col">
-        ${c.author_avatar
-          ? `<img src="${c.author_avatar}" class="tk-avatar" style="width:${avatarSize}px;height:${avatarSize}px">`
-          : `<div class="tk-avatar-letter" style="width:${avatarSize}px;height:${avatarSize}px">${avatarLetter}</div>`}
-      </div>
-
-      <div class="tk-content-col">
-        <div class="tk-username">${escHtml(nickname)}</div>
-        <div class="tk-text">${replyToHtml}${escHtml(c.content || '')}</div>
-        ${c.image_url ? `<img src="${c.image_url}" class="tk-comment-img" alt="">` : ''}
-
-        <div class="tk-meta-row">
-          <span class="tk-time">${escHtml(timeStr)}</span>
-          <span class="tk-action-btn" data-action="reply" data-comment-id="${c.id}" data-post-id="${postId}" data-author="${escAttr(nickname)}">回复</span>
-          ${window._currentUser && c.author_id === window._currentUser.id ? `
-            <span class="tk-action-btn tk-danger" data-action="delete-comment" data-comment-id="${c.id}" data-post-id="${postId}">删除</span>
-          ` : ''}
-
-          <div class="tk-like-container ${liked ? 'liked' : ''}" data-action="like" data-comment-id="${c.id}" data-post-id="${postId}">
-            <i class="${liked ? 'ri-heart-fill' : 'ri-heart-line'}"></i>
-            <span>${c.like_count || 0}</span>
-          </div>
-        </div>
-
-        <div class="inline-reply-box" id="inline-reply-${c.id}">
-          <div class="tk-inline-input-row">
-            <input type="text" class="inline-reply-input" id="inline-reply-input-${c.id}" placeholder="回复 ${escAttr(nickname)}...">
-            <label class="tk-inline-icon-btn">
-              <i class="ri-image-line"></i>
-              <input type="file" hidden accept="image/*" onchange="window._inlineReplyHandleFiles(this,${postId},${c.id})">
-            </label>
-            <button class="tk-inline-send-btn" data-action="send-reply" data-comment-id="${c.id}" data-post-id="${postId}">发送</button>
-          </div>
-          <div class="forum-editor-previews" id="inline-reply-previews-${c.id}"></div>
-        </div>
-
-        ${!isSub && replyCount > 0 ? `
-          <div class="tk-replies-container" id="sub-list-${c.id}" style="display:none">
-            ${flattenReplies(replies, nickname).map(r => renderCommentWithReplies(r, postId, 1, r.replyToName)).join('')}
-          </div>
-          <div class="tk-view-more-replies" data-action="toggle-sub" data-comment-id="${c.id}">
-            <span class="tk-view-more-line"></span>
-            <span class="toggle-text">展开 ${replyCount} 条回复</span>
-            <i class="ri-arrow-down-s-line"></i>
-          </div>
-        ` : ''}
-      </div>
-    </div>
-  `;
-}
-
-/* ---- 评论事件 ---- */
-
-function bindCommentEvents(el, postId) {
-  const sendBtn = el.querySelector(`#comment-send-btn-${postId}`);
-  const mainInput = el.querySelector(`#comment-main-input-${postId}`);
-  sendBtn?.addEventListener('click', () => submitMainComment(postId));
-  mainInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitMainComment(postId); });
-
-  el.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    const action = btn.dataset.action;
-    const cid = Number(btn.dataset.commentId);
-    const pid = Number(btn.dataset.postId);
-
-    switch (action) {
-      case 'reply':
-        toggleInlineReply(cid, btn.dataset.author);
-        break;
-      case 'send-reply':
-        submitInlineReply(pid, cid);
-        break;
-      case 'toggle-sub':
-        toggleSubReplies(cid);
-        break;
-      case 'like':
-        toggleLike(cid, pid);
-        break;
-      case 'delete-comment':
-        deleteComment(pid, cid);
-        break;
-    }
-  });
-}
-
-/* ---- 评论图片预览 ---- */
-
-window._commentHandleFiles = function(input, postId) {
-  const state = getCommentImages(postId);
-  const maxImages = 9;
-  const remaining = maxImages - state.files.length;
-  if (remaining <= 0) {
-    showToast(`最多只能添加 ${maxImages} 张图片`);
-    input.value = '';
-    return;
-  }
-  for (const file of Array.from(input.files).slice(0, remaining)) {
-    if (!file.type.startsWith('image/')) continue;
-    if (file.size > 20 * 1024 * 1024) { showToast('图片不能超过 20MB'); continue; }
-    state.files.push(file);
-    state.urls.push(URL.createObjectURL(file));
-  }
-  input.value = '';
-  renderCommentPreviews(postId);
-};
-
-function renderCommentPreviews(postId) {
-  const el = document.getElementById(`comment-previews-${postId}`);
-  if (!el) return;
-  const state = getCommentImages(postId);
-  if (state.urls.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = state.urls.map((url, i) => `
-    <div class="forum-editor-preview">
-      <img src="${url}" alt="">
-      <button class="forum-editor-preview-remove" onclick="window._commentRemoveImage(${postId},${i})">&times;</button>
-    </div>
-  `).join('');
-}
-
-window._commentRemoveImage = function(postId, index) {
-  const state = getCommentImages(postId);
-  if (state.urls[index]) URL.revokeObjectURL(state.urls[index]);
-  state.files.splice(index, 1);
-  state.urls.splice(index, 1);
-  renderCommentPreviews(postId);
-};
-
-/* ---- 行内回复图片预览 ---- */
-const _inlineReplyImages = {};  // { commentId: { files, urls } }
-
-function getInlineReplyImages(commentId) {
-  if (!_inlineReplyImages[commentId]) _inlineReplyImages[commentId] = { files: [], urls: [] };
-  return _inlineReplyImages[commentId];
-}
-
-window._inlineReplyHandleFiles = function(input, postId, commentId) {
-  const state = getInlineReplyImages(commentId);
-  const maxImages = 9;
-  const remaining = maxImages - state.files.length;
-  if (remaining <= 0) { showToast(`最多只能添加 ${maxImages} 张图片`); input.value = ''; return; }
-  for (const file of Array.from(input.files).slice(0, remaining)) {
-    if (!file.type.startsWith('image/')) continue;
-    if (file.size > 20 * 1024 * 1024) { showToast('图片不能超过 20MB'); continue; }
-    state.files.push(file);
-    state.urls.push(URL.createObjectURL(file));
-  }
-  input.value = '';
-  renderInlineReplyPreviews(commentId);
-};
-
-function renderInlineReplyPreviews(commentId) {
-  const el = document.getElementById(`inline-reply-previews-${commentId}`);
-  if (!el) return;
-  const state = getInlineReplyImages(commentId);
-  if (state.urls.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = state.urls.map((url, i) => `
-    <div class="forum-editor-preview">
-      <img src="${url}" alt="">
-      <button class="forum-editor-preview-remove" onclick="window._inlineReplyRemoveImage(${commentId},${i})">&times;</button>
-    </div>
-  `).join('');
-}
-
-window._inlineReplyRemoveImage = function(commentId, index) {
-  const state = getInlineReplyImages(commentId);
-  if (state.urls[index]) URL.revokeObjectURL(state.urls[index]);
-  state.files.splice(index, 1);
-  state.urls.splice(index, 1);
-  renderInlineReplyPreviews(commentId);
-};
-
-async function submitMainComment(postId) {
-  const input = document.getElementById(`comment-main-input-${postId}`);
-  const content = input?.value?.trim();
-  const state = getCommentImages(postId);
-  if (!content && state.files.length === 0) return;
-
-  if (state.files.length > 0) {
-    const formData = new FormData();
-    formData.append('content', content);
-    state.files.forEach((f, i) => formData.append(i === 0 ? 'image' : 'images', f));
-    try {
-      const token = getToken();
-      const res = await fetch(`/api/explore/posts/${postId}/comments`, {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: formData
-      });
-      const data = await res.json();
-      if (data.error) { showToast(data.error); return; }
-    } catch { showToast('发送失败'); return; }
-  } else {
-    const res = await apiPost(`/api/explore/posts/${postId}/comments`, { content });
-    if (res.error) { showToast(res.error); return; }
-  }
-  // 清理
-  input.value = '';
-  state.urls.forEach(u => URL.revokeObjectURL(u));
-  _commentImages[postId] = { files: [], urls: [] };
-  renderCommentPreviews(postId);
-  showToast('评论成功');
-  loadCommentsNew(postId);
-}
-
-function toggleInlineReply(commentId, authorName) {
-  const box = document.getElementById(`inline-reply-${commentId}`);
-  if (!box) return;
-  const isOpen = box.classList.contains('open');
-  document.querySelectorAll('.inline-reply-box.open').forEach(b => b.classList.remove('open'));
-  if (!isOpen) {
-    box.classList.add('open');
-    const input = box.querySelector('.inline-reply-input');
-    if (input) { input.placeholder = `回复 @${authorName}...`; input.value = ''; setTimeout(() => input.focus(), 100); }
-  }
-}
-
-async function submitInlineReply(postId, parentCommentId) {
-  const input = document.getElementById(`inline-reply-input-${parentCommentId}`);
-  const content = input?.value?.trim();
-  const state = getInlineReplyImages(parentCommentId);
-  if (!content && state.files.length === 0) return;
-
-  if (state.files.length > 0) {
-    const formData = new FormData();
-    formData.append('content', content);
-    formData.append('parent_id', parentCommentId);
-    state.files.forEach((f, i) => formData.append(i === 0 ? 'image' : 'images', f));
-    try {
-      const token = getToken();
-      const res = await fetch(`/api/explore/posts/${postId}/comments`, {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: formData
-      });
-      const data = await res.json();
-      if (data.error) { showToast(data.error); return; }
-    } catch { showToast('发送失败'); return; }
-  } else {
-    const res = await apiPost(`/api/explore/posts/${postId}/comments`, { content, parent_id: parentCommentId });
-    if (res.error) { showToast(res.error); return; }
-  }
-  // 清理
-  state.urls.forEach(u => URL.revokeObjectURL(u));
-  delete _inlineReplyImages[parentCommentId];
-  renderInlineReplyPreviews(parentCommentId);
-  showToast('回复成功');
-  loadCommentsNew(postId);
-}
-
-function toggleSubReplies(commentId) {
-  const list = document.getElementById(`sub-list-${commentId}`);
-  const toggleBar = document.querySelector(`[data-comment-id="${commentId}"][data-action="toggle-sub"]`);
-  const text = toggleBar?.querySelector('.toggle-text');
-  const arrow = toggleBar?.querySelector('i');
-  if (!list) return;
-  if (list.style.display === 'none' || list.style.display === '') {
-    list.style.display = 'block';
-    if (text) text.textContent = '收起回复';
-    if (arrow) { arrow.className = 'ri-arrow-up-s-line'; }
-  } else {
-    list.style.display = 'none';
-    if (text) text.textContent = `展开 ${list.children.length} 条回复`;
-    if (arrow) { arrow.className = 'ri-arrow-down-s-line'; }
-  }
-}
-
-// 点赞（localStorage）
-const LIKED_STORAGE_KEY = 'explore_liked_comments';
-const likedComments = new Set(
-  (() => { try { return JSON.parse(localStorage.getItem(LIKED_STORAGE_KEY) || '[]'); } catch { return []; } })()
-);
-
-function toggleLike(commentId, postId) {
-  const btn = document.querySelector(`[data-comment-id="${commentId}"][data-action="like"]`);
-  if (!btn) return;
-  const wasLiked = likedComments.has(commentId);
-  const icon = btn.querySelector('i');
-  const countSpan = btn.querySelector('span');
-  let count = parseInt(countSpan?.textContent || '0');
-
-  if (wasLiked) {
-    likedComments.delete(commentId);
-    count = Math.max(0, count - 1);
-    icon.className = 'ri-heart-line';
-    btn.classList.remove('liked');
-  } else {
-    likedComments.add(commentId);
-    count++;
-    icon.className = 'ri-heart-fill';
-    btn.classList.add('liked');
-  }
-  countSpan.textContent = count;
-  try { localStorage.setItem(LIKED_STORAGE_KEY, JSON.stringify([...likedComments])); } catch {}
-}
-
-async function deleteComment(postId, commentId) {
-  openModal('确认删除', `
-    <p style="margin-bottom:24px">确定要删除这条评论吗？</p>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-      <button class="btn btn-primary" id="confirm-del-cmt" style="background:var(--md-error)">删除</button>
-    </div>
-  `);
-  document.getElementById('confirm-del-cmt')?.addEventListener('click', async () => {
-    const res = await apiDelete(`/api/explore/posts/${postId}/comments/${commentId}`);
-    if (res.error) { showToast(res.error); } else { showToast('已删除'); loadCommentsNew(postId); }
-    closeModal();
   });
 }
 

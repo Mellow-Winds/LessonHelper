@@ -121,10 +121,9 @@ import {
   showPublishBlockedToast, switchDetailTab, toggleComments, handleAddComment,
   refreshMyMaterials, rateMyMaterial, deleteMyMaterial,
   openUploadMaterialModal, onFileSelected, handleUploadMaterial,
-  // forum stream architecture
-  toggleForumLike, openForumInlineEditor, submitForumReply,
-  autoResizeForumTextarea, handleForumReplyImageChange, removeForumReplyImage,
-  toggleForumReplies, focusForumCompose, openForumCompose, closeForumCompose,
+  // forum (compose + compat stubs)
+  toggleForumLike, autoResizeForumTextarea,
+  focusForumCompose, openForumCompose, closeForumCompose,
   handleForumComposeImageChange, removeForumComposeImage, submitForumPost,
 } from './pages/courses/detail.js';
 
@@ -185,33 +184,8 @@ function logout() {
   showToast('已退出登录');
 }
 
-function updateSidebarAvatar() {
-  const area = document.getElementById('sidebar-avatar-area');
-  if (!area) return;
-  const user = window._currentUser;
-
-  const svgEl = area.querySelector('.sidebar-avatar-icon');
-  const imgEl = area.querySelector('.sidebar-avatar-img');
-
-  if (user?.avatar_url) {
-    // 有头像 → 隐藏 SVG，显示 img
-    if (svgEl) svgEl.style.display = 'none';
-    if (imgEl) {
-      imgEl.src = user.avatar_url;
-      imgEl.style.display = '';
-    } else {
-      const img = document.createElement('img');
-      img.src = user.avatar_url;
-      img.alt = user.nickname || '';
-      img.className = 'sidebar-avatar-img';
-      area.appendChild(img);
-    }
-  } else {
-    // 无头像 → 显示 SVG，隐藏 img
-    if (svgEl) svgEl.style.display = '';
-    if (imgEl) imgEl.style.display = 'none';
-  }
-}
+// 侧边栏保持默认人像图标，不随头像上传变化
+function updateSidebarAvatar() {}
 
 // 挂载到 window 供页面模块和 HTML 内联事件使用
 window.loadCurrentUser = loadCurrentUser;
@@ -275,14 +249,9 @@ Object.assign(window, {
   openUploadMaterialModal,
   onFileSelected,
   handleUploadMaterial,
-  // forum stream architecture
+  // forum (compose + compat stubs)
   toggleForumLike,
-  openForumInlineEditor,
-  submitForumReply,
   autoResizeForumTextarea,
-  handleForumReplyImageChange,
-  removeForumReplyImage,
-  toggleForumReplies,
   focusForumCompose,
   openForumCompose,
   closeForumCompose,

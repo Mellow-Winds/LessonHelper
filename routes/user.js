@@ -51,6 +51,32 @@ module.exports = function (db) {
     res.json({ activities, page, pageSize });
   });
 
+  // GET /api/user/friends — 互关好友列表 [Auth]（@提及选择用）
+  router.get('/friends', authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const q = (req.query.q || '').trim();
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+
+    let sql = `
+      SELECT u.id, u.nickname, u.username, u.avatar_url, u.grade, u.major
+      FROM follows f
+      JOIN users u ON u.id = f.following_id
+      WHERE f.follower_id = ?
+    `;
+    const params = [userId];
+
+    if (q) {
+      sql += ` AND (u.nickname LIKE ? OR u.username LIKE ?)`;
+      params.push(`%${q}%`, `%${q}%`);
+    }
+
+    sql += ` ORDER BY u.nickname ASC LIMIT ?`;
+    params.push(limit);
+
+    const friends = db.all(sql, params);
+    res.json({ friends });
+  });
+
   // GET /api/user/:id — 用户公开信息
   router.get('/:id', optionalAuthMiddleware, (req, res) => {
     const userId = Number(req.params.id);
