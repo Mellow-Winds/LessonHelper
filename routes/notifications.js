@@ -81,6 +81,22 @@ module.exports = function (db) {
     res.json({ message: 'ok' });
   });
 
+  // POST /api/notifications/batch-delete — 批量删除 [Auth]
+  router.post('/batch-delete', authMiddleware, (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: '请提供要删除的通知 ID 列表' });
+    }
+    const userId = req.user.userId;
+    let deleted = 0;
+    for (const id of ids) {
+      const result = db.run('DELETE FROM notifications WHERE id = ? AND user_id = ?', [Number(id), userId]);
+      if (result.changes > 0) deleted++;
+    }
+    db.save();
+    res.json({ message: `已删除 ${deleted} 条通知`, deleted });
+  });
+
   return router;
 };
 

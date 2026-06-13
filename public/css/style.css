@@ -3116,7 +3116,10 @@ input {
 
 .notif-page-item {
   cursor: pointer;
-  transition: box-shadow 0.15s;
+  transition: background-color 0.15s var(--ease-standard),
+              box-shadow 0.15s var(--ease-standard),
+              transform 0.1s var(--ease-standard);
+  position: relative;
 }
 
 .notif-page-item + .notif-page-item {
@@ -3124,7 +3127,12 @@ input {
 }
 
 .notif-page-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background-color: var(--md-surface-container-low);
+  box-shadow: var(--shadow-2);
+}
+
+.notif-page-item:active {
+  transform: scale(0.995);
 }
 
 .notif-page-unread {
@@ -3150,6 +3158,29 @@ input {
   background: var(--md-primary);
   flex-shrink: 0;
   margin-top: 6px;
+}
+
+.notif-action-bar {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.notif-batch-checkbox {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-3);
+  width: 18px;
+  height: 18px;
+  accent-color: var(--md-primary);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.notif-batch-mode .notif-page-item {
+  padding-left: 44px;
 }
 
 /* ==========================================================================
@@ -7398,6 +7429,20 @@ input, textarea, select, button,
     width: 100% !important;
     min-height: 300px;
   }
+
+  /* 手机端评论区输入栏 — 缩小间距，左右对称避免溢出 */
+  .comment-input-area {
+    padding: 10px 12px;
+  }
+  .comment-input-row {
+    gap: 8px;
+  }
+  .comment-send-btn {
+    padding: 0 16px;
+  }
+  .comment-input-wrapper {
+    padding: 0 36px 0 12px;
+  }
 }
 
 /* =========================================================
@@ -7486,6 +7531,17 @@ input, textarea, select, button,
   background: var(--md-surface-container-lowest);
   border-left: 1px solid var(--md-outline-variant);
 }
+
+@media (max-width: 767px) {
+  .comment-sidebar {
+    width: 100%;
+    flex-shrink: 1;
+    height: auto;
+    position: static;
+    border-left: none;
+  }
+}
+
 .comment-sidebar .comment-section-header {
   display: flex;
   align-items: center;

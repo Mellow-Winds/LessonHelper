@@ -3,7 +3,7 @@
  * 独立全页面展示通知列表
  */
 
-import { apiGet, apiPut } from '../core/api.js';
+import { apiGet, apiPut, apiPost } from '../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../core/router.js';
 import { showToast, openModal, closeModal, escHtml, formatTime, renderLoginPrompt, bindLoginPrompt, createMdTextarea } from '../components/ui.js';
 import { renderAuth } from './auth.js';
@@ -11,6 +11,7 @@ import { resolveNotificationTarget } from './notification_routes.mjs';
 import { renderFollowingFeed } from './following_feed.js';
 
 let activeTab = 'messages';
+let _batchMode = false;
 
 /* =============================================
    页面注册
@@ -27,8 +28,19 @@ registerPage('notifications', async (container) => {
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title" style="margin:0"><span class="mi" style="vertical-align:-4px;margin-right:4px">notifications</span>通知</h1>
-      <button class="btn btn-secondary btn-compact" id="notif-mark-all-btn" style="display:none">
-        <span class="mi">done_all</span> 全部已读
+    </div>
+    <div class="notif-action-bar">
+      <button class="btn btn-text" id="notif-mark-all-btn" style="display:none">
+        <span class="mi">done_all</span> 全部标为已读
+      </button>
+      <button class="btn btn-text" id="notif-batch-toggle-btn">
+        <span class="mi">checklist</span> 批量管理
+      </button>
+      <button class="btn btn-text" id="notif-batch-delete-btn" style="display:none">
+        <span class="mi">delete_sweep</span> 批量删除
+      </button>
+      <button class="btn btn-text" id="notif-select-all-btn" style="display:none">
+        <span class="mi">select_all</span> 全选
       </button>
     </div>
     <div class="md-pills" id="notification-pills">
@@ -46,6 +58,9 @@ registerPage('notifications', async (container) => {
   animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
 
   document.getElementById('notif-mark-all-btn')?.addEventListener('click', handleMarkAllRead);
+  document.getElementById('notif-batch-toggle-btn')?.addEventListener('click', toggleBatchMode);
+  document.getElementById('notif-batch-delete-btn')?.addEventListener('click', deleteSelectedNotifications);
+  document.getElementById('notif-select-all-btn')?.addEventListener('click', toggleSelectAll);
 
   container.querySelectorAll('#notification-pills .md-pill-btn').forEach(btn => {
     btn.addEventListener('click', () => switchNotificationTab(btn.dataset.tab));
@@ -61,6 +76,7 @@ registerPage('notifications', async (container) => {
 async function switchNotificationTab(tab) {
   if (tab === activeTab) return;
   activeTab = tab;
+  _batchMode = false;
   document.querySelectorAll('#notification-pills .md-pill-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
@@ -72,9 +88,15 @@ async function renderActiveTab(animate) {
   if (!content) return;
 
   const markAllBtn = document.getElementById('notif-mark-all-btn');
-  if (markAllBtn) markAllBtn.style.display = 'none';
+  const batchToggleBtn = document.getElementById('notif-batch-toggle-btn');
+  const batchDeleteBtn = document.getElementById('notif-batch-delete-btn');
+  const selectAllBtn = document.getElementById('notif-select-all-btn');
 
-  // 平滑切换：先淡出再替换再淡入
+  if (markAllBtn) markAllBtn.style.display = 'none';
+  if (batchToggleBtn) batchToggleBtn.style.display = 'none';
+  if (batchDeleteBtn) batchDeleteBtn.style.display = 'none';
+  if (selectAllBtn) selectAllBtn.style.display = 'none';
+
   if (animate) {
     content.style.transition = 'opacity 0.12s var(--ease-standard)';
     content.style.opacity = '0';
@@ -87,6 +109,17 @@ async function renderActiveTab(animate) {
     content.innerHTML = '<div id="notif-list-container"></div>';
     const listContainer = document.getElementById('notif-list-container');
     listContainer?.addEventListener('click', (e) => {
+      if (e.target.closest('.notif-batch-checkbox')) return;
+
+      if (_batchMode) {
+        const card = e.target.closest('.notif-page-item');
+        if (card) {
+          const cb = card.querySelector('.notif-batch-checkbox');
+          if (cb) cb.checked = !cb.checked;
+          return;
+        }
+      }
+
       const item = e.target.closest('.notif-page-item');
       if (!item) return;
       const { notifId, relatedType, relatedId, relatedCommentId, courseId, isRead } = item.dataset;
@@ -109,6 +142,8 @@ async function loadNotifications() {
   if (!container) return;
 
   container.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">加载中...</p></div>';
+  container.scrollTop = 0;
+  window.scrollTo(0, 0);
 
   try {
     const data = await apiGet('/api/notifications');
@@ -121,14 +156,19 @@ async function loadNotifications() {
           <p class="text-secondary" style="margin-top:12px">暂无通知</p>
         </div>
       `;
+      const batchToggleBtn = document.getElementById('notif-batch-toggle-btn');
+      if (batchToggleBtn) batchToggleBtn.style.display = 'none';
       return;
     }
 
-    // 显示/隐藏「全部已读」按钮
     const markAllBtn = document.getElementById('notif-mark-all-btn');
+    const batchToggleBtn = document.getElementById('notif-batch-toggle-btn');
     if (markAllBtn) {
       markAllBtn.style.display = data.unread > 0 ? 'inline-flex' : 'none';
     }
+    if (batchToggleBtn) batchToggleBtn.style.display = 'inline-flex';
+
+    updateBatchUI();
 
     container.innerHTML = notifs.map(n => `
       <div class="card notif-page-item${n.is_read ? '' : ' notif-page-unread'}"
@@ -138,6 +178,7 @@ async function loadNotifications() {
            data-related-comment-id="${n.related_comment_id || 0}"
            data-course-id="${n.course_id || 0}"
            data-is-read="${!!n.is_read}">
+        <input type="checkbox" class="notif-batch-checkbox" style="display:${_batchMode ? 'block' : 'none'}" data-notif-id="${n.id}">
         <div style="display:flex;align-items:flex-start;gap:12px">
           <div class="notif-page-icon">${getNotifIcon(n.type)}</div>
           <div style="flex:1;min-width:0">
@@ -163,18 +204,25 @@ async function loadNotifications() {
 
 async function handleNotifItemClick(notifId, relatedType, relatedId, courseId, isRead, relatedCommentId = 0) {
   if (!isRead) {
-    await apiPut(`/api/notifications/${notifId}/read`, {});
-    if (window.refreshNotifBadge) window.refreshNotifBadge();
+    try {
+      await apiPut(`/api/notifications/${notifId}/read`, {});
+      if (window.refreshNotifBadge) window.refreshNotifBadge();
+    } catch { /* 标记已读失败不影响跳转 */ }
   }
 
-  // 交换联系方式请求特殊处理
   if (relatedType === 'contact_exchange') {
     await showExchangeDetailModal(relatedId);
     return;
   }
 
   const target = resolveNotificationTarget(relatedType, relatedId, courseId, relatedCommentId);
-  if (target) navigateTo(target.page, target.data);
+  if (!target) return;
+
+  try {
+    navigateTo(target.page, target.data);
+  } catch {
+    showToast('内容不存在或已被作者移除');
+  }
 }
 
 /* =============================================
@@ -186,6 +234,70 @@ async function handleMarkAllRead() {
   if (window.refreshNotifBadge) window.refreshNotifBadge();
   showToast('全部已读');
   await loadNotifications();
+}
+
+/* =============================================
+   批量管理模式
+   ============================================= */
+
+function toggleBatchMode() {
+  _batchMode = !_batchMode;
+  updateBatchUI();
+
+  const container = document.getElementById('notif-list-container');
+  if (container) {
+    container.classList.toggle('notif-batch-mode', _batchMode);
+    container.querySelectorAll('.notif-batch-checkbox').forEach(cb => {
+      cb.style.display = _batchMode ? 'block' : 'none';
+      if (!_batchMode) cb.checked = false;
+    });
+  }
+}
+
+function updateBatchUI() {
+  const batchToggleBtn = document.getElementById('notif-batch-toggle-btn');
+  const batchDeleteBtn = document.getElementById('notif-batch-delete-btn');
+  const selectAllBtn = document.getElementById('notif-select-all-btn');
+
+  if (batchToggleBtn) {
+    batchToggleBtn.innerHTML = _batchMode
+      ? '<span class="mi">close</span> 退出管理'
+      : '<span class="mi">checklist</span> 批量管理';
+  }
+  if (batchDeleteBtn) batchDeleteBtn.style.display = _batchMode ? 'inline-flex' : 'none';
+  if (selectAllBtn) selectAllBtn.style.display = _batchMode ? 'inline-flex' : 'none';
+}
+
+function toggleSelectAll() {
+  const container = document.getElementById('notif-list-container');
+  if (!container) return;
+  const checkboxes = container.querySelectorAll('.notif-batch-checkbox');
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  checkboxes.forEach(cb => { cb.checked = !allChecked; });
+}
+
+async function deleteSelectedNotifications() {
+  const checked = document.querySelectorAll('.notif-batch-checkbox:checked');
+  if (checked.length === 0) {
+    showToast('请先选择要删除的通知');
+    return;
+  }
+
+  if (!confirm(`确定删除选中的 ${checked.length} 条通知？`)) return;
+
+  const ids = Array.from(checked).map(cb => Number(cb.dataset.notifId));
+  try {
+    const result = await apiPost('/api/notifications/batch-delete', { ids });
+    if (result.error) {
+      showToast(result.error);
+      return;
+    }
+    showToast(result.message || `已删除 ${ids.length} 条通知`);
+    _batchMode = false;
+    await loadNotifications();
+  } catch {
+    showToast('删除失败，请稍后重试');
+  }
 }
 
 /* =============================================
@@ -290,7 +402,6 @@ async function showExchangeDetailModal(requestId) {
 
   openModal('交换联系方式详情', bodyHtml);
 
-  // 绑定同意/拒绝按钮
   if (isPending && isRecipient) {
     document.getElementById('exchange-accept-btn')?.addEventListener('click', async () => {
       const btn = document.getElementById('exchange-accept-btn');

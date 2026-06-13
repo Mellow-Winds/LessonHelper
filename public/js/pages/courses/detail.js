@@ -46,7 +46,18 @@ async function checkEnrollment(courseId) {
    Page: 统一课程详情页
    ============================================= */
 
-registerPage('course-detail', async (container, courseId) => {
+registerPage('course-detail', async (container, data) => {
+  const courseId = typeof data === 'object' ? data.id : data;
+  const initialTab = typeof data === 'object' ? (data.tab || 'forum') : 'forum';
+  const targetPostId = typeof data === 'object' ? (data.targetPostId || 0) : 0;
+  const scrollToCommentId = typeof data === 'object' ? (data.scrollToCommentId || 0) : 0;
+
+  // 通知跳转：存储定位参数供 renderForumTab 使用
+  if (targetPostId) {
+    window._courseDetailTargetPostId = targetPostId;
+    window._courseDetailScrollToCommentId = scrollToCommentId;
+  }
+
   container.innerHTML = `<div class="card"><p class="text-secondary">加载中...</p></div>`;
 
   try {
@@ -91,10 +102,10 @@ registerPage('course-detail', async (container, courseId) => {
         </div>
       </div>
       <div class="md-pills" id="detail-pills">
-        <button class="md-pill-btn active" data-tab="forum" onclick="switchDetailTab('forum', ${courseId})">
+        <button class="md-pill-btn${initialTab === 'forum' ? ' active' : ''}" data-tab="forum" onclick="switchDetailTab('forum', ${courseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">forum</span> 论坛
         </button>
-        <button class="md-pill-btn" data-tab="materials" onclick="switchDetailTab('materials', ${courseId})">
+        <button class="md-pill-btn${initialTab === 'materials' ? ' active' : ''}" data-tab="materials" onclick="switchDetailTab('materials', ${courseId})">
           <span class="mi" style="font-size:16px;vertical-align:-3px">folder</span> 资料
         </button>
         ${squareTab}
@@ -106,7 +117,7 @@ registerPage('course-detail', async (container, courseId) => {
     animIn(container.querySelector('.page-header'), { y: 16, dur: 380 });
     animIn(container.querySelector('.md-pills'), { y: 12, delay: 80, dur: 350 });
 
-    await switchDetailTab('forum', courseId);
+    await switchDetailTab(initialTab, courseId);
   } catch (e) {
     container.innerHTML = `<div class="card"><p class="text-secondary">加载失败: ${e.message}</p></div>`;
   }
@@ -187,6 +198,23 @@ function getOrCreateComments(postId) {
   return tk;
 }
 
+function scrollToTkComment(commentId) {
+  const tryScroll = (retries = 0) => {
+    const el = document.getElementById(`tk-comment-${commentId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.background = 'var(--md-primary-container)';
+      el.style.transition = 'background 0.3s';
+      setTimeout(() => { el.style.background = ''; }, 2000);
+    } else if (retries < 10) {
+      setTimeout(() => tryScroll(retries + 1), 300);
+    } else {
+      showToast('该评论已被删除或移除');
+    }
+  };
+  tryScroll();
+}
+
 function destroyAllComments() {
   for (const [, tk] of _tkCommentsInstances) {
     try { tk.destroy(); } catch {}
@@ -251,11 +279,29 @@ async function renderForumTab(contentEl, courseId, enrolled) {
   // ---- 事件绑定（绕过 window 注册问题） ----
   bindForumEvents(contentEl, courseId, enrolled);
 
-  // 定位目标帖子
+  // 定位目标帖子（通知跳转）
   const targetId = window._courseDetailTargetPostId;
   if (targetId) {
-    document.getElementById(`forum-post-${targetId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const postEl = document.getElementById(`forum-post-${targetId}`);
+    if (postEl) {
+      postEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 自动展开评论
+      setTimeout(() => {
+        const tk = getOrCreateComments(targetId);
+        if (tk) {
+          const section = document.getElementById(`forum-comments-${targetId}`);
+          if (section) section.style.display = '';
+          tk.init();
+          // 滚动到目标评论
+          const scrollCid = window._courseDetailScrollToCommentId;
+          if (scrollCid) {
+            setTimeout(() => scrollToTkComment(scrollCid), 600);
+          }
+        }
+      }, 400);
+    }
     window._courseDetailTargetPostId = null;
+    window._courseDetailScrollToCommentId = null;
   }
 }
 
