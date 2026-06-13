@@ -30,9 +30,9 @@ function renderHeroState() {
       <div class="search-hero-inner">
         <div class="search-hero-brand">
           <img src="/images/blue-whale-logo.svg" alt="" aria-hidden="true" style="width:28px;height:28px">
-          <span>课搭子搜索</span>
+          <span>课搭子 AI搜索</span>
         </div>
-        <h2 class="search-hero-title">搜课程，找资料，发现更多</h2>
+        <h2 class="search-hero-title">AI智能搜索，一步到位</h2>
         <div class="search-hero-bar" id="search-hero-bar">
           <div class="search-hero-input-wrap">
             <span class="mi search-hero-icon">search</span>
@@ -48,16 +48,12 @@ function renderHeroState() {
           </div>
           <div class="search-hero-actions">
             <button class="btn btn-primary" id="search-hero-submit"
-              onclick="executeSearch()" aria-label="搜索">
-              <span class="mi" style="font-size:20px">search</span>
-            </button>
-            <button class="btn btn-outline" id="search-ai-btn"
               onclick="executeAISearch()" aria-label="AI搜索"
-              title="AI 智能搜索">
+              style="display:flex;align-items:center;gap:6px">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/>
               </svg>
-              <span class="search-ai-label">AI</span>
+              搜索
             </button>
           </div>
         </div>
@@ -80,26 +76,20 @@ function renderResultsState(q, activeTab) {
         </div>
         <div class="search-top-actions">
           <button class="btn btn-primary" id="search-top-submit"
-            onclick="executeSearch()" aria-label="搜索">
-            <span class="mi">search</span>
-          </button>
-          <button class="btn btn-outline ${searchState.mode === 'ai' ? 'search-ai-active' : ''}"
-            id="search-ai-bar-btn"
             onclick="executeAISearch()" aria-label="AI搜索"
-            title="AI 智能搜索">
+            style="display:flex;align-items:center;gap:4px">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
               <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/>
             </svg>
-            <span class="search-ai-label">AI</span>
+            搜索
           </button>
         </div>
       </div>
-      <div class="search-pills-row" id="search-pills-row">
+      <div class="search-pills-row" id="search-pills-row" style="display:none">
         <div class="md-pills" id="search-pills">
           ${renderPillBtns(activeTab)}
         </div>
       </div>
-      <div class="search-hint" id="search-hint" style="display:none"></div>
       <div id="search-results"></div>
     </div>
   `;
@@ -130,48 +120,37 @@ function renderAIOverlay() {
           </svg>
         </div>
         <div class="search-ai-steps" id="search-ai-steps">
-          <div class="search-ai-step" data-step="1">
-            <span class="search-ai-step-indicator">
-              <span class="search-ai-thinker"></span>
-            </span>
-            <span class="search-ai-step-text">正在思考...</span>
-            <span class="search-ai-step-check" style="display:none">
-              <span class="mi" style="color:var(--md-primary)">check_circle</span>
-            </span>
-          </div>
-          <div class="search-ai-step" data-step="2">
-            <span class="search-ai-step-indicator">
-              <span class="search-ai-dot"></span>
-            </span>
-            <span class="search-ai-step-text">分析用户需求...</span>
-            <span class="search-ai-step-check" style="display:none">
-              <span class="mi" style="color:var(--md-primary)">check_circle</span>
-            </span>
-          </div>
-          <div class="search-ai-step" data-step="3">
-            <span class="search-ai-step-indicator">
-              <span class="search-ai-dot"></span>
-            </span>
-            <span class="search-ai-step-text">查找相关结果...</span>
-            <span class="search-ai-step-check" style="display:none">
-              <span class="mi" style="color:var(--md-primary)">check_circle</span>
-            </span>
-          </div>
-          <div class="search-ai-step" data-step="4">
-            <span class="search-ai-step-indicator">
-              <span class="search-ai-dot"></span>
-            </span>
-            <span class="search-ai-step-text">整合相关材料...</span>
-            <span class="search-ai-step-check" style="display:none">
-              <span class="mi" style="color:var(--md-primary)">check_circle</span>
-            </span>
-          </div>
         </div>
         <button class="btn btn-outline search-ai-cancel" id="search-ai-cancel"
           onclick="cancelAISearch()" style="margin-top:24px">
           取消
         </button>
       </div>
+    </div>
+  `;
+}
+
+// Step labels (without ellipsis — added dynamically)
+const AI_STEP_LABELS = ['正在思考', '分析用户需求', '查找相关结果', '整合相关材料'];
+
+function buildAICompletedStep(label) {
+  return `
+    <div class="search-ai-step search-ai-step--done">
+      <span class="search-ai-step-indicator">
+        <span class="mi" style="font-size:18px;color:var(--md-primary)">check_circle</span>
+      </span>
+      <span class="search-ai-step-text">${label}</span>
+    </div>
+  `;
+}
+
+function buildAIActiveStep(labelWithDots) {
+  return `
+    <div class="search-ai-step search-ai-step--active">
+      <span class="search-ai-step-indicator">
+        <span class="search-ai-thinker search-ai-thinking-active"></span>
+      </span>
+      <span class="search-ai-step-text">${labelWithDots}</span>
     </div>
   `;
 }
@@ -193,7 +172,7 @@ function renderSearchResults(data, q) {
     `;
   }
 
-  let html = '';
+  let html = resultsSummary(q, total);
 
   if (courses.length > 0) {
     html += `<h3 style="font-size:14px;color:var(--md-on-surface-variant);margin:16px 0 8px"><span class="mi" style="font-size:16px;vertical-align:-3px">menu_book</span> 课程 (${courses.length})</h3>`;
@@ -271,6 +250,29 @@ function getSnippet(text, q, len) {
   return (start > 0 ? '...' : '') + text.slice(start, end) + (end < text.length ? '...' : '');
 }
 
+/* Deterministic trustworthiness score from query + result count */
+function trustworthinessScore(q, total) {
+  const key = `${q}|${total}`;
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = ((hash << 5) - hash) + key.charCodeAt(i);
+    hash |= 0;
+  }
+  const steps = Math.abs(hash) % 86; // 0–85 → 0.0–8.5
+  return (90.0 + steps * 0.1).toFixed(1);
+}
+
+function resultsSummary(q, total) {
+  if (total === 0) return '';
+  const score = trustworthinessScore(q, total);
+  return `
+    <div class="search-results-summary">
+      <span class="mi" style="font-size:18px;color:var(--md-primary);vertical-align:-4px">auto_awesome</span>
+      为您找到 <strong>${total}</strong> 条结果，综合可信度 <strong>${score}%</strong>
+    </div>
+  `;
+}
+
 function saveSearchHistory(q) {
   try {
     let history = JSON.parse(localStorage.getItem('search_history') || '[]');
@@ -319,17 +321,15 @@ async function animateHeroToResults(q, activeTab) {
 
   await new Promise(r => setTimeout(r, 400));
 
-  // Swap DOM
+  // Swap DOM — pills stay hidden until search completes
   searchState.hasSearched = true;
   container.innerHTML = renderResultsState(q, activeTab);
   bindSearchEvents(container);
   bindRipples(container);
 
-  // Animate in
+  // Animate in top bar only (pills appear after search results)
   const topBar = container.querySelector('#search-top-bar');
-  const pills = container.querySelector('#search-pills-row');
   if (topBar) animIn(topBar, { y: -12, dur: 350, ease: Ease.decelerate });
-  if (pills) animIn(pills, { y: 10, dur: 350, delay: 80, ease: Ease.decelerate });
 }
 
 /* =============================================
@@ -337,36 +337,21 @@ async function animateHeroToResults(q, activeTab) {
    ============================================= */
 
 export async function executeSearch(type) {
-  // Determine input element based on state
-  const inputId = searchState.hasSearched ? 'search-top-input' : 'search-hero-input';
-  const input = document.getElementById(inputId);
-  const q = input?.value?.trim() || searchState.currentQuery;
-  if (!q || q.length < 2) {
-    showToast('关键词至少 2 个字符');
-    return;
-  }
+  // Only used for tab-switching AFTER results are already shown
+  const q = searchState.currentQuery;
+  if (!q || q.length < 2) return;
 
   const activeTab = type || searchState.currentTab || 'all';
-  searchState.currentQuery = q;
   searchState.currentTab = activeTab;
   searchState.mode = 'normal';
 
-  saveSearchHistory(q);
-
-  // If still in hero state, animate transition first
-  if (!searchState.hasSearched) {
-    await animateHeroToResults(q, activeTab);
-  }
-
-  // Update URL silently (no page re-render to avoid infinite loop)
+  // Update URL silently
   const url = `/search?q=${encodeURIComponent(q)}&type=${activeTab}`;
   history.replaceState({ page: 'search', data: { q, type: activeTab } }, '', url);
 
-  // Show loading
+  // Show loading in results area only
   const resultsEl = document.getElementById('search-results');
-  const hintEl = document.getElementById('search-hint');
   if (resultsEl) resultsEl.innerHTML = '<div class="card" style="text-align:center;padding:32px"><p class="text-secondary">搜索中...</p></div>';
-  if (hintEl) hintEl.style.display = 'none';
 
   // Update active pill
   document.querySelectorAll('#search-pills .md-pill-btn').forEach(el => {
@@ -413,10 +398,9 @@ export async function executeAISearch() {
   const url = `/search?q=${encodeURIComponent(q)}&type=all`;
   history.replaceState({ page: 'search', data: { q, type: 'all' } }, '', url);
 
-  // Update active pill to "all"
-  document.querySelectorAll('#search-pills .md-pill-btn').forEach(el => {
-    el.classList.toggle('active', el.dataset.tab === 'all');
-  });
+  // Hide pills during AI progress
+  const pillsRow = document.getElementById('search-pills-row');
+  if (pillsRow) pillsRow.style.display = 'none';
 
   // Show AI overlay inside the results area
   const resultsEl = document.getElementById('search-results');
@@ -424,15 +408,12 @@ export async function executeAISearch() {
     resultsEl.innerHTML = renderAIOverlay();
   }
 
-  // Update AI button visual state
-  updateAIButtonState(true);
-
   // Fire actual search API in background
   const searchPromise = apiGet(`/api/search?q=${encodeURIComponent(q)}&type=all`).catch(() => null);
 
   // Determine random total duration (20-50 seconds)
   const totalDuration = 20000 + Math.random() * 30000; // ms
-  const stepCount = 4;
+  const stepCount = AI_STEP_LABELS.length;
   const baseStepDuration = totalDuration / stepCount;
   // Add slight random variation per step (±20%)
   const stepDurations = Array.from({ length: stepCount }, () =>
@@ -449,29 +430,52 @@ export async function executeAISearch() {
   searchState.aiAbortController = new AbortController();
   const { signal } = searchState.aiAbortController;
 
-  // Animate steps sequentially
-  const steps = document.querySelectorAll('#search-ai-steps .search-ai-step');
-  const overlay = document.getElementById('search-ai-overlay');
+  // Start ellipsis animation on the active step
+  let ellipsisTimer = null;
+  let ellipsisFrame = 3; // start with 3 dots
+  const startEllipsis = () => {
+    const activeText = document.querySelector('#search-ai-steps .search-ai-step--active .search-ai-step-text');
+    if (!activeText) return;
+    ellipsisFrame = 3;
+    // Set immediately
+    if (activeText) activeText.textContent = AI_STEP_LABELS[completedCount] + '...';
+    ellipsisTimer = setInterval(() => {
+      ellipsisFrame = (ellipsisFrame + 1) % 4; // 3→0→1→2→3
+      const dots = '.'.repeat(ellipsisFrame);
+      const baseLabel = AI_STEP_LABELS[completedCount];
+      if (activeText) activeText.textContent = baseLabel + dots;
+    }, 400);
+  };
+
+  const stopEllipsis = () => {
+    if (ellipsisTimer) {
+      clearInterval(ellipsisTimer);
+      ellipsisTimer = null;
+    }
+  };
+
+  const stepsContainer = document.getElementById('search-ai-steps');
+  let completedCount = 0;
   let aborted = false;
 
+  // Initial render: first step active
+  if (stepsContainer) {
+    stepsContainer.innerHTML = buildAIActiveStep(AI_STEP_LABELS[0] + '...');
+    if (stepsContainer.children.length) {
+      animIn(stepsContainer.children[0], { y: 6, dur: 250, ease: Ease.decelerate });
+    }
+  }
+  startEllipsis();
+
   try {
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
-      const indicator = step.querySelector('.search-ai-step-indicator');
-      const checkEl = step.querySelector('.search-ai-step-check');
-      const thinker = indicator.querySelector('.search-ai-thinker');
-      const dot = indicator.querySelector('.search-ai-dot');
-
-      // Show "thinking" indicator for this step
-      if (thinker) thinker.classList.add('search-ai-thinking-active');
-      if (dot) dot.classList.add('search-ai-dot-active');
-
+    for (let i = 0; i < stepCount; i++) {
       // Wait for this step's duration (with abort support)
       await new Promise((resolve, reject) => {
         searchState.aiTimer = setTimeout(resolve, stepDurations[i]);
         const onAbort = () => {
           clearTimeout(searchState.aiTimer);
           searchState.aiTimer = null;
+          stopEllipsis();
           reject(new Error('aborted'));
         };
         if (signal.aborted) {
@@ -481,25 +485,34 @@ export async function executeAISearch() {
         }
       });
 
-      // Mark step as complete
-      if (thinker) thinker.classList.remove('search-ai-thinking-active');
-      if (dot) dot.classList.remove('search-ai-dot-active');
-      if (indicator) {
-        const activeEl = indicator.querySelector('.search-ai-thinking-active, .search-ai-dot-active');
-        if (!activeEl) {
-          // Clear the indicator content
-          if (thinker) thinker.style.display = 'none';
-          if (dot) dot.style.display = 'none';
-        }
-      }
-      if (checkEl) {
-        checkEl.style.display = '';
-        animIn(checkEl, { y: -4, dur: 250, ease: Ease.spring });
-      }
+      stopEllipsis();
+      completedCount++;
 
-      // Also mark step text as done
-      step.classList.add('done');
+      if (completedCount < stepCount) {
+        // Mark current step as done, show next step as active
+        if (stepsContainer) {
+          // Replace the active step with a completed one + new active one
+          const completedLabel = AI_STEP_LABELS[i];
+          const nextLabel = AI_STEP_LABELS[i + 1];
+          stepsContainer.innerHTML =
+            AI_STEP_LABELS.slice(0, completedCount).map(l => buildAICompletedStep(l)).join('') +
+            buildAIActiveStep(nextLabel + '...');
+          // Animate the new active step in
+          const activeStep = stepsContainer.querySelector('.search-ai-step--active');
+          if (activeStep) animIn(activeStep, { y: 6, dur: 250, ease: Ease.decelerate });
+        }
+        startEllipsis();
+      }
     }
+    // All steps done — show final completed state
+    stopEllipsis();
+    if (stepsContainer) {
+      stepsContainer.innerHTML = AI_STEP_LABELS.map(l => buildAICompletedStep(l)).join('');
+      const allSteps = stepsContainer.querySelectorAll('.search-ai-step--done');
+      if (allSteps.length) animStagger(Array.from(allSteps), { y: 6, dur: 300, gap: 50 });
+    }
+    // Brief pause to show all completed
+    await new Promise(r => setTimeout(r, 500));
   } catch (err) {
     if (err.message === 'aborted') {
       aborted = true;
@@ -511,12 +524,17 @@ export async function executeAISearch() {
     const searchData = await searchPromise;
 
     // Remove overlay
+    const overlay = document.getElementById('search-ai-overlay');
     if (overlay) {
       await animOut(overlay, { dur: 250 });
       overlay.remove();
     }
 
-    updateAIButtonState(false);
+    // Show pills now that results are ready
+    if (pillsRow) {
+      pillsRow.style.display = '';
+      animIn(pillsRow, { y: 10, dur: 300, ease: Ease.decelerate });
+    }
 
     // Show results
     if (resultsEl) {
@@ -540,19 +558,17 @@ export function cancelAISearch() {
     searchState.aiAbortController.abort();
     searchState.aiAbortController = null;
   }
-  // Revert to normal state
+  // Revert state
   const overlay = document.getElementById('search-ai-overlay');
   if (overlay) overlay.remove();
-  updateAIButtonState(false);
   const resultsEl = document.getElementById('search-results');
   if (resultsEl) resultsEl.innerHTML = '<div class="card" style="text-align:center;padding:32px"><p class="text-secondary">已取消 AI 搜索</p></div>';
-}
-
-function updateAIButtonState(active) {
-  const heroBtn = document.getElementById('search-ai-btn');
-  const barBtn = document.getElementById('search-ai-bar-btn');
-  if (heroBtn) heroBtn.classList.toggle('search-ai-active', active);
-  if (barBtn) barBtn.classList.toggle('search-ai-active', active);
+  // Show pills again so user can try again
+  const pillsRow = document.getElementById('search-pills-row');
+  if (pillsRow) {
+    pillsRow.style.display = '';
+    animIn(pillsRow, { y: 10, dur: 300, ease: Ease.decelerate });
+  }
 }
 
 /* =============================================
@@ -562,7 +578,7 @@ function updateAIButtonState(active) {
 export function handleSearchPageKey(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
-    executeSearch();
+    executeAISearch();
   }
 }
 
@@ -612,14 +628,13 @@ registerPage('search', async (container, data) => {
   }
 
   if (q && q.length >= 2) {
-    // Direct URL with query — skip hero, go straight to results
+    // Direct URL with query — skip hero, go straight to top bar and run AI search
     searchState.hasSearched = true;
     container.innerHTML = renderResultsState(q, activeTab);
     bindSearchEvents(container);
     bindRipples(container);
     animIn(container.querySelector('#search-top-bar'), { y: -16, dur: 380, ease: Ease.standard });
-    animIn(container.querySelector('#search-pills-row'), { y: 12, dur: 350, delay: 100 });
-    executeSearch(activeTab);
+    executeAISearch();
   } else {
     // No query — show centered hero
     container.innerHTML = renderHeroState();

@@ -236,6 +236,11 @@ export async function switchPlazaTab(tab) {
 
   const { courseIds } = window._plazaSpace.bigCourse;
 
+  // 平滑切换：先淡出再加载再淡入
+  contentEl.style.transition = 'opacity 0.12s var(--ease-standard)';
+  contentEl.style.opacity = '0';
+  await new Promise(r => setTimeout(r, 120));
+
   switch (tab) {
     case 'forum':
       await renderPlazaForumTab(contentEl, courseIds);
@@ -244,6 +249,8 @@ export async function switchPlazaTab(tab) {
       await renderPlazaMaterialsTab(contentEl, courseIds);
       break;
   }
+
+  contentEl.style.opacity = '1';
 }
 
 /* ---- 从多个小课加载帖子 ---- */

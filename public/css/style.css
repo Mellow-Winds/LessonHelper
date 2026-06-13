@@ -8222,9 +8222,10 @@ input, textarea, select, button,
   max-width: 100%;
 }
 
-/* ---- 灞曞紑鎬佸叏瀹藉崱鐗?---- */
+/* ---- 展开态 2×2 卡片 ---- */
 .tb-card--expanded {
-  grid-column: 1 / -1;
+  grid-column: span 2;
+  grid-row: span 2;
   min-height: auto;
   padding: var(--space-6);
   box-shadow: var(--shadow-3);
@@ -8266,7 +8267,7 @@ input, textarea, select, button,
   transform: scale(0.9);
 }
 
-/* ---- 閬僵灞?---- */
+/* ---- 遮罩层 ---- */
 .tb-backdrop {
   position: fixed;
   inset: 0;
@@ -8281,7 +8282,7 @@ input, textarea, select, button,
   pointer-events: auto;
 }
 
-/* ---- 鏈睍寮€鍗＄墖鍙樻殫 ---- */
+/* ---- 未展开卡片变暗 ---- */
 .tb-card--compact.tb-card--dimmed {
   opacity: 0.35;
   pointer-events: none;
@@ -8296,6 +8297,7 @@ input, textarea, select, button,
 
   .tb-card--expanded {
     grid-column: 1;
+    grid-row: span 1;
   }
 
   .tb-expand-close {
@@ -8564,6 +8566,22 @@ input, textarea, select, button,
   .home-nav-grid { grid-template-columns: 1fr 1fr; }
 }
 
+/* ---- Results summary ---- */
+.search-results-summary {
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.search-results-summary strong {
+  font-weight: 700;
+}
+
 /* ========================================
    Search Hero (Google-style centered)
    ======================================== */
@@ -8812,8 +8830,19 @@ input, textarea, select, button,
   transition: color var(--dur-normal) var(--ease-standard);
 }
 
-.search-ai-step.done {
+.search-ai-step.done,
+.search-ai-step--done {
   color: var(--md-on-surface);
+}
+
+/* Active step (with bouncing dot) */
+.search-ai-step--active {
+  color: var(--md-on-surface);
+  font-weight: 500;
+}
+
+.search-ai-step--active .search-ai-step-text {
+  min-width: 170px;
 }
 
 .search-ai-step-indicator {

@@ -122,18 +122,11 @@ function startPomodoroTick() {
         new Notification('番茄时钟', { body: '25 分钟到！休息一下吧' });
       }
       showToast('番茄时钟结束！休息一下吧');
-      const card = document.querySelector('[data-tb-widget="pomodoro"].tb-card--expanded');
-      if (card) {
-        let html = renderPomodoro();
-        if (card.classList.contains('tb-card--expanded')) {
-          html = buildExpandedHTML('pomodoro', html);
-        }
-        card.outerHTML = html;
-        bindPomodoro();
-        if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'pomodoro') {
-          _currentExpandedCard = document.querySelector('[data-tb-widget="pomodoro"].tb-card--expanded');
-        }
-      }
+      // 直接更新 DOM，不替换 outerHTML 避免闪变
+      const timeEl = document.getElementById('pomodoro-time');
+      const fg = document.getElementById('pomodoro-fg');
+      if (timeEl) timeEl.textContent = '25:00';
+      if (fg) fg.setAttribute('stroke-dashoffset', '0');
     }
   }, 1000);
 }
@@ -159,18 +152,11 @@ function bindPomodoro() {
     if (_pomodoroTimer) { clearInterval(_pomodoroTimer); _pomodoroTimer = null; }
     savePomodoroState({ endAt: null, running: false });
     document.title = '课搭子';
-    const card = document.querySelector('[data-tb-widget="pomodoro"].tb-card--expanded');
-    if (card) {
-      let html = renderPomodoro();
-      if (card.classList.contains('tb-card--expanded')) {
-        html = buildExpandedHTML('pomodoro', html);
-      }
-      card.outerHTML = html;
-      bindPomodoro();
-      if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'pomodoro') {
-        _currentExpandedCard = document.querySelector('[data-tb-widget="pomodoro"].tb-card--expanded');
-      }
-    }
+    // 直接更新 DOM，不替换 outerHTML 避免闪变
+    const timeEl = document.getElementById('pomodoro-time');
+    const fg = document.getElementById('pomodoro-fg');
+    if (timeEl) timeEl.textContent = '25:00';
+    if (fg) fg.setAttribute('stroke-dashoffset', '0');
   });
 }
 
@@ -655,7 +641,7 @@ function openBlindBox() {
     if (!card) return;
     let html = renderBlindBox(idx);
     if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('blindbox', html);
+      html = buildExpandedHTML('blindbox', html, card.style.gridColumn || undefined, card.style.gridRow || undefined);
     }
     card.outerHTML = html;
     bindBlindBox();
@@ -666,27 +652,21 @@ function openBlindBox() {
 }
 
 function retryBlindBox() {
-  const card = document.getElementById('blindbox-revealed')?.closest('.tb-card');
-  if (!card) return;
+  const taskEl = document.getElementById('blindbox-task');
+  if (!taskEl) return;
 
   const idx = Math.floor(Math.random() * BLIND_BOX_TASKS.length);
 
-  // Fade out current task, then reveal new one
-  card.style.transition = 'transform 0.3s var(--ease-spring), opacity 0.2s var(--ease-standard)';
-  card.style.transform = 'scale(0.95)';
-  card.style.opacity = '0.5';
+  // 平滑 crossfade：先缩出旧文字，再更新并弹入新文字
+  taskEl.style.transition = 'opacity 0.15s var(--ease-standard), transform 0.2s var(--ease-spring)';
+  taskEl.style.opacity = '0';
+  taskEl.style.transform = 'scale(0.92)';
 
   setTimeout(() => {
-    let html = renderBlindBox(idx);
-    if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('blindbox', html);
-    }
-    card.outerHTML = html;
-    bindBlindBox();
-    if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'blindbox') {
-      _currentExpandedCard = document.querySelector('[data-tb-widget="blindbox"].tb-card--expanded');
-    }
-  }, 250);
+    taskEl.textContent = BLIND_BOX_TASKS[idx];
+    taskEl.style.opacity = '1';
+    taskEl.style.transform = 'scale(1)';
+  }, 150);
 }
 
 function bindBlindBox() {
@@ -791,7 +771,7 @@ function drawAnswer() {
     if (!card) return;
     let html = renderAnswerBook(answer);
     if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('answerbook', html);
+      html = buildExpandedHTML('answerbook', html, card.style.gridColumn || undefined, card.style.gridRow || undefined);
     }
     card.outerHTML = html;
     bindAnswerBook();
@@ -802,27 +782,22 @@ function drawAnswer() {
 }
 
 function retryAnswerBook() {
-  const card = document.getElementById('answerbook-revealed')?.closest('.tb-card');
-  if (!card) return;
+  const answerEl = document.getElementById('answerbook-answer');
+  if (!answerEl) return;
 
   const idx = Math.floor(Math.random() * ANSWER_BOOK_ANSWERS.length);
   const answer = ANSWER_BOOK_ANSWERS[idx];
 
-  card.style.transition = 'transform 0.3s var(--ease-spring), opacity 0.2s var(--ease-standard)';
-  card.style.transform = 'scale(0.95)';
-  card.style.opacity = '0.5';
+  // 平滑 crossfade：缩出旧答案 → 更新文字 → 弹入新答案
+  answerEl.style.transition = 'opacity 0.15s var(--ease-standard), transform 0.2s var(--ease-spring)';
+  answerEl.style.opacity = '0';
+  answerEl.style.transform = 'scale(0.92)';
 
   setTimeout(() => {
-    let html = renderAnswerBook(answer);
-    if (card.classList.contains('tb-card--expanded')) {
-      html = buildExpandedHTML('answerbook', html);
-    }
-    card.outerHTML = html;
-    bindAnswerBook();
-    if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === 'answerbook') {
-      _currentExpandedCard = document.querySelector('[data-tb-widget="answerbook"].tb-card--expanded');
-    }
-  }, 250);
+    answerEl.textContent = answer;
+    answerEl.style.opacity = '1';
+    answerEl.style.transform = 'scale(1)';
+  }, 150);
 }
 
 function bindAnswerBook() {
@@ -1251,7 +1226,6 @@ function bindFoodPicker() {
 
 let _isExpanding = false;
 let _currentExpandedCard = null;
-let _backdropEl = null;
 
 const WIDGET_RENDERERS = {
   pomodoro:    { render: renderPomodoro,    bind: bindPomodoro,    compact: renderPomodoroCompact },
@@ -1264,26 +1238,85 @@ const WIDGET_RENDERERS = {
   foodpicker:  { render: renderFoodPicker,  bind: bindFoodPicker,  compact: renderFoodPickerCompact },
 };
 
-function ensureBackdrop() {
-  if (_backdropEl) return _backdropEl;
-  _backdropEl = document.createElement('div');
-  _backdropEl.className = 'tb-backdrop';
-  _backdropEl.addEventListener('click', () => {
-    if (_currentExpandedCard) collapseWidget(_currentExpandedCard, true);
-  });
-  document.body.appendChild(_backdropEl);
-  return _backdropEl;
+function captureCardRects(grid) {
+  var map = {};
+  var cards = grid.querySelectorAll('.tb-card[data-tb-widget]');
+  for (var i = 0; i < cards.length; i++) {
+    map[cards[i].dataset.tbWidget] = cards[i].getBoundingClientRect();
+  }
+  return map;
 }
 
-function buildExpandedHTML(widgetType, fullHTML) {
+function flipGridCards(grid, beforeMap, onAllDone) {
+  var cards = grid.querySelectorAll('.tb-card[data-tb-widget]');
+  var pending = 0;
+
+  function checkDone() {
+    if (pending === 0 && onAllDone) {
+      onAllDone();
+      onAllDone = null;
+    }
+  }
+
+  for (var i = 0; i < cards.length; i++) {
+    var card = cards[i];
+    var widget = card.dataset.tbWidget;
+    var beforeRect = beforeMap[widget];
+    if (!beforeRect) continue;
+    var afterRect = card.getBoundingClientRect();
+    var dx = beforeRect.left - afterRect.left;
+    var dy = beforeRect.top - afterRect.top;
+    var sx = beforeRect.width / afterRect.width;
+    var sy = beforeRect.height / afterRect.height;
+
+    // 无显著变化则跳过
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) continue;
+
+    pending++;
+    card.style.transformOrigin = 'top left';
+    card.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')';
+    card.style.transition = 'none';
+    card.style.willChange = 'transform';
+
+    (function(c) {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          c.style.transition = 'transform 0.75s var(--ease-spring)';
+          c.style.transform = 'translate(0, 0) scale(1, 1)';
+        });
+      });
+    })(card);
+
+    card.addEventListener('transitionend', function cleanup() {
+      card.removeEventListener('transitionend', cleanup);
+      card.style.transform = '';
+      card.style.transition = '';
+      card.style.willChange = '';
+      card.style.transformOrigin = '';
+      pending--;
+      checkDone();
+    }, { once: true });
+  }
+
+  // 无动画时异步回调
+  if (pending === 0) {
+    setTimeout(checkDone, 16);
+  }
+}
+
+function buildExpandedHTML(widgetType, fullHTML, gridColumn, gridRow) {
   const closeBtn = '<button class="tb-expand-close" aria-label="关闭"><svg class="mi-svg" viewBox="0 0 24 24" width="20" height="20"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>';
+  var parts = [];
+  if (gridColumn) parts.push('grid-column:' + gridColumn);
+  if (gridRow) parts.push('grid-row:' + gridRow);
+  var styleAttr = parts.length > 0 ? ' style="' + parts.join(';') + '"' : '';
   return fullHTML.replace(
     '<div class="tb-card">',
-    '<div class="tb-card tb-card--expanded" data-tb-widget="' + widgetType + '">' + closeBtn
+    '<div class="tb-card tb-card--expanded" data-tb-widget="' + widgetType + '"' + styleAttr + '>' + closeBtn
   );
 }
 
-function collapseWidget(expandedCardEl, animate) {
+function collapseWidget(expandedCardEl, animate, onDone) {
   if (animate === void 0) animate = true;
   if (_isExpanding && animate) return;
   if (!expandedCardEl) return;
@@ -1296,52 +1329,36 @@ function collapseWidget(expandedCardEl, animate) {
   if (!animate) {
     expandedCardEl.outerHTML = compactHTML;
     cleanupAfterCollapse();
+    if (onDone) onDone();
     return;
   }
 
   _isExpanding = true;
 
-  var firstRect = expandedCardEl.getBoundingClientRect();
+  var grid = expandedCardEl.closest('.tb-grid');
+  if (!grid) { _isExpanding = false; cleanupAfterCollapse(); if (onDone) onDone(); return; }
+
+  var beforeMap = captureCardRects(grid);
   expandedCardEl.outerHTML = compactHTML;
-  var grid = document.querySelector('.tb-grid');
-  var newCard = grid && grid.querySelector('[data-tb-widget="' + widgetType + '"]');
 
-  if (!newCard) {
+  flipGridCards(grid, beforeMap, function() {
     _isExpanding = false;
-    cleanupAfterCollapse();
-    return;
-  }
-
-  var lastRect = newCard.getBoundingClientRect();
-  newCard.style.transformOrigin = 'top left';
-  newCard.style.transform = 'translate(' + (firstRect.left - lastRect.left) + 'px, ' + (firstRect.top - lastRect.top) + 'px) scale(' + (firstRect.width / lastRect.width) + ', ' + (firstRect.height / lastRect.height) + ')';
-  newCard.style.transition = 'none';
-  newCard.style.willChange = 'transform';
-
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      newCard.style.transition = 'transform 0.35s var(--ease-spring)';
-      newCard.style.transform = 'translate(0, 0) scale(1, 1)';
-    });
+    // 番茄钟运行时恢复紧凑预览倒计时
+    if (widgetType === 'pomodoro') {
+      var pState = loadPomodoroState();
+      if (pState.running && pState.endAt) {
+        updateCompactPomodoroPreview();
+        _pomodoroCompactTimer = setInterval(updateCompactPomodoroPreview, 1000);
+      }
+    }
+    if (onDone) onDone();
   });
-
-  newCard.addEventListener('transitionend', function onEnd() {
-    newCard.removeEventListener('transitionend', onEnd);
-    newCard.style.transform = '';
-    newCard.style.transition = '';
-    newCard.style.willChange = '';
-    newCard.style.transformOrigin = '';
-    _isExpanding = false;
-  }, { once: true });
 
   cleanupAfterCollapse();
 }
 
 function cleanupAfterCollapse() {
   _currentExpandedCard = null;
-  if (_backdropEl) { _backdropEl.classList.remove('active'); }
-  var dimmed = document.querySelectorAll('.tb-card--dimmed');
-  for (var i = 0; i < dimmed.length; i++) { dimmed[i].classList.remove('tb-card--dimmed'); }
   if (_pomodoroCompactTimer) {
     clearInterval(_pomodoroCompactTimer);
     _pomodoroCompactTimer = null;
@@ -1381,63 +1398,63 @@ function expandWidget(compactCardEl) {
   if (!widgetType || !WIDGET_RENDERERS[widgetType]) return;
   if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget === widgetType) return;
 
+  // 先动画收起已展开的不同卡片，收完后自动展开新卡片
   if (_currentExpandedCard && _currentExpandedCard.dataset.tbWidget !== widgetType) {
-    collapseWidget(_currentExpandedCard, false);
+    var targetWidget = widgetType;
+    collapseWidget(_currentExpandedCard, true, function() {
+      var targetCompact = document.querySelector('[data-tb-widget="' + targetWidget + '"].tb-card--compact');
+      if (targetCompact) expandWidget(targetCompact);
+    });
+    return;
   }
 
   _isExpanding = true;
 
-  var firstRect = compactCardEl.getBoundingClientRect();
-  var fullHTML = WIDGET_RENDERERS[widgetType].render();
-  var expandedHTML = buildExpandedHTML(widgetType, fullHTML);
-  compactCardEl.outerHTML = expandedHTML;
+  var grid = compactCardEl.closest('.tb-grid');
+  if (!grid) { _isExpanding = false; return; }
 
-  var grid = document.querySelector('.tb-grid');
-  var expandedCard = grid && grid.querySelector('[data-tb-widget="' + widgetType + '"].tb-card--expanded');
+  var beforeMap = captureCardRects(grid);
 
-  if (!expandedCard) {
-    _isExpanding = false;
-    return;
+  // 计算紧凑卡片在第几列（0=左, 1=中, 2=右），右侧卡片向左展开并锁定行
+  var siblings = Array.from(grid.children);
+  var idx = siblings.indexOf(compactCardEl);
+  var col = idx % 3;
+  var gridCol, gridRow;
+  if (col === 2) {
+    // 右列：向左跨 2 列，锁定在原行避免被中间卡片阻挡
+    gridCol = '2 / 4';
+    gridRow = (Math.floor(idx / 3) + 1) + ' / ' + (Math.floor(idx / 3) + 3);
+  } else {
+    gridCol = 'span 2';
+    gridRow = null;
   }
 
+  // 替换紧凑卡片为展开版
+  var fullHTML = WIDGET_RENDERERS[widgetType].render();
+  var expandedHTML = buildExpandedHTML(widgetType, fullHTML, gridCol, gridRow);
+  compactCardEl.outerHTML = expandedHTML;
+
+  // 绑定组件事件
   WIDGET_RENDERERS[widgetType].bind();
   if (widgetType === 'pomodoro') {
     var pState = loadPomodoroState();
     if (pState.running && pState.endAt) { startPomodoroTick(); }
   }
 
-  var lastRect = expandedCard.getBoundingClientRect();
-  expandedCard.style.transformOrigin = 'top left';
-  expandedCard.style.transform = 'translate(' + (firstRect.left - lastRect.left) + 'px, ' + (firstRect.top - lastRect.top) + 'px) scale(' + (firstRect.width / lastRect.width) + ', ' + (firstRect.height / lastRect.height) + ')';
-  expandedCard.style.transition = 'none';
-  expandedCard.style.willChange = 'transform';
-
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      expandedCard.style.transition = 'transform 0.35s var(--ease-spring)';
-      expandedCard.style.transform = 'translate(0, 0) scale(1, 1)';
-    });
-  });
-
-  expandedCard.addEventListener('transitionend', function onEnd() {
-    expandedCard.removeEventListener('transitionend', onEnd);
-    expandedCard.style.transform = '';
-    expandedCard.style.transition = '';
-    expandedCard.style.willChange = '';
-    expandedCard.style.transformOrigin = '';
-    _currentExpandedCard = expandedCard;
-    _isExpanding = false;
-    expandedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, { once: true });
-
-  ensureBackdrop().classList.add('active');
-  var compacts = document.querySelectorAll('.tb-card--compact');
-  for (var i = 0; i < compacts.length; i++) { compacts[i].classList.add('tb-card--dimmed'); }
-
+  // 停止紧凑番茄钟预览
   if (_pomodoroCompactTimer) {
     clearInterval(_pomodoroCompactTimer);
     _pomodoroCompactTimer = null;
   }
+
+  // FLIP 动画 —— 展开卡片 + 周围卡片全部参与
+  flipGridCards(grid, beforeMap, function() {
+    _currentExpandedCard = grid.querySelector('[data-tb-widget="' + widgetType + '"].tb-card--expanded');
+    _isExpanding = false;
+    if (_currentExpandedCard) {
+      _currentExpandedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  });
 }
 
 function bindTreasureBoxGrid(container) {
@@ -1477,11 +1494,21 @@ function bindDecideTabs(container) {
     const content = document.getElementById('decide-content');
     if (!content) return;
 
-    if (type === 'coin') content.innerHTML = renderCoin();
-    else if (type === 'dice') content.innerHTML = renderDice();
-    else if (type === 'rand') content.innerHTML = renderRand();
+    // 平滑 crossfade 切换子内容
+    content.style.transition = 'opacity 0.12s var(--ease-standard), transform 0.15s var(--ease-spring)';
+    content.style.opacity = '0';
+    content.style.transform = 'scale(0.96)';
 
-    bindDecideActions();
+    setTimeout(() => {
+      if (type === 'coin') content.innerHTML = renderCoin();
+      else if (type === 'dice') content.innerHTML = renderDice();
+      else if (type === 'rand') content.innerHTML = renderRand();
+
+      bindDecideActions();
+
+      content.style.opacity = '1';
+      content.style.transform = 'scale(1)';
+    }, 120);
   });
 }
 
@@ -1500,7 +1527,6 @@ function escHtml(str) {
 registerPage('treasurebox', function(container) {
   _isExpanding = false;
   _currentExpandedCard = null;
-  if (_backdropEl) { _backdropEl.classList.remove('active'); }
   container.innerHTML = renderTreasureBox();
   setTimeout(function() {
     bindTreasureBoxGrid(container);
