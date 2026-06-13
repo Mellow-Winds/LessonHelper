@@ -376,7 +376,7 @@ async function renderPlazaMaterialsTab(contentEl, courseIds) {
           </div>
           <div class="material-meta-row">
             <span class="material-meta-item"><span class="mi">straighten</span> ${formatFileSize(m.file_size)}</span>
-            <span class="material-meta-item"><span class="mi">download</span> ${m.download_count}</span>
+            <span class="material-meta-item material-download-count">下载 ${m.download_count}</span>
           </div>
         </div>
         <div class="material-card-actions">
