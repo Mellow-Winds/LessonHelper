@@ -698,13 +698,41 @@ function toggleSubReplies(commentId) {
   const text = toggleBar?.querySelector('.toggle-text');
   const arrow = toggleBar?.querySelector('i');
   if (!list) return;
-  if (list.style.display === 'none' || list.style.display === '') {
+
+  const isOpen = list.dataset.subOpen === 'true';
+
+  if (!isOpen) {
+    // 展开：用 max-height 做平滑动画
     list.style.display = 'block';
+    list.style.overflow = 'hidden';
+    list.style.maxHeight = '0';
+    list.style.opacity = '0';
+    list.style.transition = 'max-height 0.35s var(--ease-standard), opacity 0.25s var(--ease-standard)';
+    list.dataset.subOpen = 'true';
+    requestAnimationFrame(() => {
+      list.style.maxHeight = list.scrollHeight + 'px';
+      list.style.opacity = '1';
+    });
     if (text) text.textContent = '收起回复';
     if (arrow) { arrow.className = 'ri-arrow-up-s-line'; }
   } else {
-    list.style.display = 'none';
-    if (text) text.textContent = `展开 ${list.children.length} 条回复`;
+    // 收起：max-height → 0
+    list.style.maxHeight = list.scrollHeight + 'px';
+    list.style.overflow = 'hidden';
+    list.style.transition = 'max-height 0.3s var(--ease-standard), opacity 0.15s var(--ease-accelerate)';
+    list.dataset.subOpen = 'false';
+    requestAnimationFrame(() => {
+      list.style.maxHeight = '0';
+      list.style.opacity = '0';
+    });
+    var onDone = function() {
+      list.removeEventListener('transitionend', onDone);
+      if (list.dataset.subOpen === 'false') {
+        list.style.display = 'none';
+      }
+    };
+    list.addEventListener('transitionend', onDone, { once: true });
+    if (text) text.textContent = '展开 ' + list.children.length + ' 条回复';
     if (arrow) { arrow.className = 'ri-arrow-down-s-line'; }
   }
 }

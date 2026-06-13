@@ -114,16 +114,23 @@ async function switchMyPostTab(tabName, container) {
   tabs.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
-  await loadMyPostTab(tabName);
+  await loadMyPostTab(tabName, true);
 }
 
 /* =============================================
    加载 Tab 内容
    ============================================= */
 
-async function loadMyPostTab(tabName) {
+async function loadMyPostTab(tabName, animate) {
   const contentEl = document.getElementById('my-post-content');
   if (!contentEl) return;
+
+  // 平滑切换：先淡出再加载再淡入
+  if (animate) {
+    contentEl.style.transition = 'opacity 0.12s var(--ease-standard)';
+    contentEl.style.opacity = '0';
+    await new Promise(r => setTimeout(r, 120));
+  }
 
   contentEl.innerHTML = '<div class="card"><p class="text-secondary" style="text-align:center">加载中...</p></div>';
 
@@ -133,8 +140,14 @@ async function loadMyPostTab(tabName) {
     } else if (tabName === 'explore') {
       await renderExplorePosts(contentEl);
     }
+
+    // 加载完成后淡入
+    if (animate) {
+      contentEl.style.opacity = '1';
+    }
   } catch (e) {
     contentEl.innerHTML = `<div class="card"><p class="text-secondary">加载失败: ${e.message}</p></div>`;
+    if (animate) contentEl.style.opacity = '1';
   }
 }
 

@@ -104,9 +104,18 @@ registerPage('favorites', async (container) => {
   container.querySelectorAll('#favorite-pills .md-pill-btn').forEach(button => {
     button.addEventListener('click', () => {
       container.querySelectorAll('#favorite-pills .md-pill-btn').forEach(item => item.classList.toggle('active', item === button));
-      document.getElementById('favorite-list').innerHTML = button.dataset.tab === 'courses'
-        ? renderCourseCards(courses)
-        : renderPostCards(posts);
+      const listEl = document.getElementById('favorite-list');
+      // 平滑 crossfade 切换
+      listEl.style.transition = 'opacity 0.12s var(--ease-standard), transform 0.15s var(--ease-spring)';
+      listEl.style.opacity = '0';
+      listEl.style.transform = 'scale(0.98)';
+      setTimeout(() => {
+        listEl.innerHTML = button.dataset.tab === 'courses'
+          ? renderCourseCards(courses)
+          : renderPostCards(posts);
+        listEl.style.opacity = '1';
+        listEl.style.transform = 'scale(1)';
+      }, 120);
     });
   });
   bindRipples(container);
