@@ -12,7 +12,7 @@ import { apiGet, apiPost, apiDelete, isLoggedIn } from '../../core/api.js';
 import { registerPage, navigateTo, animIn, animStagger, bindRipples } from '../../core/router.js';
 import { showToast, openModal, closeModal, createMdInput, createMdSelect, escHtml, formatTime, formatFileSize, renderLoginPrompt, bindLoginPrompt } from '../../components/ui.js';
 import { renderAuth } from '../auth.js';
-import { renderTkComment, renderTkInputArea, toggleSubReplies, toggleInlineReply, getTkImages, clearTkImages, getTkReplyImages, clearTkReplyImages, renderTkPreviews, renderTkReplyPreviews } from '../../components/tk-comments.js';
+import { TkComments } from '../../components/tk-comments.js';
 import { getFavoriteCourseIds, getFavoritePostIds, renderCourseFavoriteButton, renderPostFavoriteButton } from '../favorites.js';
 import { renderPostAttachments } from './post_attachments.js';
 import { cleanBigCourseName } from './all_courses.js';
@@ -151,104 +151,53 @@ export async function switchDetailTab(tab, courseId) {
    ============================================= */
 
 // ---- 论坛流式状态 ----
-const _forumExpandedComments = {};   // { [postId]: bool }
-const _forumExpandedReplies = {};    // { [commentId]: bool }
-const _forumLikeState = {};          // { 'p123': { liked: bool, count: N } }
-const _forumReplyImages = {};        // { ctxKey: { files: [], urls: [] } }
-let _forumCommentsCache = {};  // postId → comments array
-const _forumCooldownTimers = {};     // { postId: secondsRemaining }
-const _forumCooldownTicking = new Set();  // 防重复 tick
-
-const FORUM_COOLDOWN_KEY = 'fc_cooldowns';  // localStorage key for forum cooldowns
-
-function loadForumCooldowns() {
-  try {
-    const raw = localStorage.getItem(FORUM_COOLDOWN_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);  // { postId: endTimestamp }
-    const now = Date.now();
-    for (const [postId, endTime] of Object.entries(data)) {
-      const remaining = Math.ceil((endTime - now) / 1000);
-      if (remaining > 0) {
-        const pid = Number(postId);
-        _forumCooldownTimers[pid] = remaining;
-        if (!_forumCooldownTicking.has(pid)) resumeForumCooldownTick(pid);
-      }
-    }
-    cleanForumCooldownStorage();
-  } catch { /* ignore */ }
-}
-
-function saveForumCooldown(postId) {
-  try {
-    const raw = localStorage.getItem(FORUM_COOLDOWN_KEY);
-    const data = raw ? JSON.parse(raw) : {};
-    data[postId] = Date.now() + 30000;
-    localStorage.setItem(FORUM_COOLDOWN_KEY, JSON.stringify(data));
-  } catch { /* ignore */ }
-}
-
-function removeForumCooldown(postId) {
-  try {
-    const raw = localStorage.getItem(FORUM_COOLDOWN_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    delete data[postId];
-    if (Object.keys(data).length === 0) localStorage.removeItem(FORUM_COOLDOWN_KEY);
-    else localStorage.setItem(FORUM_COOLDOWN_KEY, JSON.stringify(data));
-  } catch { /* ignore */ }
-}
-
-function cleanForumCooldownStorage() {
-  try {
-    const raw = localStorage.getItem(FORUM_COOLDOWN_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    const now = Date.now();
-    let changed = false;
-    for (const [postId, endTime] of Object.entries(data)) {
-      if (endTime <= now) { delete data[postId]; changed = true; }
-    }
-    if (changed) {
-      if (Object.keys(data).length === 0) localStorage.removeItem(FORUM_COOLDOWN_KEY);
-      else localStorage.setItem(FORUM_COOLDOWN_KEY, JSON.stringify(data));
-    }
-  } catch { /* ignore */ }
-}
-
-function resumeForumCooldownTick(postId) {
-  _forumCooldownTicking.add(postId);
-  const tick = () => {
-    const remaining = _forumCooldownTimers[postId];
-    if (!remaining || remaining <= 0) {
-      delete _forumCooldownTimers[postId];
-      _forumCooldownTicking.delete(postId);
-      removeForumCooldown(postId);
-      // 仅恢复属于本 post 的冷却按钮
-      document.querySelectorAll(`[id^="forum-send-"][data-post-id="${postId}"]`).forEach(b => {
-        if (!b.disabled) return;
-        b.disabled = false;
-        b.innerHTML = '<span class="mi">send</span>';
-      });
-      return;
-    }
-    _forumCooldownTimers[postId] = remaining - 1;
-    // 仅更新属于本 post 的冷却按钮文字
-    document.querySelectorAll(`[id^="forum-send-"][data-post-id="${postId}"]`).forEach(b => {
-      if (b.disabled && b.innerHTML.includes('重新发送')) {
-        b.innerHTML = `<span style="font-size:11px">重新发送(${remaining - 1}s)</span>`;
-      }
-    });
-    setTimeout(tick, 1000);
-  };
-  setTimeout(tick, 1000);
-}
+const _forumLikeState = {};          // { 'p123': { liked: bool, count: N } } — 帖子级赞（客户端 only）
 let _forumDailyCount = 0;            // 当日发布计数
 let _forumDailyDate = '';            // 当日日期标记
 
+// ---- TkComments 实例管理（每帖一个实例，懒创建） ----
+const _tkCommentsInstances = new Map();  // postId → TkComments
+
+function getOrCreateComments(postId) {
+  if (_tkCommentsInstances.has(postId)) return _tkCommentsInstances.get(postId);
+  const container = document.getElementById(`forum-comments-${postId}`);
+  if (!container) return null;
+  const tk = new TkComments({
+    apiBase: '/api/courses/posts',
+    ctxId: postId,
+    container: container,
+    layout: 'inline',
+    likeKey: 'forum_comment_likes',
+    onNavigateProfile: (identifier) => {
+      if (typeof identifier === 'number' || /^\d+$/.test(String(identifier))) {
+        navigateTo('profile-user', Number(identifier));
+      } else {
+        navigateTo('profile-user', identifier);
+      }
+    }
+  });
+  _tkCommentsInstances.set(postId, tk);
+  return tk;
+}
+
+function destroyAllComments() {
+  for (const [, tk] of _tkCommentsInstances) {
+    try { tk.destroy(); } catch {}
+  }
+  _tkCommentsInstances.clear();
+}
+
+function updatePostCommentCount(postId) {
+  const countEl = document.getElementById(`tk-comment-count-${postId}`);
+  const btn = document.querySelector(`[data-action="forum-toggle-comments"][data-post-id="${postId}"]`);
+  if (btn && countEl) {
+    const count = String(countEl.textContent || '').replace(/[^0-9]/g, '') || '0';
+    btn.innerHTML = `<span class="mi" style="font-size:16px">forum</span> ${count} 回复`;
+  }
+}
+
 async function renderForumTab(contentEl, courseId, enrolled) {
-  // 恢复 localStorage 中的冷却状态
-  loadForumCooldowns();
+  destroyAllComments();
 
   contentEl.innerHTML = '<div class="card"><p class="text-secondary">加载中...</p></div>';
   const posts = await apiGet(`/api/courses/${courseId}/posts`);
@@ -258,7 +207,7 @@ async function renderForumTab(contentEl, courseId, enrolled) {
   posts.forEach(p => {
     const key = `p${p.id}`;
     if (!_forumLikeState[key]) {
-      _forumLikeState[key] = { liked: false, count: p.comment_count || 0 };
+      _forumLikeState[key] = { liked: false, count: 0 };
     }
   });
 
@@ -313,30 +262,46 @@ function bindForumEvents(root, courseId, enrolled) {
   }
 
   // 用事件委托处理所有 forum 内部点击
-  root.addEventListener('click', (e) => {
+  root.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const action = btn.dataset.action;
     const postId = Number(btn.dataset.postId);
-    const commentId = Number(btn.dataset.commentId);
     const likeKey = btn.dataset.likeKey;
 
     switch (action) {
-      case 'reply-post':
-        openForumInlineEditor(postId, null, `post-${postId}`);
+      case 'forum-reply-post': {
+        const tk = getOrCreateComments(postId);
+        if (!tk) break;
+        const section = document.getElementById(`forum-comments-${postId}`);
+        if (section && section.style.display === 'none') {
+          section.style.display = '';
+          await tk.init();
+          updatePostCommentCount(postId);
+        }
+        setTimeout(() => {
+          document.getElementById(`comment-main-input-${postId}`)?.focus();
+        }, 200);
         break;
-      case 'reply-comment':
-        openForumInlineEditor(postId, commentId, `comment-${commentId}`);
+      }
+
+      case 'forum-toggle-comments': {
+        const section = document.getElementById(`forum-comments-${postId}`);
+        if (!section) break;
+        if (section.style.display !== 'none') {
+          section.style.display = 'none';
+        } else {
+          section.style.display = '';
+          const tk = getOrCreateComments(postId);
+          if (!tk._initialized) {
+            await tk.init();
+            tk._initialized = true;
+            updatePostCommentCount(postId);
+          }
+        }
         break;
-      case 'reply-nested':
-        openForumInlineEditor(postId, commentId, `nested-${commentId}`);
-        break;
-      case 'toggle-comments':
-        toggleForumComments(postId);
-        break;
-      case 'toggle-replies':
-        toggleForumReplies(commentId, postId);
-        break;
+      }
+
       case 'like': {
         const state = _forumLikeState[likeKey] || { liked: false, count: 0 };
         state.liked = !state.liked;
@@ -346,48 +311,33 @@ function bindForumEvents(root, courseId, enrolled) {
         btn.classList.toggle('liked', state.liked);
         const icon = btn.querySelector('.mi');
         if (icon) icon.textContent = state.liked ? 'favorite' : 'favorite_border';
-        const wrapper = btn.closest('.forum-like-col, .forum-reply-like');
+        const wrapper = btn.closest('.forum-like-col');
         const countEl = wrapper?.querySelector('.forum-like-count');
         if (countEl) countEl.textContent = state.count;
         break;
       }
+
       case 'navigate-profile':
         navigateTo('profile-user', Number(btn.dataset.userId));
         break;
-      case 'delete-comment':
-        openModal('确认删除', `
-          <p style="margin-bottom:24px">确定要删除这条回复吗？删除后无法恢复</p>
-          <div class="inline-btn-group" style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-            <button class="btn btn-primary" id="confirm-forum-delete" style="background:var(--md-error,#e53935)">删除</button>
-          </div>
-        `);
-        document.getElementById('confirm-forum-delete')?.addEventListener('click', async () => {
-          const result = await apiDelete(`/api/courses/posts/${postId}/comments/${commentId}`);
-          if (result.error) { showToast(result.error); return; }
-          closeModal();
-          await refreshForumComments(postId);
-          showToast('已删除');
-        });
-        break;
+
       case 'delete-post':
-        openModal('确认删除', `
-          <p style="margin-bottom:24px">确定要删除这篇帖子吗？所有回复也将一并删除，且无法恢复</p>
-          <div class="inline-btn-group" style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-            <button class="btn btn-primary" id="confirm-forum-post-delete" style="background:var(--md-error,#e53935)">删除</button>
-          </div>
-        `);
+        openModal('确认删除', `<p style="margin-bottom:24px">确定要删除这篇帖子吗？所有回复也将一并删除，且无法恢复</p><div class="inline-btn-group" style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" id="confirm-forum-post-delete" style="background:var(--md-error,#e53935)">删除</button></div>`);
         document.getElementById('confirm-forum-post-delete')?.addEventListener('click', async () => {
           const result = await apiDelete(`/api/courses/posts/${postId}`);
           if (result.error) { showToast(result.error); return; }
           closeModal();
-          // 从 DOM 中移除帖子
           const postEl = document.getElementById(`forum-post-${postId}`);
-          if (postEl) postEl.remove();
+          if (postEl) {
+            const tk = _tkCommentsInstances.get(postId);
+            if (tk) { tk.destroy(); _tkCommentsInstances.delete(postId); }
+            postEl.remove();
+          }
           showToast('已删除');
         });
         break;
+
+      // 评论内部操作（回复/点赞/删除/@提及）由 TkComments._bindEvents() 处理
     }
   });
 }
@@ -396,6 +346,8 @@ function renderForumPostRow(p, enrolled, favoritePostIds) {
   const likeKey = `p${p.id}`;
   const like = _forumLikeState[likeKey] || { liked: false, count: 0 };
   const avatarLetter = (p.author_name || '?')[0].toUpperCase();
+  const isSelf = !!(window._currentUser && Number(p.author_id) === Number(window._currentUser.id));
+  const profileAttrs = isSelf ? '' : 'data-action="navigate-profile" data-user-id="' + p.author_id + '"';
   const images = (p.attachments || []).filter(a => a.file_type === 'image');
   const files = (p.attachments || []).filter(a => a.file_type !== 'image');
 
@@ -403,14 +355,17 @@ function renderForumPostRow(p, enrolled, favoritePostIds) {
     <div class="forum-post-row" id="forum-post-${p.id}">
       <div class="forum-avatar-col">
         ${p.author_avatar_url
-          ? `<img class="forum-avatar" src="${p.author_avatar_url}" alt="" data-action="navigate-profile" data-user-id="${p.author_id}" style="cursor:pointer">`
-          : `<div class="forum-avatar-letter" data-action="navigate-profile" data-user-id="${p.author_id}" style="cursor:pointer">${escHtml(avatarLetter)}</div>`
+          ? `<img class="forum-avatar" src="${p.author_avatar_url}" alt="" ${profileAttrs} style="cursor:${isSelf ? 'default' : 'pointer'}">`
+          : `<div class="forum-avatar-letter" ${profileAttrs} style="cursor:${isSelf ? 'default' : 'pointer'}">${escHtml(avatarLetter)}</div>`
         }
       </div>
       <div class="forum-content-col">
         <div class="forum-post-header">
           <div class="forum-post-meta">
-            <button class="forum-post-name" data-action="navigate-profile" data-user-id="${p.author_id}">${escHtml(p.author_name)}</button>
+            ${isSelf
+              ? `<span class="forum-post-name" style="font-weight:600">${escHtml(p.author_name)}</span>`
+              : `<button class="forum-post-name" data-action="navigate-profile" data-user-id="${p.author_id}">${escHtml(p.author_name)}</button>`
+            }
             <span class="forum-post-time">${formatTime(p.created_at)}</span>
           </div>
           <div class="forum-like-col">
@@ -444,10 +399,10 @@ function renderForumPostRow(p, enrolled, favoritePostIds) {
         ` : ''}
         ${enrolled ? `
           <div class="forum-actions">
-            <button class="forum-action-btn" data-action="reply-post" data-post-id="${p.id}">
+            <button class="forum-action-btn" data-action="forum-reply-post" data-post-id="${p.id}">
               <span class="mi" style="font-size:16px">chat_bubble_outline</span> 回复
             </button>
-            <button class="forum-action-btn" data-action="toggle-comments" data-post-id="${p.id}">
+            <button class="forum-action-btn" data-action="forum-toggle-comments" data-post-id="${p.id}">
               <span class="mi" style="font-size:16px">forum</span> ${p.comment_count || 0} 回复
             </button>
             ${renderPostFavoriteButton(p.id, favoritePostIds.has(p.id))}
@@ -460,7 +415,7 @@ function renderForumPostRow(p, enrolled, favoritePostIds) {
             </span>
           </div>
         `}
-        <div id="forum-inline-post-${p.id}"></div>
+
         <div id="forum-comments-${p.id}" style="display:none"></div>
       </div>
     </div>
@@ -469,456 +424,27 @@ function renderForumPostRow(p, enrolled, favoritePostIds) {
 
 /* ---- 评论区展开/收起 ---- */
 
+/* ---- 向后兼容桩（供 my_courses.js / 旧 window 引用） ---- */
+
 export async function toggleComments(postId) {
-  await toggleForumComments(postId);
+  // 兼容旧调用 → 触发 forum-toggle-comments
+  const btn = document.querySelector(`[data-action="forum-toggle-comments"][data-post-id="${postId}"]`);
+  if (btn) btn.click();
 }
 
-async function refreshForumComments(postId) {
-  const section = document.getElementById(`forum-comments-${postId}`);
-  if (!section) return;
-
-  section.style.display = 'block';
-  _forumExpandedComments[postId] = true;
-
-  section.innerHTML = '<p style="font-size:12px;color:var(--md-on-surface-variant);padding:8px 0">加载中...</p>';
-
-  try {
-    const data = await apiGet(`/api/courses/posts/${postId}/comments`);
-    const comments = Array.isArray(data) ? data : (data.comments || []);
-    _forumCommentsCache[postId] = comments;
-
-    const topComments = comments.filter(c => !c.parent_id);
-    const childMap = {};
-    comments.forEach(c => {
-      if (c.parent_id) {
-        if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
-        childMap[c.parent_id].push(c);
-      }
-    });
-
-    if (topComments.length === 0) {
-      section.innerHTML = '<p style="font-size:12px;color:var(--md-on-surface-variant);padding:8px 0;text-align:center">暂无回复</p>';
-    } else {
-      section.innerHTML = topComments.map(c => renderForumComment(c, postId, childMap)).join('');
-    }
-
-    // Bind events
-    section.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-action]');
-      if (!btn) return;
-      const action = btn.dataset.action;
-      const cid = Number(btn.dataset.commentId);
-      const pId = Number(btn.dataset.postId) || postId;
-
-      switch (action) {
-        case 'forum-reply':
-        case 'reply':
-          toggleInlineReply(cid, btn.dataset.author);
-          break;
-        case 'reply-send':
-          submitForumTkReply(pId, cid);
-          break;
-        case 'tk-toggle-sub':
-          toggleSubReplies(cid);
-          break;
-        case 'forum-delete-comment':
-        case 'delete-comment':
-          openModal('确认删除', `
-            <p style="margin-bottom:24px">确定要删除这条回复吗？</p>
-            <div style="display:flex;gap:8px;justify-content:flex-end">
-              <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-              <button class="btn btn-primary" id="confirm-del-fcmt" style="background:var(--md-error)">删除</button>
-            </div>
-          `);
-          document.getElementById('confirm-del-fcmt')?.addEventListener('click', async () => {
-            const result = await apiDelete(`/api/courses/posts/${pId}/comments/${cid}`);
-            if (result.error) { showToast(result.error); } else { showToast('已删除'); refreshForumComments(postId); }
-            closeModal();
-          });
-          break;
-      }
-    });
-  } catch {
-    section.innerHTML = '<p style="font-size:12px;color:var(--md-error);padding:8px 0">加载失败，点击重试</p>';
-    section.style.cursor = 'pointer';
-    section.onclick = () => { section.onclick = null; refreshForumComments(postId); };
-  }
+export async function handleAddComment(e, postId) {
+  // 兼容旧调用 → 触发 forum-reply-post
+  const btn = document.querySelector(`[data-action="forum-reply-post"][data-post-id="${postId}"]`);
+  if (btn) btn.click();
 }
-
-async function toggleForumComments(postId) {
-  const section = document.getElementById(`forum-comments-${postId}`);
-  if (!section) return;
-
-  if (section.style.display === 'block') {
-    section.style.display = 'none';
-    _forumExpandedComments[postId] = false;
-    return;
-  }
-
-  await refreshForumComments(postId);
-}
-
-function renderCommentImages(imageUrlStr) {
-  if (!imageUrlStr) return '';
-  const urls = imageUrlStr.split(';').filter(Boolean);
-  if (urls.length === 0) return '';
-  if (urls.length === 1) {
-    return `<a href="${urls[0]}" target="_blank" rel="noopener"><img class="forum-reply-image" src="${urls[0]}" alt="回复图片" loading="lazy"></a>`;
-  }
-  return `
-    <div class="forum-image-grid count-${Math.min(urls.length, 9)}" style="max-width:240px">
-      ${urls.map(url => `<a href="${url}" target="_blank" rel="noopener" class="forum-image-link"><img src="${url}" alt="回复图片" loading="lazy"></a>`).join('')}
-    </div>
-  `;
-}
-
-function renderForumComment(c, postId, childMap) {
-  const nickname = c.author_name || '匿名';
-  const children = childMap[c.id] || [];
-  const likeKey = `c${c.id}`;
-  const like = _forumLikeState[likeKey] || { liked: false, count: 0 };
-
-  // Mount replies tree for renderTkComment
-  function attachReplies(comment) {
-    const kids = childMap[comment.id] || [];
-    kids.forEach(attachReplies);
-    comment.replies = kids;
-    comment.reply_count = kids.length;
-  }
-  c.replies = children;
-  c.reply_count = children.length;
-  children.forEach(attachReplies);
-
-  // Override like display with our existing like state
-  const origLike = c.like_count;
-  c.like_count = like.count;
-  const html = renderTkComment(c, postId, 0, {
-    deleteAction: 'forum-delete-comment',
-    replyAction: 'forum-reply',
-    likedSet: null
-  });
-  c.like_count = origLike;
-  return html;
-}
-
-export async function toggleForumReplies(commentId, postId) {
-  _forumExpandedReplies[commentId] = !_forumExpandedReplies[commentId];
-  // 重新渲染整个评论区
-  if (_forumExpandedComments[postId]) {
-    await refreshForumComments(postId);
-  }
-}
-
-/* ---- 点赞（纯本地 +1/-1，不触发通知） ---- */
 
 export function toggleForumLike(id, type, el) {
-  const key = `${type === 'post' ? 'p' : 'c'}${id}`;
-  if (!_forumLikeState[key]) {
-    _forumLikeState[key] = { liked: false, count: 0 };
-  }
-  const state = _forumLikeState[key];
-  state.liked = !state.liked;
-  state.count += state.liked ? 1 : -1;
-  if (state.count < 0) state.count = 0;
-
-  // 找到按钮（可能是 span 触发的，用 closest 兜底）
-  const btn = el?.closest?.('.forum-like-btn') || el;
-  if (!btn) return;
-
-  btn.classList.toggle('liked', state.liked);
-  const icon = btn.querySelector('.mi');
-  if (icon) icon.textContent = state.liked ? 'favorite' : 'favorite_border';
-
-  // 计数器在按钮的父元素（forum-like-col / forum-reply-like）里
-  const wrapper = btn.parentElement;
-  const countEl = wrapper?.querySelector('.forum-like-count');
-  if (countEl) countEl.textContent = state.count;
+  // 已废弃 — 评论点赞由 TkComments 服务端接管，帖子点赞由 bindForumEvents 处理
 }
-
-/* ---- 行内回复编辑器 ---- */
-
-export function openForumInlineEditor(postId, parentCommentId, ctxKey) {
-  const containerId = parentCommentId
-    ? `forum-inline-comment-${parentCommentId}`
-    : `forum-inline-post-${postId}`;
-  const container = document.getElementById(containerId);
-  if (!container) return;
-
-  // 如果已有编辑器，切换关闭
-  if (container.innerHTML.trim() !== '') {
-    closeForumInlineEditor(ctxKey);
-    return;
-  }
-
-  // 关闭其他编辑器
-  document.querySelectorAll('[id^="forum-inline-"]').forEach(el => {
-    if (el.id !== containerId && el.innerHTML.trim() !== '') {
-      el.innerHTML = '';
-    }
-  });
-
-  // 初始化图片状态
-  _forumReplyImages[ctxKey] = { files: [], urls: [] };
-
-  const cooldown = _forumCooldownTimers[postId] || 0;
-  const isDailyLimit = _forumDailyCount >= 100;
-  const sendDisabled = cooldown > 0 || isDailyLimit;
-  const sendLabel = cooldown > 0 ? `重新发送(${cooldown}s)` : (isDailyLimit ? '已达上限' : '');
-
-  container.innerHTML = `
-    <div class="forum-inline-editor">
-      <div class="forum-editor-row">
-        <textarea class="forum-editor-textarea" id="forum-textarea-${ctxKey}"
-          placeholder=" " rows="1"
-          oninput="autoResizeForumTextarea(this)"></textarea>
-        <div class="forum-editor-actions">
-          <input type="file" id="forum-file-${ctxKey}" accept="image/jpeg,image/png,image/gif,image/webp"
-            multiple style="display:none" onchange="handleForumReplyImageChange('${ctxKey}', ${postId})">
-          <button class="forum-editor-btn forum-editor-camera" onclick="document.getElementById('forum-file-${ctxKey}').click()" title="添加图片">
-            <span class="mi">photo_camera</span>
-          </button>
-          <button class="forum-editor-btn forum-editor-send" id="forum-send-${ctxKey}"
-            data-post-id="${postId}"
-            onclick="submitForumReply(${postId}, ${parentCommentId || 'null'}, '${ctxKey}')"
-            ${sendDisabled ? 'disabled' : ''}>
-            ${cooldown > 0 ? `<span style="font-size:11px">${sendLabel}</span>` : '<span class="mi">send</span>'}
-          </button>
-        </div>
-      </div>
-      <div class="forum-editor-previews" id="forum-previews-${ctxKey}"></div>
-      ${isDailyLimit ? '<div class="forum-rate-limit-banner">今日发布额度已达上限</div>' : ''}
-    </div>
-  `;
-
-  // 自动聚焦
-  setTimeout(() => {
-    const textarea = document.getElementById(`forum-textarea-${ctxKey}`);
-    if (textarea) textarea.focus();
-  }, 150);
-
-  // 失焦自动收回：仅当焦点彻底离开编辑器区域且内容为空时才收回
-  setTimeout(() => {
-    const editorDiv = container.querySelector('.forum-inline-editor');
-    if (!editorDiv) return;
-    editorDiv.addEventListener('focusout', () => {
-      setTimeout(() => {
-        // 容器已被刷新（DOM 替换）→ 不处理
-        if (!container.querySelector('.forum-inline-editor')) return;
-        // 焦点还在编辑器内部 → 不收回
-        if (editorDiv.contains(document.activeElement)) return;
-        // 有文字内容 → 不收回
-        const ta = editorDiv.querySelector('textarea');
-        if (ta && ta.value.trim()) return;
-        // 有图片 → 不收回
-        const imgs = _forumReplyImages[ctxKey];
-        if (imgs && imgs.files.length > 0) return;
-        // 彻底离开且为空 → 收回（只清自己的容器）
-        container.innerHTML = '';
-        delete _forumReplyImages[ctxKey];
-      }, 300);
-    });
-  }, 200);
-}
-
-function closeForumInlineEditor(ctxKey) {
-  // 清理预览 URL
-  const imgs = _forumReplyImages[ctxKey];
-  if (imgs) {
-    imgs.urls.forEach(url => URL.revokeObjectURL(url));
-    delete _forumReplyImages[ctxKey];
-  }
-  // 清空所有可能的容器
-  document.querySelectorAll('[id^="forum-inline-"]').forEach(el => {
-    if (el.innerHTML.includes('forum-inline-editor')) {
-      el.innerHTML = '';
-    }
-  });
-}
-
-/* ---- 文本框自动伸缩 ---- */
 
 export function autoResizeForumTextarea(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-}
-
-/* ---- 回复图片上传 ---- */
-
-export function handleForumReplyImageChange(ctxKey, postId) {
-  const input = document.getElementById(`forum-file-${ctxKey}`);
-  if (!input || !input.files.length) return;
-
-  if (!_forumReplyImages[ctxKey]) {
-    _forumReplyImages[ctxKey] = { files: [], urls: [] };
-  }
-  const imgs = _forumReplyImages[ctxKey];
-
-  const remaining = 9 - imgs.files.length;
-  if (remaining <= 0) {
-    showToast('最多上传 9 张图片');
-    input.value = '';
-    return;
-  }
-
-  const newFiles = Array.from(input.files).slice(0, remaining);
-  newFiles.forEach(file => {
-    if (!file.type.startsWith('image/')) {
-      showToast('仅支持图片文件');
-      return;
-    }
-    if (file.size > 20 * 1024 * 1024) {
-      showToast(`${file.name} 超过 20MB，已跳过`);
-      return;
-    }
-    imgs.files.push(file);
-    imgs.urls.push(URL.createObjectURL(file));
-  });
-
-  input.value = '';
-  renderForumImagePreviews(ctxKey);
-}
-
-function renderForumImagePreviews(ctxKey) {
-  const container = document.getElementById(`forum-previews-${ctxKey}`);
-  const imgs = _forumReplyImages[ctxKey];
-  if (!container || !imgs) return;
-
-  if (imgs.files.length === 0) {
-    container.innerHTML = '';
-    return;
-  }
-
-  container.innerHTML = imgs.urls.map((url, i) => `
-    <div class="forum-editor-preview">
-      <img src="${url}" alt="预览">
-      <button class="forum-editor-preview-remove" onclick="removeForumReplyImage('${ctxKey}', ${i})">×</button>
-    </div>
-  `).join('');
-}
-
-export function removeForumReplyImage(ctxKey, index) {
-  const imgs = _forumReplyImages[ctxKey];
-  if (!imgs) return;
-  URL.revokeObjectURL(imgs.urls[index]);
-  imgs.files.splice(index, 1);
-  imgs.urls.splice(index, 1);
-  renderForumImagePreviews(ctxKey);
-}
-
-/* ---- 发布回复（tk-* 标准，用于评论区行内回复） ---- */
-
-async function submitForumTkReply(postId, parentCommentId) {
-  const input = document.getElementById(`inline-reply-input-${parentCommentId}`);
-  const content = input?.value?.trim();
-  const state = getTkReplyImages(parentCommentId);
-  if (!content && state.files.length === 0) return;
-
-  try {
-    let res;
-    if (state.files.length > 0) {
-      const formData = new FormData();
-      formData.append('content', content || '');
-      formData.append('parent_id', parentCommentId);
-      state.files.forEach((f, i) => formData.append(i === 0 ? 'image' : 'images', f));
-      const token = localStorage.getItem('kedazi_token');
-      const headers = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const fetchRes = await fetch(`/api/courses/posts/${postId}/comments`, { method: 'POST', headers, body: formData });
-      res = await fetchRes.json();
-    } else {
-      res = await apiPost(`/api/courses/posts/${postId}/comments`, { content, parent_id: parentCommentId });
-    }
-    if (res.error) { showToast(res.error); return; }
-    clearTkReplyImages(parentCommentId);
-    renderTkReplyPreviews(parentCommentId);
-    _forumCommentsCache[postId] = null;
-    if (_forumExpandedComments[postId]) refreshForumComments(postId);
-    showToast('回复成功');
-  } catch { showToast('发送失败'); }
-}
-
-/* ---- 发布回复（防刷流控，保留用于 compose bar） ---- */
-
-export async function submitForumReply(postId, parentCommentId, ctxKey) {
-  const textarea = document.getElementById(`forum-textarea-${ctxKey}`);
-  if (!textarea) return;
-
-  const content = textarea.value.trim();
-  const imgs = _forumReplyImages[ctxKey];
-  const hasImages = imgs && imgs.files.length > 0;
-
-  if (!content && !hasImages) {
-    showToast('请输入内容或上传图片');
-    return;
-  }
-
-  // 每日上限检查
-  if (_forumDailyCount >= 100) {
-    showToast('今日发布额度已达上限');
-    return;
-  }
-
-  // 冷却检查
-  if (_forumCooldownTimers[postId] > 0) {
-    showToast(`请等待 ${_forumCooldownTimers[postId]} 秒后再发送`);
-    return;
-  }
-
-  const sendBtn = document.getElementById(`forum-send-${ctxKey}`);
-  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '发送中...'; }
-
-  try {
-    const formData = new FormData();
-    formData.append('content', content);
-    if (parentCommentId) formData.append('parent_id', String(parentCommentId));
-    if (hasImages) {
-      imgs.files.forEach(file => formData.append('image', file));
-    }
-
-    const { getToken } = await import('../../core/api.js');
-    const token = getToken();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const res = await fetch(`/api/courses/posts/${postId}/comments`, {
-      method: 'POST',
-      headers,
-      body: formData
-    });
-    const result = await res.json();
-
-    if (result.error) {
-      showToast(result.error);
-      if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<span class="mi">send</span>'; }
-      return;
-    }
-
-    // 成功：清理编辑器、刷新评论区
-    closeForumInlineEditor(ctxKey);
-    _forumDailyCount++;
-    showToast('回复成功');
-
-    // 直接刷新评论区
-    await refreshForumComments(postId);
-
-    // 启动 30 秒冷却
-    startForumCooldown(postId, ctxKey);
-
-  } catch {
-    showToast('网络错误，请重试');
-    if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<span class="mi">send</span>'; }
-  }
-}
-
-function startForumCooldown(postId, ctxKey) {
-  _forumCooldownTimers[postId] = 30;
-  saveForumCooldown(postId);
-  const btn = document.getElementById(`forum-send-${ctxKey}`);
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span style="font-size:11px">重新发送(30s)</span>';
-  }
-  resumeForumCooldownTick(postId);
 }
 
 /* ---- 帖子创作（行内 compose） ---- */
@@ -1162,7 +688,7 @@ function renderMaterialsList(materials, courseId, enrolled) {
     <div class="card material-card">
       <div class="material-card-inner">
         <div class="material-icon" style="color:${typeColors[m.file_type] || typeColors.other}">
-          <span class="mi" style="font-size:28px">${typeIcons[m.file_type] || typeIcons.other}</span>
+          <span class="mi" style="font-size:34px">${typeIcons[m.file_type] || typeIcons.other}</span>
           <span style="font-size:10px;text-transform:uppercase">${m.file_type}</span>
         </div>
         <div class="material-card-body">
@@ -1363,9 +889,3 @@ export async function handleUploadMaterial(e, courseId) {
   }
 }
 
-/* ---- Backward-compatible exports ---- */
-export async function handleAddComment(e, postId) {
-  e.preventDefault();
-  // Delegate to the new stream architecture
-  await submitForumReply(postId, null, `post-${postId}`);
-}

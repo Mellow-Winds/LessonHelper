@@ -7,9 +7,9 @@
  */
 
 import { apiGet, apiPost, apiPut, apiDelete, isLoggedIn, getToken } from '../../core/api.js';
-import { animIn, animStagger } from '../../core/router.js';
+import { navigateTo, animIn, animStagger } from '../../core/router.js';
 import { showToast, openModal, closeModal, createMdInput, createMdSelect, createMdTextarea, escHtml, formatTime } from '../../components/ui.js';
-import { renderTkComment, renderTkInputArea, toggleLike, getLikedSet, bindTkCommentEvents, getTkImages, clearTkImages, getTkReplyImages, clearTkReplyImages, renderTkPreviews, renderTkReplyPreviews } from '../../components/tk-comments.js';
+import { TkComments } from '../../components/tk-comments.js';
 
 /* =============================================
    Constants
@@ -191,9 +191,8 @@ export async function viewCourseSquarePost(courseId, postId, prefix) {
         </div>
       ` : ''}
 
-      <div class="card">
-        <h3 style="font-size:var(--text-sm);font-weight:600;margin-bottom:12px"><span class="mi" style="font-size:16px;vertical-align:-3px">chat</span> 评论</h3>
-        <div id="${prefix}-sq-comments-${postId}"></div>
+      <div class="card" id="tk-comments-container-${postId}">
+        ${isLoggedIn() ? '' : '<p class="text-secondary" style="font-size:12px;text-align:center;padding:12px"><a href="#" onclick="navigateTo(\'auth\');return false">登录</a> 后参与讨论</p>'}
       </div>
     `;
 
@@ -230,10 +229,21 @@ export async function viewCourseSquarePost(courseId, postId, prefix) {
 
     animIn(tabContent.querySelector('.card'), { y: 16, dur: 380 });
 
-    // 加载评论
-    const st = getState(prefix);
-    st.loadedComments = {};
-    toggleCourseSquareComments(courseId, postId, prefix);
+    // 初始化统一评论区
+    if (isLoggedIn()) {
+      const commentContainer = document.getElementById(`tk-comments-container-${postId}`);
+      if (commentContainer) {
+        const tkComments = new TkComments({
+          apiBase: `/api/courses/${courseId}/square-posts`,
+          ctxId: postId,
+          container: commentContainer,
+          layout: 'inline',
+          onNavigateProfile: (userId) => { navigateTo('profile-user', userId); }
+        });
+        tkComments.init();
+        tabContent._tkComments = tkComments;
+      }
+    }
   } catch (e) {
     tabContent.innerHTML = `<div class="card"><p class="text-secondary">加载失败: ${e.message}</p></div>`;
   }
@@ -427,173 +437,4 @@ function openCourseSquareEditModal(courseId, postId, prefix, postData) {
   });
 }
 
-/* =============================================
-   评论系统（楼中楼 + 图片 + 软删除）
-   ============================================= */
-
-const TK_CSQ_LIKE_KEY = 'coursesq_liked_comments';
-const _csqLikedSet = getLikedSet(TK_CSQ_LIKE_KEY);
-
-let _csqCommentsCache = {};  // key: `${prefix}-${postId}` → { comments, total }
-
-function getCsqCache(prefix, postId) {
-  const key = `${prefix}-${postId}`;
-  if (!_csqCommentsCache[key]) _csqCommentsCache[key] = { comments: [], total: 0 };
-  return _csqCommentsCache[key];
-}
-
-function clearCsqCache(prefix, postId) {
-  delete _csqCommentsCache[`${prefix}-${postId}`];
-}
-
-async function toggleCourseSquareComments(courseId, postId, prefix) {
-  const section = document.getElementById(`${prefix}-sq-comments-${postId}`);
-  if (!section) return;
-
-  if (section.style.display === 'block') {
-    section.style.display = 'none';
-    return;
-  }
-
-  section.style.display = 'block';
-
-  const cache = getCsqCache(prefix, postId);
-  if (!cache._loaded) {
-    section.innerHTML = '<p class="text-secondary" style="text-align:center;padding:24px;font-size:13px">加载中...</p>';
-    try {
-      const data = await apiGet(`/api/courses/${courseId}/square-posts/${postId}/comments?pageSize=50`);
-      cache.comments = data.comments || data.items || [];
-      cache.total = data.total || cache.comments.length;
-      cache._loaded = true;
-      renderCsqTkComments(section, courseId, postId, prefix);
-    } catch {
-      section.innerHTML = '<p class="text-secondary" style="text-align:center;padding:24px;font-size:13px">加载失败，点击重试</p>';
-      section.style.cursor = 'pointer';
-      section.onclick = () => { section.onclick = null; clearCsqCache(prefix, postId); toggleCourseSquareComments(courseId, postId, prefix); };
-    }
-  } else {
-    renderCsqTkComments(section, courseId, postId, prefix);
-  }
-}
-
-function renderCsqTkComments(section, courseId, postId, prefix) {
-  const cache = getCsqCache(prefix, postId);
-  const allComments = cache.comments || [];
-
-  const topComments = allComments.filter(c => !c.parent_id);
-  const childMap = {};
-  allComments.forEach(c => {
-    if (c.parent_id) {
-      if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
-      childMap[c.parent_id].push(c);
-    }
-  });
-  function attach(comment) {
-    const children = childMap[comment.id] || [];
-    children.forEach(attach);
-    comment.replies = children;
-    comment.reply_count = children.length;
-  }
-  topComments.forEach(attach);
-
-  section.innerHTML = `
-    <div class="comment-list" id="tk-comment-list-${postId}">
-      ${topComments.length === 0
-        ? '<p class="text-secondary" style="text-align:center;padding:24px;font-size:13px">暂无评论</p>'
-        : topComments.map(c => renderTkComment(c, postId, 0, {
-            deleteAction: 'csq-delete-comment',
-            replyAction: 'csq-reply',
-            likedSet: _csqLikedSet
-          })).join('')
-      }
-    </div>
-    ${isLoggedIn() ? renderTkInputArea(postId, '说点什么...') : '<p class="text-secondary" style="padding:12px 24px;font-size:12px;text-align:center"><a href="#" onclick="navigateTo(\'auth\');return false">登录</a> 后参与评论</p>'}
-  `;
-
-  bindTkCommentEvents(section, {
-    onSubmitReply: (ctxId, cid) => submitCsqTkReply(courseId, ctxId, cid, prefix, section),
-    onDelete: (ctxId, cid) => deleteCsqTkComment(courseId, ctxId, cid, prefix, section),
-    onLike: (cid) => toggleLike(cid, TK_CSQ_LIKE_KEY)
-  });
-
-  const sendBtn = document.getElementById(`comment-send-btn-${postId}`);
-  const mainInput = document.getElementById(`comment-main-input-${postId}`);
-  sendBtn?.addEventListener('click', () => submitCsqTkMain(courseId, postId, prefix, section));
-  mainInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCsqTkMain(courseId, postId, prefix, section); });
-}
-
-async function submitCsqTkMain(courseId, postId, prefix, section) {
-  const input = document.getElementById(`comment-main-input-${postId}`);
-  const content = input?.value?.trim();
-  const state = getTkImages(postId);
-  if (!content && state.files.length === 0) return;
-
-  try {
-    let res;
-    if (state.files.length > 0) {
-      const formData = new FormData();
-      formData.append('content', content || '');
-      state.files.forEach((f, i) => formData.append(i === 0 ? 'image' : 'images', f));
-      const token = localStorage.getItem('kedazi_token');
-      const headers = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const fetchRes = await fetch(`/api/courses/${courseId}/square-posts/${postId}/comments`, { method: 'POST', headers, body: formData });
-      res = await fetchRes.json();
-    } else {
-      res = await apiPost(`/api/courses/${courseId}/square-posts/${postId}/comments`, { content });
-    }
-    if (res.error) { showToast(res.error); return; }
-    if (input) input.value = '';
-    clearTkImages(postId);
-    renderTkPreviews(postId);
-    clearCsqCache(prefix, postId);
-    toggleCourseSquareComments(courseId, postId, prefix);
-    showToast('评论成功');
-  } catch { showToast('发送失败'); }
-}
-
-async function submitCsqTkReply(courseId, postId, parentCommentId, prefix, section) {
-  const input = document.getElementById(`inline-reply-input-${parentCommentId}`);
-  const content = input?.value?.trim();
-  const state = getTkReplyImages(parentCommentId);
-  if (!content && state.files.length === 0) return;
-
-  try {
-    let res;
-    if (state.files.length > 0) {
-      const formData = new FormData();
-      formData.append('content', content || '');
-      formData.append('parent_id', parentCommentId);
-      state.files.forEach((f, i) => formData.append(i === 0 ? 'image' : 'images', f));
-      const token = localStorage.getItem('kedazi_token');
-      const headers = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const fetchRes = await fetch(`/api/courses/${courseId}/square-posts/${postId}/comments`, { method: 'POST', headers, body: formData });
-      res = await fetchRes.json();
-    } else {
-      res = await apiPost(`/api/courses/${courseId}/square-posts/${postId}/comments`, { content, parent_id: parentCommentId });
-    }
-    if (res.error) { showToast(res.error); return; }
-    clearTkReplyImages(parentCommentId);
-    renderTkReplyPreviews(parentCommentId);
-    clearCsqCache(prefix, postId);
-    toggleCourseSquareComments(courseId, postId, prefix);
-    showToast('回复成功');
-  } catch { showToast('发送失败'); }
-}
-
-async function deleteCsqTkComment(courseId, postId, commentId, prefix, section) {
-  openModal('确认删除', `
-    <p style="margin-bottom:24px">确定要删除这条评论吗？</p>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-      <button class="btn btn-primary" id="confirm-del-cmt" style="background:var(--md-error)">删除</button>
-    </div>
-  `);
-  document.getElementById('confirm-del-cmt')?.addEventListener('click', async () => {
-    const result = await apiDelete(`/api/courses/${courseId}/square-posts/${postId}/comments/${commentId}`);
-    if (result.error) { showToast(result.error); } else { showToast('已删除'); clearCsqCache(prefix, postId); toggleCourseSquareComments(courseId, postId, prefix); }
-    closeModal();
-  });
-}
 

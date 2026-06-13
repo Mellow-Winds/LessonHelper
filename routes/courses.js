@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { authMiddleware } = require('./middleware/auth');
+const { authMiddleware, optionalAuthMiddleware } = require('./middleware/auth');
 const { createNotification } = require('./notifications');
 
 const POST_ATTACHMENT_DIR = path.join(__dirname, '..', 'uploads', 'post-attachments');
@@ -56,11 +56,13 @@ function toAttachmentResponse(attachment) {
   };
 }
 
-// 评论图片上传配置（最多 9 张，JPG/PNG/GIF/WebP，每张 ≤ 20MB）
+// 评论图片上传配置（单图，JPG/PNG/WebP，≤ 5MB）
 const COMMENT_IMAGE_DIR = path.join(__dirname, '..', 'uploads', 'comment-images');
-const COMMENT_IMAGE_MAX = 20 * 1024 * 1024;
-const COMMENT_IMAGE_LIMIT = 9;
-const COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+const COMMENT_IMAGE_MAX = 5 * 1024 * 1024; // 5MB
+const COMMENT_IMAGE_LIMIT = 1;
+const COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const COMMENT_CHAR_LIMIT = 200;
+const COMMENT_COOLDOWN = 30; // seconds
 
 const commentImageUpload = multer({
   storage: multer.diskStorage({
@@ -70,7 +72,7 @@ const commentImageUpload = multer({
     },
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${ext}`);
+      cb(null, `ec_${Date.now()}_${crypto.randomBytes(6).toString('hex')}${ext}`);
     },
   }),
   limits: { fileSize: COMMENT_IMAGE_MAX, files: COMMENT_IMAGE_LIMIT },
@@ -83,20 +85,42 @@ const commentImageUpload = multer({
 
 function parseCommentImage(req, res, next) {
   if (!req.is('multipart/form-data')) return next();
-  commentImageUpload.array('image', COMMENT_IMAGE_LIMIT)(req, res, (error) => {
+  commentImageUpload.single('image')(req, res, (error) => {
     if (!error) return next();
-    (req.files || []).forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     const message = error.code === 'LIMIT_FILE_SIZE'
-      ? '单张图片不能超过 20MB'
-      : error.code === 'LIMIT_FILE_COUNT' || error.code === 'LIMIT_UNEXPECTED_FILE'
-        ? '最多上传 9 张图片'
-        : '仅支持 JPG、PNG、GIF、WebP 格式';
+      ? '图片不能超过 5MB'
+      : error.code === 'LIMIT_FILE_COUNT'
+        ? '只能上传一张图片'
+        : '仅支持 JPG、PNG、WebP 格式';
     res.status(400).json({ error: message });
   });
 }
 
 module.exports = function (db) {
   const router = express.Router();
+
+  // --- Comment helpers ---
+  function collectDescendantComments(table, commentId) {
+    const result = [];
+    const stack = [commentId];
+    while (stack.length > 0) {
+      const currentId = stack.pop();
+      const children = db.all(`SELECT * FROM ${table} WHERE parent_id = ?`, [currentId]);
+      for (const child of children) { result.push(child); stack.push(child.id); }
+    }
+    return result;
+  }
+  function deleteCommentImages(imageUrl) {
+    if (!imageUrl) return;
+    imageUrl.split(';').filter(Boolean).forEach(url => {
+      const p = path.join(__dirname, '..', url);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    });
+  }
+  function getCommentCount(table, postId) {
+    return (db.get(`SELECT COUNT(*) AS cnt FROM ${table} WHERE post_id = ?`, [postId]) || {}).cnt || 0;
+  }
 
   function isEnrolled(userId, courseId) {
     return !!db.get(
@@ -416,116 +440,153 @@ module.exports = function (db) {
     res.sendFile(path.join(POST_ATTACHMENT_DIR, attachment.file_path));
   });
 
-  // GET /api/courses/posts/:postId/comments — 评论列表（分页 + 楼中楼）
+  // GET /api/courses/posts/:postId/comments — 评论列表（游标分页 + 楼中楼 + 点赞状态）
   router.get('/posts/:postId/comments', (req, res) => {
     const postId = Number(req.params.postId);
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
-    const offset = (page - 1) * pageSize;
+    const lastCommentId = req.query.lastCommentId ? parseInt(req.query.lastCommentId) : null;
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const userId = req.user?.userId || null;
 
-    const total = (db.get('SELECT COUNT(*) AS cnt FROM comments WHERE post_id = ?', [postId]) || {}).cnt || 0;
-
-    const comments = db.all(`
-      SELECT c.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
-      FROM comments c
-      JOIN users u ON c.author_id = u.id
-      WHERE c.post_id = ?
-      ORDER BY c.created_at ASC
-      LIMIT ? OFFSET ?
-    `, [postId, pageSize, offset]);
-
-    res.json({ comments, total, page, pageSize });
+    let topComments;
+    if (lastCommentId) {
+      topComments = db.all(
+        `SELECT c.*, u.nickname AS author_name, u.username AS author_username,
+                u.avatar_url AS author_avatar, u.grade AS author_grade, u.major AS author_major
+         FROM comments c LEFT JOIN users u ON u.id = c.author_id
+         WHERE c.post_id = ? AND c.parent_id IS NULL AND c.id > ?
+         ORDER BY c.id ASC LIMIT ?`, [postId, lastCommentId, limit]);
+    } else {
+      topComments = db.all(
+        `SELECT c.*, u.nickname AS author_name, u.username AS author_username,
+                u.avatar_url AS author_avatar, u.grade AS author_grade, u.major AS author_major
+         FROM comments c LEFT JOIN users u ON u.id = c.author_id
+         WHERE c.post_id = ? AND c.parent_id IS NULL
+         ORDER BY c.id ASC LIMIT ?`, [postId, limit]);
+    }
+    const topIds = topComments.map(c => c.id);
+    let allChildren = [];
+    if (topIds.length > 0) {
+      const ph = topIds.map(() => '?').join(',');
+      allChildren = db.all(
+        `SELECT c.*, u.nickname AS author_name, u.username AS author_username,
+                u.avatar_url AS author_avatar, u.grade AS author_grade, u.major AS author_major
+         FROM comments c LEFT JOIN users u ON u.id = c.author_id
+         WHERE c.parent_id IN (${ph}) ORDER BY c.created_at ASC`, topIds);
+    }
+    const childrenMap = {};
+    for (const child of allChildren) {
+      const pid = child.parent_id;
+      if (!childrenMap[pid]) childrenMap[pid] = [];
+      if (childrenMap[pid].length < 3) childrenMap[pid].push(child);
+    }
+    const moreCounts = {};
+    if (topIds.length > 0) {
+      const ph = topIds.map(() => '?').join(',');
+      const rows = db.all(`SELECT parent_id, COUNT(*) AS cnt FROM comments WHERE parent_id IN (${ph}) GROUP BY parent_id`, topIds);
+      for (const row of rows) {
+        const visible = (childrenMap[row.parent_id] || []).length;
+        if (row.cnt > visible) moreCounts[row.parent_id] = row.cnt - visible;
+      }
+    }
+    for (const c of topComments) {
+      c.replies = childrenMap[c.id] || [];
+      c.reply_count = moreCounts[c.id] ? 3 + moreCounts[c.id] : (childrenMap[c.id] || []).length;
+      c.has_more_replies = !!moreCounts[c.id];
+      c.more_reply_count = moreCounts[c.id] || 0;
+    }
+    if (userId && topComments.length > 0) {
+      const allIds = [...topComments.map(c => c.id), ...allChildren.map(c => c.id)];
+      const ph = allIds.map(() => '?').join(',');
+      const likedRows = db.all(`SELECT comment_id FROM comment_likes WHERE comment_type='course' AND comment_id IN (${ph}) AND user_id = ?`, [...allIds, userId]);
+      const likedSet = new Set(likedRows.map(r => r.comment_id));
+      for (const c of topComments) {
+        c.is_liked = likedSet.has(c.id); c.like_count = c.like_count || 0;
+        for (const r of (c.replies || [])) { r.is_liked = likedSet.has(r.id); r.like_count = r.like_count || 0; }
+      }
+    } else {
+      for (const c of topComments) {
+        c.like_count = c.like_count || 0; c.is_liked = false;
+        for (const r of (c.replies || [])) { r.like_count = r.like_count || 0; r.is_liked = false; }
+      }
+    }
+    res.json({ items: topComments, hasMore: topComments.length === limit, commentCount: getCommentCount('comments', postId) });
   });
 
-  // POST /api/courses/posts/:postId/comments — 发评论 [Auth]（支持多图 + 楼中楼）
+  // POST /api/courses/posts/:postId/comments — 发评论 [Auth]（支持图片 + 楼中楼 + @提及）
   router.post('/posts/:postId/comments', authMiddleware, parseCommentImage, (req, res) => {
     const { content, parent_id } = req.body;
-    const imageFiles = req.files || [];
+    const imageFile = req.file;
+    const userId = req.user.userId;
 
     // 风控：同一用户 30 秒内只能评论一次
-    const lastComment = db.get(
-      'SELECT MAX(created_at) as last_time FROM comments WHERE author_id = ?',
-      [req.user.userId]
-    );
+    const lastComment = db.get('SELECT MAX(created_at) as last_time FROM comments WHERE author_id = ?', [userId]);
     if (lastComment?.last_time) {
       const elapsed = Date.now() - new Date(lastComment.last_time).getTime();
-      if (elapsed < 30000) {
-        imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+      if (elapsed < COMMENT_COOLDOWN * 1000) {
+        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
         return res.status(429).json({
-          error: `评论发送太频繁，请 ${Math.ceil((30000 - elapsed) / 1000)} 秒后再试`,
-          retryAfter: Math.ceil((30000 - elapsed) / 1000)
+          error: `评论发送太频繁，请 ${Math.ceil((COMMENT_COOLDOWN * 1000 - elapsed) / 1000)} 秒后再试`,
+          retryAfter: Math.ceil((COMMENT_COOLDOWN * 1000 - elapsed) / 1000)
         });
       }
     }
-
-    // 至少需要文字或图片
-    if ((!content || !content.trim()) && imageFiles.length === 0) {
-      imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+    if ((!content || !content.trim()) && !imageFile) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
       return res.status(400).json({ error: '请输入内容或上传图片' });
+    }
+    if (content && content.length > COMMENT_CHAR_LIMIT) {
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: `评论内容不能超过 ${COMMENT_CHAR_LIMIT} 字` });
     }
 
     const postId = Number(req.params.postId);
     const post = db.get('SELECT id, course_id FROM posts WHERE id = ?', [postId]);
     if (!post) {
-      imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+      if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
       return res.status(404).json({ error: '帖子不存在' });
     }
-
-    // 楼中楼：校验 parent_id
     let parentId = null;
     if (parent_id) {
       parentId = Number(parent_id);
       const parentComment = db.get('SELECT id, post_id FROM comments WHERE id = ?', [parentId]);
       if (!parentComment || parentComment.post_id !== postId) {
-        imageFiles.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
         return res.status(400).json({ error: '被回复的评论不存在' });
       }
     }
-
-    // 多图：用分号连接多张图片 URL
-    const imageUrls = imageFiles.map(f => `/uploads/comment-images/${f.filename}`);
-    const imageUrlStr = imageUrls.join(';');
-
+    const imageUrl = imageFile ? `/uploads/comment-images/${imageFile.filename}` : '';
     const result = db.run(
       'INSERT INTO comments (post_id, author_id, content, parent_id, image_url) VALUES (?, ?, ?, ?, ?)',
-      [postId, req.user.userId, (content || '').trim(), parentId, imageUrlStr]
-    );
-    db.save();
+      [postId, userId, (content || '').trim(), parentId, imageUrl]);
+    const commentId = result.lastInsertRowid;
 
-    // 通知逻辑
-    const commenter = db.get('SELECT nickname FROM users WHERE id = ?', [req.user.userId]);
-
+    const commenter = db.get('SELECT nickname, username FROM users WHERE id = ?', [userId]);
+    const userName = commenter?.nickname || commenter?.username || '某用户';
     if (parentId) {
-      const parentComment = db.get('SELECT author_id FROM comments WHERE id = ?', [parentId]);
-      if (parentComment && parentComment.author_id !== req.user.userId) {
-        createNotification(db, {
-          userId: parentComment.author_id, type: 'new_comment', title: '新回复',
-          message: `${commenter?.nickname || '匿名'} 回复了你的评论`,
-          relatedType: 'post', relatedId: postId, courseId: post.course_id
-        });
-        db.save();
-      }
+      const pc = db.get('SELECT author_id FROM comments WHERE id = ?', [parentId]);
+      if (pc && pc.author_id !== userId)
+        createNotification(db, { userId: pc.author_id, type: 'new_comment', title: '新回复', message: `${userName} 回复了你的评论`, relatedType: 'post', relatedId: postId, courseId: post.course_id, relatedCommentId: commentId });
     } else {
-      const postDetail = db.get('SELECT author_id, title, course_id FROM posts WHERE id = ?', [postId]);
-      if (postDetail && postDetail.author_id !== req.user.userId) {
-        createNotification(db, {
-          userId: postDetail.author_id, type: 'new_comment', title: '新评论',
-          message: `${commenter?.nickname || '匿名'} 评论了你的帖子「${postDetail.title}」`,
-          relatedType: 'post', relatedId: postId, courseId: postDetail.course_id
-        });
-        db.save();
+      const pd = db.get('SELECT author_id, title, course_id FROM posts WHERE id = ?', [postId]);
+      if (pd && pd.author_id !== userId)
+        createNotification(db, { userId: pd.author_id, type: 'new_comment', title: '新评论', message: `${userName} 评论了你的帖子「${pd.title}」`, relatedType: 'post', relatedId: postId, courseId: pd.course_id, relatedCommentId: commentId });
+    }
+    // @提及通知
+    if (content) {
+      const mentionedNames = [...new Set((content.match(/@(\w+)/g) || []).map(m => m.slice(1)))];
+      if (mentionedNames.length > 0) {
+        const mentionedUsers = db.all(`SELECT id, username FROM users WHERE username IN (${mentionedNames.map(() => '?').join(',')})`, mentionedNames);
+        const parentAuthorId = parentId ? (db.get('SELECT author_id FROM comments WHERE id = ?', [parentId]) || {}).author_id : null;
+        const alreadyNotified = new Set([userId, (db.get('SELECT author_id FROM posts WHERE id = ?', [postId]) || {}).author_id, parentAuthorId].filter(Boolean));
+        for (const m of mentionedUsers) {
+          if (!alreadyNotified.has(m.id))
+            createNotification(db, { userId: m.id, type: 'comment_mention', title: '有人@了你', message: `${userName} 在评论中@了你`, relatedType: 'post', relatedId: postId, courseId: post.course_id, relatedCommentId: commentId });
+        }
       }
     }
-
-    res.status(201).json({
-      id: result.lastInsertRowid,
-      post_id: postId,
-      author_id: req.user.userId,
-      content: (content || '').trim(),
-      parent_id: parentId,
-      image_url: imageUrlStr,
-      image_urls: imageUrls
-    });
+    db.save();
+    const comment = db.get(`SELECT c.*, u.nickname AS author_name, u.username AS author_username, u.avatar_url AS author_avatar FROM comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.id = ?`, [commentId]);
+    res.status(201).json(comment);
   });
 
   // DELETE /api/courses/posts/:postId — 删除帖子（级联删除所有回复）
@@ -565,41 +626,56 @@ module.exports = function (db) {
     res.json({ message: '已删除' });
   });
 
-  // DELETE /api/courses/posts/:postId/comments/:commentId — 删除自己的回复（硬删除）
+  // DELETE /api/courses/posts/:postId/comments/:commentId — 删除评论 [Auth]（递归删除）
   router.delete('/posts/:postId/comments/:commentId', authMiddleware, (req, res) => {
     const commentId = Number(req.params.commentId);
     const postId = Number(req.params.postId);
     const userId = req.user.userId;
-
     const comment = db.get('SELECT * FROM comments WHERE id = ? AND post_id = ?', [commentId, postId]);
     if (!comment) return res.status(404).json({ error: '评论不存在' });
     if (comment.author_id !== userId) return res.status(403).json({ error: '只能删除自己的回复' });
-
-    // 删除图片文件（支持多图，分号分隔）
-    if (comment.image_url) {
-      comment.image_url.split(';').filter(Boolean).forEach(url => {
-        const imgPath = path.join(__dirname, '..', url);
-        if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
-      });
-    }
-
-    // 硬删除：直接删除评论
-    db.run('DELETE FROM comments WHERE id = ?', [commentId]);
+    const descendants = collectDescendantComments('comments', commentId);
+    [comment, ...descendants].forEach(c => deleteCommentImages(c.image_url));
+    const ids = [commentId, ...descendants.map(c => c.id)];
+    const ph = ids.map(() => '?').join(',');
+    db.run(`DELETE FROM comment_likes WHERE comment_type='course' AND comment_id IN (${ph})`, ids);
+    for (const id of ids) db.run('DELETE FROM comments WHERE id = ?', [id]);
     db.save();
-
-    res.json({ message: '已删除' });
+    res.json({ message: '已删除', deleted_count: ids.length, comment_count: getCommentCount('comments', postId) });
   });
 
-  // GET /api/courses/posts/:postId/comments/:commentId/replies — 获取楼中楼回复
+  // POST/DELETE /api/courses/posts/:postId/comments/:commentId/like
+  router.post('/posts/:postId/comments/:commentId/like', authMiddleware, (req, res) => {
+    const commentId = parseInt(req.params.commentId), userId = req.user.userId;
+    const comment = db.get('SELECT id, like_count FROM comments WHERE id = ?', [commentId]);
+    if (!comment) return res.status(404).json({ error: '评论不存在' });
+    try { db.run("INSERT INTO comment_likes (comment_type, comment_id, user_id) VALUES ('course', ?, ?)", [commentId, userId]); }
+    catch { return res.status(409).json({ error: '已点赞' }); }
+    db.run('UPDATE comments SET like_count = like_count + 1 WHERE id = ?', [commentId]);
+    db.save();
+    res.json({ liked: true, like_count: (db.get('SELECT like_count FROM comments WHERE id = ?', [commentId]) || {}).like_count || 1 });
+  });
+  router.delete('/posts/:postId/comments/:commentId/like', authMiddleware, (req, res) => {
+    const commentId = parseInt(req.params.commentId), userId = req.user.userId;
+    if (!db.get("SELECT id FROM comment_likes WHERE comment_type='course' AND comment_id = ? AND user_id = ?", [commentId, userId]))
+      return res.status(404).json({ error: '未点赞' });
+    db.run("DELETE FROM comment_likes WHERE comment_type='course' AND comment_id = ? AND user_id = ?", [commentId, userId]);
+    db.run('UPDATE comments SET like_count = MAX(0, like_count - 1) WHERE id = ?', [commentId]);
+    db.save();
+    res.json({ liked: false, like_count: (db.get('SELECT like_count FROM comments WHERE id = ?', [commentId]) || {}).like_count || 0 });
+  });
+
+  // GET /api/courses/posts/:postId/comments/:commentId/replies
   router.get('/posts/:postId/comments/:commentId/replies', (req, res) => {
     const commentId = Number(req.params.commentId);
-    const replies = db.all(`
-      SELECT c.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
-      FROM comments c
-      JOIN users u ON c.author_id = u.id
-      WHERE c.parent_id = ?
-      ORDER BY c.created_at ASC
-    `, [commentId]);
+    const userId = req.user?.userId || null;
+    const replies = db.all(`SELECT c.*, u.nickname AS author_name, u.username AS author_username, u.avatar_url AS author_avatar, u.grade AS author_grade, u.major AS author_major FROM comments c LEFT JOIN users u ON c.author_id = u.id WHERE c.parent_id = ? ORDER BY c.created_at ASC`, [commentId]);
+    if (userId && replies.length > 0) {
+      const ids = replies.map(r => r.id);
+      const ph = ids.map(() => '?').join(',');
+      const likedSet = new Set(db.all(`SELECT comment_id FROM comment_likes WHERE comment_type='course' AND comment_id IN (${ph}) AND user_id = ?`, [...ids, userId]).map(r => r.comment_id));
+      for (const r of replies) { r.is_liked = likedSet.has(r.id); r.like_count = r.like_count || 0; }
+    } else { for (const r of replies) { r.like_count = r.like_count || 0; r.is_liked = false; } }
     res.json(replies);
   });
 
@@ -607,41 +683,7 @@ module.exports = function (db) {
      课程搭子帖（course-scoped square posts）
      ============================================= */
 
-  const COURSE_SQ_COMMENT_IMAGE_DIR = path.join(__dirname, '..', 'uploads', 'comment-images');
-  const COURSE_SQ_COMMENT_IMAGE_MAX = 1 * 1024 * 1024;
-  const COURSE_SQ_COMMENT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png']);
-
-  const courseSquareCommentUpload = multer({
-    storage: multer.diskStorage({
-      destination: (req, file, cb) => {
-        fs.mkdirSync(COURSE_SQ_COMMENT_IMAGE_DIR, { recursive: true });
-        cb(null, COURSE_SQ_COMMENT_IMAGE_DIR);
-      },
-      filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
-        cb(null, `csq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
-      }
-    }),
-    limits: { fileSize: COURSE_SQ_COMMENT_IMAGE_MAX, files: 1 },
-    fileFilter: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, COURSE_SQ_COMMENT_IMAGE_EXT.has(ext));
-    }
-  });
-
-  function parseCourseSquareCommentImage(req, res, next) {
-    if (!req.is('multipart/form-data')) return next();
-    courseSquareCommentUpload.single('image')(req, res, (error) => {
-      if (!error) return next();
-      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-      const message = error.code === 'LIMIT_FILE_SIZE'
-        ? '图片不能超过 1MB'
-        : error.code === 'LIMIT_FILE_COUNT'
-          ? '只能上传一张图片'
-          : '仅支持 jpg/jpeg/png 格式';
-      return res.status(400).json({ error: message });
-    });
-  }
+  // 课程搭子帖评论图片上传复用统一 parseCommentImage（5MB, JPG/PNG/WebP）
 
   const COURSE_SQUARE_CATEGORIES = ['考研搭子', '考公搭子', '考证搭子', '项目组队', '技能交换', '竞赛组队', '其他'];
   const COURSE_SQUARE_EXPIRY_DAYS = 7;
@@ -871,59 +913,108 @@ module.exports = function (db) {
     res.json({ message: '已接受' });
   });
 
-  // GET /api/courses/:id/square-posts/:postId/comments — 评论列表
-  router.get('/:id/square-posts/:postId/comments', (req, res) => {
+  // GET /api/courses/:id/square-posts/:postId/comments — 评论列表（游标分页 + 楼中楼 + 点赞状态）
+  router.get('/:id/square-posts/:postId/comments', optionalAuthMiddleware, (req, res) => {
     const postId = Number(req.params.postId);
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
-    const offset = (page - 1) * pageSize;
+    const lastCommentId = req.query.lastCommentId ? parseInt(req.query.lastCommentId) : null;
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const userId = req.user?.userId || null;
 
-    const total = (db.get('SELECT COUNT(*) AS cnt FROM square_comments WHERE post_id = ?', [postId]) || {}).cnt || 0;
-
-    const comments = db.all(`
-      SELECT sc.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
-      FROM square_comments sc
-      JOIN users u ON sc.author_id = u.id
-      WHERE sc.post_id = ?
-      ORDER BY sc.created_at ASC
-      LIMIT ? OFFSET ?
-    `, [postId, pageSize, offset]);
-
-    res.json({ comments, total, page, pageSize });
+    let topComments;
+    if (lastCommentId) {
+      topComments = db.all(
+        `SELECT sc.*, u.nickname AS author_name, u.username AS author_username,
+                u.avatar_url AS author_avatar, u.grade AS author_grade, u.major AS author_major
+         FROM square_comments sc LEFT JOIN users u ON u.id = sc.author_id
+         WHERE sc.post_id = ? AND sc.parent_id IS NULL AND sc.id > ?
+         ORDER BY sc.id ASC LIMIT ?`, [postId, lastCommentId, limit]);
+    } else {
+      topComments = db.all(
+        `SELECT sc.*, u.nickname AS author_name, u.username AS author_username,
+                u.avatar_url AS author_avatar, u.grade AS author_grade, u.major AS author_major
+         FROM square_comments sc LEFT JOIN users u ON u.id = sc.author_id
+         WHERE sc.post_id = ? AND sc.parent_id IS NULL
+         ORDER BY sc.id ASC LIMIT ?`, [postId, limit]);
+    }
+    const topIds = topComments.map(c => c.id);
+    let allChildren = [];
+    if (topIds.length > 0) {
+      const ph = topIds.map(() => '?').join(',');
+      allChildren = db.all(
+        `SELECT sc.*, u.nickname AS author_name, u.username AS author_username,
+                u.avatar_url AS author_avatar, u.grade AS author_grade, u.major AS author_major
+         FROM square_comments sc LEFT JOIN users u ON u.id = sc.author_id
+         WHERE sc.parent_id IN (${ph}) ORDER BY sc.created_at ASC`, topIds);
+    }
+    const childrenMap = {};
+    for (const child of allChildren) {
+      const pid = child.parent_id;
+      if (!childrenMap[pid]) childrenMap[pid] = [];
+      if (childrenMap[pid].length < 3) childrenMap[pid].push(child);
+    }
+    const moreCounts = {};
+    if (topIds.length > 0) {
+      const ph = topIds.map(() => '?').join(',');
+      const rows = db.all(`SELECT parent_id, COUNT(*) AS cnt FROM square_comments WHERE parent_id IN (${ph}) GROUP BY parent_id`, topIds);
+      for (const row of rows) {
+        const visible = (childrenMap[row.parent_id] || []).length;
+        if (row.cnt > visible) moreCounts[row.parent_id] = row.cnt - visible;
+      }
+    }
+    for (const c of topComments) {
+      c.replies = childrenMap[c.id] || [];
+      c.reply_count = moreCounts[c.id] ? 3 + moreCounts[c.id] : (childrenMap[c.id] || []).length;
+      c.has_more_replies = !!moreCounts[c.id];
+      c.more_reply_count = moreCounts[c.id] || 0;
+    }
+    if (userId && topComments.length > 0) {
+      const allIds = [...topComments.map(c => c.id), ...allChildren.map(c => c.id)];
+      const ph = allIds.map(() => '?').join(',');
+      const likedRows = db.all(`SELECT comment_id FROM comment_likes WHERE comment_type='square' AND comment_id IN (${ph}) AND user_id = ?`, [...allIds, userId]);
+      const likedSet = new Set(likedRows.map(r => r.comment_id));
+      for (const c of topComments) {
+        c.is_liked = likedSet.has(c.id); c.like_count = c.like_count || 0;
+        for (const r of (c.replies || [])) { r.is_liked = likedSet.has(r.id); r.like_count = r.like_count || 0; }
+      }
+    } else {
+      for (const c of topComments) {
+        c.like_count = c.like_count || 0; c.is_liked = false;
+        for (const r of (c.replies || [])) { r.like_count = r.like_count || 0; r.is_liked = false; }
+      }
+    }
+    res.json({ items: topComments, hasMore: topComments.length === limit, commentCount: getCommentCount('square_comments', postId) });
   });
 
-  // POST /api/courses/:id/square-posts/:postId/comments — 发评论 [Auth + 选课]（:id 为大课 ID）
-  router.post('/:id/square-posts/:postId/comments', authMiddleware, parseCourseSquareCommentImage, (req, res) => {
+  // POST /api/courses/:id/square-posts/:postId/comments — 发评论 [Auth + 选课]（@mention + 200 字限制）
+  router.post('/:id/square-posts/:postId/comments', authMiddleware, parseCommentImage, (req, res) => {
     const bigCourseId = Number(req.params.id);
     const postId = Number(req.params.postId);
     const userId = req.user.userId;
     if (!isEnrolledInBigCourse(userId, bigCourseId)) return res.status(403).json({ error: '未选修该课程' });
 
-    // 风控：同一用户 30 秒内只能评论一次
-    const lastComment = db.get(
-      'SELECT MAX(created_at) as last_time FROM square_comments WHERE author_id = ?',
-      [userId]
-    );
+    const { content, parent_id } = req.body;
+    const imageFile = req.file;
+
+    // 风控：同一用户 COOLDOWN 秒内只能评论一次
+    const lastComment = db.get('SELECT MAX(created_at) as last_time FROM square_comments WHERE author_id = ?', [userId]);
     if (lastComment?.last_time) {
       const elapsed = Date.now() - new Date(lastComment.last_time).getTime();
-      if (elapsed < 30000) {
+      if (elapsed < COMMENT_COOLDOWN * 1000) {
+        if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
         return res.status(429).json({
-          error: `评论发送太频繁，请 ${Math.ceil((30000 - elapsed) / 1000)} 秒后再试`,
-          retryAfter: Math.ceil((30000 - elapsed) / 1000)
+          error: `评论发送太频繁，请 ${Math.ceil((COMMENT_COOLDOWN * 1000 - elapsed) / 1000)} 秒后再试`,
+          retryAfter: Math.ceil((COMMENT_COOLDOWN * 1000 - elapsed) / 1000)
         });
       }
     }
-
-    const { content, parent_id } = req.body;
-    const imageFile = req.file;
 
     if ((!content || !content.trim()) && !imageFile) {
       if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
       return res.status(400).json({ error: '请输入内容或上传图片' });
     }
-    if (content && content.length > 500) {
+    if (content && content.length > COMMENT_CHAR_LIMIT) {
       if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
-      return res.status(400).json({ error: '回复内容不能超过 500 字' });
+      return res.status(400).json({ error: `评论内容不能超过 ${COMMENT_CHAR_LIMIT} 字` });
     }
 
     const post = db.get('SELECT id, creator_id, title FROM square_posts WHERE id = ? AND course_id = ?', [postId, bigCourseId]);
@@ -935,48 +1026,78 @@ module.exports = function (db) {
     let parentId = null;
     if (parent_id) {
       parentId = Number(parent_id);
-      const parentComment = db.get('SELECT id, post_id FROM square_comments WHERE id = ?', [parentId]);
-      if (!parentComment || parentComment.post_id !== postId) {
+      const parentComment = db.get('SELECT id, author_id FROM square_comments WHERE id = ? AND post_id = ?', [parentId, postId]);
+      if (!parentComment) {
         if (imageFile && fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
         return res.status(400).json({ error: '被回复的评论不存在' });
       }
     }
 
     const imageUrl = imageFile ? `/uploads/comment-images/${imageFile.filename}` : '';
-
     const result = db.run(
       'INSERT INTO square_comments (post_id, author_id, content, parent_id, image_url) VALUES (?, ?, ?, ?, ?)',
       [postId, userId, (content || '').trim(), parentId, imageUrl]
     );
-    db.save();
+    const commentId = result.lastInsertRowid;
 
-    const commenter = db.get('SELECT nickname FROM users WHERE id = ?', [userId]);
+    // 通知
+    const user = db.get('SELECT nickname, username FROM users WHERE id = ?', [userId]);
+    const userName = user?.nickname || user?.username || '某用户';
 
     if (parentId) {
       const parentComment = db.get('SELECT author_id FROM square_comments WHERE id = ?', [parentId]);
       if (parentComment && parentComment.author_id !== userId) {
         createNotification(db, {
-          userId: parentComment.author_id, type: 'new_comment', title: '新回复',
-          message: `${commenter?.nickname || '匿名'} 回复了你的评论`,
-          relatedType: 'course_square_post', relatedId: postId, courseId: bigCourseId
+          userId: parentComment.author_id, type: 'comment_reply', title: '评论回复',
+          message: `${userName} 回复了你在「${post.title}」下的评论`,
+          relatedType: 'course_square_post', relatedId: postId, relatedCommentId: commentId, courseId: bigCourseId
         });
-        db.save();
       }
     } else {
       if (post.creator_id !== userId) {
         createNotification(db, {
-          userId: post.creator_id, type: 'new_comment', title: '新评论',
-          message: `${commenter?.nickname || '匿名'} 评论了你的搭子帖「${post.title}」`,
-          relatedType: 'course_square_post', relatedId: postId, courseId: bigCourseId
+          userId: post.creator_id, type: 'post_comment', title: '新评论',
+          message: `${userName} 评论了你的搭子帖「${post.title}」`,
+          relatedType: 'course_square_post', relatedId: postId, relatedCommentId: commentId, courseId: bigCourseId
         });
-        db.save();
       }
     }
 
-    res.status(201).json({ id: result.lastInsertRowid, post_id: postId, author_id: userId, content: (content || '').trim(), parent_id: parentId, image_url: imageUrl });
+    // @提及解析
+    if (content) {
+      const mentionedNames = [...new Set((content.match(/@(\w+)/g) || []).map(m => m.slice(1)))];
+      if (mentionedNames.length > 0) {
+        const mentionedUsers = db.all(
+          `SELECT id, username FROM users WHERE username IN (${mentionedNames.map(() => '?').join(',')})`,
+          mentionedNames
+        );
+        const parentAuthorId = parentId
+          ? (db.get('SELECT author_id FROM square_comments WHERE id = ?', [parentId]) || {}).author_id
+          : null;
+        const alreadyNotified = new Set([userId, post.creator_id, parentAuthorId].filter(Boolean));
+        for (const mentioned of mentionedUsers) {
+          if (!alreadyNotified.has(mentioned.id)) {
+            createNotification(db, {
+              userId: mentioned.id, type: 'comment_mention', title: '有人@了你',
+              message: `${userName} 在评论中@了你`,
+              relatedType: 'course_square_post', relatedId: postId,
+              relatedCommentId: commentId, courseId: bigCourseId
+            });
+          }
+        }
+      }
+    }
+
+    db.save();
+
+    // 返回完整评论
+    const comment = db.get(
+      `SELECT sc.*, u.nickname AS author_name, u.username AS author_username, u.avatar_url AS author_avatar, u.grade AS author_grade, u.major AS author_major
+       FROM square_comments sc LEFT JOIN users u ON u.id = sc.author_id WHERE sc.id = ?`, [commentId]);
+    res.status(201).json(comment);
   });
 
-  // DELETE /api/courses/:id/square-posts/:postId/comments/:commentId — 删除评论（硬删除）
+  // DELETE /api/courses/:id/square-posts/:postId/comments/:commentId — 递归删除
   router.delete('/:id/square-posts/:postId/comments/:commentId', authMiddleware, (req, res) => {
     const commentId = Number(req.params.commentId);
     const postId = Number(req.params.postId);
@@ -986,27 +1107,64 @@ module.exports = function (db) {
     if (!comment) return res.status(404).json({ error: '评论不存在' });
     if (comment.author_id !== userId) return res.status(403).json({ error: '只能删除自己的回复' });
 
-    if (comment.image_url) {
-      const imgPath = path.join(__dirname, '..', comment.image_url);
-      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
-    }
+    const descendants = collectDescendantComments('square_comments', commentId);
+    [comment, ...descendants].forEach(c => deleteCommentImages(c.image_url));
 
-    // 硬删除：直接删除评论
-    db.run('DELETE FROM square_comments WHERE id = ?', [commentId]);
+    const ids = [commentId, ...descendants.map(c => c.id)];
+    const idPlaceholders = ids.map(() => '?').join(',');
+    db.run(`DELETE FROM comment_likes WHERE comment_type='square' AND comment_id IN (${idPlaceholders})`, ids);
+    for (const id of ids) db.run('DELETE FROM square_comments WHERE id = ?', [id]);
     db.save();
-    res.json({ message: '已删除' });
+
+    res.json({ message: '已删除', deleted_count: ids.length, comment_count: getCommentCount('square_comments', postId) });
   });
 
-  // GET /api/courses/:id/square-posts/:postId/comments/:commentId/replies — 嵌套回复
-  router.get('/:id/square-posts/:postId/comments/:commentId/replies', (req, res) => {
+  // POST /api/courses/:id/square-posts/:postId/comments/:commentId/like — 点赞
+  router.post('/:id/square-posts/:postId/comments/:commentId/like', authMiddleware, (req, res) => {
+    const commentId = parseInt(req.params.commentId);
+    const userId = req.user.userId;
+    const comment = db.get('SELECT id, like_count FROM square_comments WHERE id = ?', [commentId]);
+    if (!comment) return res.status(404).json({ error: '评论不存在' });
+    try {
+      db.run("INSERT INTO comment_likes (comment_type, comment_id, user_id) VALUES ('square', ?, ?)", [commentId, userId]);
+    } catch { return res.status(409).json({ error: '已点赞' }); }
+    db.run('UPDATE square_comments SET like_count = like_count + 1 WHERE id = ?', [commentId]);
+    db.save();
+    const updated = db.get('SELECT like_count FROM square_comments WHERE id = ?', [commentId]);
+    res.json({ liked: true, like_count: updated?.like_count || 1 });
+  });
+
+  // DELETE /api/courses/:id/square-posts/:postId/comments/:commentId/like — 取消点赞
+  router.delete('/:id/square-posts/:postId/comments/:commentId/like', authMiddleware, (req, res) => {
+    const commentId = parseInt(req.params.commentId);
+    const userId = req.user.userId;
+    const existing = db.get("SELECT id FROM comment_likes WHERE comment_type='square' AND comment_id = ? AND user_id = ?", [commentId, userId]);
+    if (!existing) return res.status(404).json({ error: '未点赞' });
+    db.run("DELETE FROM comment_likes WHERE comment_type='square' AND comment_id = ? AND user_id = ?", [commentId, userId]);
+    db.run('UPDATE square_comments SET like_count = MAX(0, like_count - 1) WHERE id = ?', [commentId]);
+    db.save();
+    const updated = db.get('SELECT like_count FROM square_comments WHERE id = ?', [commentId]);
+    res.json({ liked: false, like_count: updated?.like_count || 0 });
+  });
+
+  // GET /api/courses/:id/square-posts/:postId/comments/:commentId/replies — 楼中楼回复
+  router.get('/:id/square-posts/:postId/comments/:commentId/replies', optionalAuthMiddleware, (req, res) => {
     const commentId = Number(req.params.commentId);
-    const replies = db.all(`
-      SELECT sc.*, u.nickname AS author_name, u.avatar_url AS author_avatar_url
-      FROM square_comments sc
-      JOIN users u ON sc.author_id = u.id
-      WHERE sc.parent_id = ?
-      ORDER BY sc.created_at ASC
-    `, [commentId]);
+    const userId = req.user?.userId || null;
+    const replies = db.all(
+      `SELECT sc.*, u.nickname AS author_name, u.username AS author_username,
+              u.avatar_url AS author_avatar, u.grade AS author_grade, u.major AS author_major
+       FROM square_comments sc LEFT JOIN users u ON sc.author_id = u.id
+       WHERE sc.parent_id = ? ORDER BY sc.created_at ASC`, [commentId]);
+    if (userId && replies.length > 0) {
+      const ids = replies.map(r => r.id);
+      const ph = ids.map(() => '?').join(',');
+      const likedRows = db.all(`SELECT comment_id FROM comment_likes WHERE comment_type='square' AND comment_id IN (${ph}) AND user_id = ?`, [...ids, userId]);
+      const likedSet = new Set(likedRows.map(r => r.comment_id));
+      for (const r of replies) { r.is_liked = likedSet.has(r.id); r.like_count = r.like_count || 0; }
+    } else {
+      for (const r of replies) { r.like_count = r.like_count || 0; r.is_liked = false; }
+    }
     res.json(replies);
   });
 

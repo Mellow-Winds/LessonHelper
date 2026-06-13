@@ -512,29 +512,46 @@ Body: `{ "content", "title?", "category?" }`
 DELETE /api/explore/posts/:id
 ```
 
-### 评论列表
+### 评论列表（游标分页）
 ```
-GET /api/explore/posts/:postId/comments?page=1&pageSize=50
+GET /api/explore/posts/:postId/comments?lastCommentId=123&limit=20
 ```
-Response: `{ "items": [...], "total": 10, "page": 1, "pageSize": 50 }`
-> 评论带嵌套 `replies` 数组，支持递归楼中楼。
+Response: `{ "items": [...], "hasMore": true, "commentCount": 42 }`
+> 每个一级评论附带最多 3 条二级回复（`replies` 数组）+ `has_more_replies` / `more_reply_count`。若已登录，每条评论返回 `is_liked` 和 `like_count`。
 
 ### 发表评论 [Auth]
 ```
 POST /api/explore/posts/:postId/comments
 ```
 Body (JSON): `{ "content", "parent_id?" }`
-Body (FormData — 含图片): `content + parent_id? + image (file, ≤1MB, JPG/PNG)`
+Body (FormData — 含图片): `content + parent_id? + image (file, ≤5MB, JPG/PNG/WebP)`
+> 字数限制 200 字。支持 @提及解析，自动创建 `comment_mention` 通知。
+
+### 点赞评论 [Auth]
+```
+POST /api/explore/posts/:postId/comments/:commentId/like
+```
+Response: `{ "liked": true, "like_count": 5 }`
+
+### 取消点赞 [Auth]
+```
+DELETE /api/explore/posts/:postId/comments/:commentId/like
+```
+Response: `{ "liked": false, "like_count": 4 }`
 
 ### 删除评论 [Auth，仅作者]
 ```
 DELETE /api/explore/posts/:postId/comments/:commentId
 ```
+> 级联删除所有子回复 + 图片文件 + 点赞记录。
 
-### 获取嵌套回复
+### 互关好友列表 [Auth]
 ```
-GET /api/explore/posts/:postId/comments/:commentId/replies
+GET /api/user/friends?q=搜索词&limit=20
 ```
+Response: `{ "friends": [{ "id", "nickname", "username", "avatar_url", "grade", "major" }] }`
+> 用于 @提及选择列表。
+
 
 ---
 

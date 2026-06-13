@@ -85,7 +85,7 @@ function renderHero() {
     <section class="home-hero">
       <div class="home-hero-text">
         <div class="home-hero-brand">
-          <img src="/images/blue-whale-logo.svg" alt="">
+          <img class="brand-logo" src="/images/blue-whale-logo.png" alt="" aria-hidden="true">
           <span>课搭子</span>
         </div>
         <h1>在这里，选一门课，<br>遇见一些人。</h1>

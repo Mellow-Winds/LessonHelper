@@ -649,7 +649,7 @@ function renderTkComments(section, postId) {
   const sendBtn = document.getElementById(`comment-send-btn-${postId}`);
   const mainInput = document.getElementById(`comment-main-input-${postId}`);
   sendBtn?.addEventListener('click', () => submitTkMain(postId, section));
-  mainInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitTkMain(postId, section); });
+  mainInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitTkMain(postId, section); } });
 }
 
 async function submitTkMain(postId, section) {

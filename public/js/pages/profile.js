@@ -1591,9 +1591,8 @@ function pickImageFile(capture) {
     try {
       const compressed = await precompressImage(file);
       imageUrl = compressed.url;
-      // 保存预压缩 Blob 引用，供上传兜底
-      imageUrl._precompressedBlob = compressed.blob;
-      imageUrl._precompressed = compressed.precompressed;
+      // 保存预压缩引用（存入闭包变量，不上字符串属性）
+      window._avatarPrecompressed = { blob: compressed.blob, precompressed: compressed.precompressed };
     } catch (err) {
       showToast(err.message || '图片处理失败');
       return;
@@ -1921,10 +1920,6 @@ async function showAvatarCropper(imageUrl) {
 
       // 更新页面上的头像
       updateProfileAvatarDisplay(result.avatar_url);
-      // 更新侧边栏
-      if (typeof window.updateSidebarAvatar === 'function') {
-        window.updateSidebarAvatar();
-      }
     } catch (err) {
       saveBtn.disabled = false;
       cancelBtn.disabled = false;
@@ -2063,9 +2058,6 @@ async function resetToDefaultAvatar() {
       }
       showToast('已恢复默认头像');
       updateProfileAvatarDisplay('');
-      if (typeof window.updateSidebarAvatar === 'function') {
-        window.updateSidebarAvatar();
-      }
     } catch {
       showToast('操作失败，请重试');
     }

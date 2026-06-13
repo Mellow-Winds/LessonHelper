@@ -142,6 +142,7 @@ async function start() {
   migrateTable('courses', 'big_course_id', 'INTEGER');
   migrateTable('comments', 'parent_id', 'INTEGER');
   migrateTable('comments', 'image_url', "TEXT DEFAULT ''");
+  migrateTable('comments', 'like_count', "INTEGER DEFAULT 0");
   // square_comments/square_posts migrations moved after table creation
 
   // New table: user_courses (many-to-many enrollment)
@@ -296,6 +297,13 @@ async function start() {
   // Migrations for square_comments (must be after table creation)
   migrateTable('square_comments', 'parent_id', 'INTEGER');
   migrateTable('square_comments', 'image_url', "TEXT DEFAULT ''");
+  migrateTable('square_comments', 'like_count', "INTEGER DEFAULT 0");
+  migrateTable('explore_comments', 'like_count', "INTEGER DEFAULT 0");
+
+  // 评论相关索引（try/catch 包裹，兼容 sql.js）
+  try { db.run('CREATE INDEX IF NOT EXISTS idx_explore_comments_post ON explore_comments(post_id, parent_id)'); } catch {}
+  try { db.run('CREATE INDEX IF NOT EXISTS idx_comment_likes_type_cid ON comment_likes(comment_type, comment_id)'); } catch {}
+  try { db.run('CREATE INDEX IF NOT EXISTS idx_comment_likes_type_user ON comment_likes(comment_type, user_id, comment_id)'); } catch {}
 
   // New table: follows (关注关系)
   db.run(`CREATE TABLE IF NOT EXISTS follows (
@@ -495,6 +503,48 @@ async function start() {
     FOREIGN KEY (post_id) REFERENCES explore_posts(id) ON DELETE CASCADE,
     FOREIGN KEY (author_id) REFERENCES users(id)
   )`);
+
+  // New table: comment_likes (统一评论点赞记录，支持多表)
+  // 迁移旧表（如有）
+  try {
+    const oldTable = db.all("SELECT name FROM sqlite_master WHERE type='table' AND name='comment_likes'");
+    if (oldTable.length > 0) {
+      const info = db.all("PRAGMA table_info(comment_likes)");
+      const hasTypeCol = info.some(r => r.name === 'comment_type');
+      if (!hasTypeCol) {
+        // 重命名旧表，创建新表，迁移数据
+        db.run('ALTER TABLE comment_likes RENAME TO comment_likes_old');
+        db.run(`CREATE TABLE comment_likes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          comment_type TEXT NOT NULL DEFAULT 'explore',
+          comment_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(comment_type, comment_id, user_id)
+        )`);
+        // 迁移旧数据
+        try {
+          db.run(`INSERT OR IGNORE INTO comment_likes (id, comment_type, comment_id, user_id, created_at)
+            SELECT id, 'explore', comment_id, user_id, created_at FROM comment_likes_old`);
+        } catch (e) {
+          console.log('  ⚠ 旧数据迁移跳过:', e.message);
+        }
+        db.run('DROP TABLE comment_likes_old');
+        console.log('  ✓ 重构 comment_likes 表（多类型支持）');
+      }
+    } else {
+      db.run(`CREATE TABLE IF NOT EXISTS comment_likes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        comment_type TEXT NOT NULL DEFAULT 'explore',
+        comment_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(comment_type, comment_id, user_id)
+      )`);
+    }
+  } catch (e) {
+    console.log('  ⚠ comment_likes 迁移:', e.message);
+  }
 
   // New table: card_templates (卡片模板)
   db.run(`CREATE TABLE IF NOT EXISTS card_templates (
