@@ -14,7 +14,7 @@ window.i18nDict = {
     profile: '个人中心',
     import_schedule: '导入课程表',
     select_existing: '选择已有课程',
-    search: '搜索',
+    search: 'AI搜索',
     login: '登录',
     register: '注册',
     email: '邮箱',
