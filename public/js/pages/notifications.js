@@ -64,15 +64,22 @@ async function switchNotificationTab(tab) {
   document.querySelectorAll('#notification-pills .md-pill-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
-  await renderActiveTab();
+  await renderActiveTab(true);
 }
 
-async function renderActiveTab() {
+async function renderActiveTab(animate) {
   const content = document.getElementById('notification-tab-content');
   if (!content) return;
 
   const markAllBtn = document.getElementById('notif-mark-all-btn');
   if (markAllBtn) markAllBtn.style.display = 'none';
+
+  // 平滑切换：先淡出再替换再淡入
+  if (animate) {
+    content.style.transition = 'opacity 0.12s var(--ease-standard)';
+    content.style.opacity = '0';
+    await new Promise(r => setTimeout(r, 120));
+  }
 
   if (activeTab === 'following') {
     await renderFollowingFeed(content);
@@ -86,6 +93,10 @@ async function renderActiveTab() {
       handleNotifItemClick(Number(notifId), relatedType, Number(relatedId), Number(courseId), isRead === 'true', Number(relatedCommentId));
     });
     await loadNotifications();
+  }
+
+  if (animate) {
+    content.style.opacity = '1';
   }
 }
 

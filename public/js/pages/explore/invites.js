@@ -261,5 +261,10 @@ async function loadMyInvites(type) {
     return;
   }
 
-  if (listEl) listEl.innerHTML = renderInvitesList(invites);
+  if (listEl) {
+    listEl.innerHTML = renderInvitesList(invites);
+    // 列表出现时做交错入场动画
+    var cards = listEl.querySelectorAll('.invite-card');
+    if (cards.length > 0) animStagger(Array.from(cards), { y: 16, dur: 350, gap: 40 });
+  }
 }
