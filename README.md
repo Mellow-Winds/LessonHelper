@@ -93,6 +93,20 @@ cd LessonHelper
 - **npm** ≥ 9.x
 - 可选：Resend API Key（邮件验证码服务）
 
+### ⚠️ 安全提示
+
+仓库已完成密钥清理，所有历史包含密钥的提交已重写。**如果你之前 clone 过本项目，需要删除本地仓库重新 clone**，否则 `git push` / `git pull` 将无法正常使用。
+
+如果你有未提交的本地修改，按以下步骤迁移：
+
+1. 把改过的文件复制到仓库外面的临时文件夹
+2. 删掉旧的 `LessonHelper` 文件夹
+3. 重新 clone：`git clone git@github.com:Mellow-Winds/LessonHelper.git`
+4. 参照下方部署指南重新搭建 `.env`
+5. 把之前备份的修改手动搬回去
+
+详细的开发环境搭建步骤请参阅 [README_TEST.md](README_TEST.md)。
+
 ### 部署指南
 
 #### 1. 克隆仓库
@@ -110,15 +124,25 @@ npm install
 
 #### 3. 配置环境变量
 
-创建 `.env` 文件（可选，开发模式下不配置邮件也能运行）：
+在项目根目录创建 `.env` 文件，写入以下内容：
 
 ```env
-# Resend API Key（用于发送验证码邮件）
-RESEND_API_KEY=re_xxxxxx
+# JWT 密钥 — 执行 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 生成
+JWT_SECRET=把这里替换成你生成的64位随机密钥
 
-# JWT 密钥（不设置则使用默认值）
-JWT_SECRET=your-secret-key
+# Resend API Key（测试环境可留空，不影响核心功能）
+RESEND_API_KEY=
+
+# Cloudflare Turnstile 人机验证 — 测试密钥，本地开发直接用
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 ```
+
+> **Turnstile 测试 Key 说明：**
+> - `1x00000000000000000000AA` — Site Key（前端，always pass，visible）
+> - `1x0000000000000000000000000000000AA` — Secret Key（后端，always pass）
+> - 更多测试 Key 可参考 [Cloudflare Turnstile 文档](https://developers.cloudflare.com/turnstile/reference/testing/)
+> - 生产环境请替换为正式密钥
 
 #### 4. 启动服务
 

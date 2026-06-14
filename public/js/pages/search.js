@@ -29,7 +29,7 @@ function renderHeroState() {
     <div class="search-hero" id="search-hero">
       <div class="search-hero-inner">
         <div class="search-hero-brand">
-          <img src="/images/blue-whale-logo.svg" alt="" aria-hidden="true" style="width:28px;height:28px">
+          <img src="/images/blue-whale-logo.png" alt="" aria-hidden="true" style="height:28px">
           <span>课搭子 AI搜索</span>
         </div>
         <h2 class="search-hero-title">AI智能搜索，一步到位</h2>

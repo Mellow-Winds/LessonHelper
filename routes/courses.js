@@ -197,10 +197,11 @@ module.exports = function (db) {
     const courses = db.all(`
       SELECT c.*,
         (SELECT COUNT(*) FROM user_courses uc
-         JOIN courses c2 ON uc.course_id = c2.id
-         WHERE c2.big_course_id = c.id) AS enrollment_count
+         WHERE uc.course_id = c.id
+            OR uc.course_id IN (SELECT c2.id FROM courses c2 WHERE c2.big_course_id = c.id)
+        ) AS enrollment_count
       FROM courses c
-      WHERE c.big_course_id IS NULL AND (c.description = '' OR c.description IS NULL)
+      WHERE c.big_course_id IS NULL
       ORDER BY c.title ASC
     `);
     res.json(courses);
@@ -249,12 +250,12 @@ module.exports = function (db) {
     if (!course) return res.status(404).json({ error: '课程不存在' });
 
     // 判断是大课还是小课
-    const isBig = !course.big_course_id && (!course.description || course.description === '');
+    const isBig = !course.big_course_id;
     if (isBig) {
-      // 大课：enrollment_count = 所有小课的选课人数总和
+      // 大课：enrollment_count = 直接选课 + 所有小课的选课人数总和
       const count = db.get(
-        'SELECT COUNT(*) AS cnt FROM user_courses uc JOIN courses c ON uc.course_id = c.id WHERE c.big_course_id = ?',
-        [courseId]
+        'SELECT COUNT(*) AS cnt FROM user_courses uc WHERE uc.course_id = ? OR uc.course_id IN (SELECT c2.id FROM courses c2 WHERE c2.big_course_id = ?)',
+        [courseId, courseId]
       );
       course.enrollment_count = count ? count.cnt : 0;
     } else {
