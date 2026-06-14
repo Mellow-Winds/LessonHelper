@@ -9,7 +9,7 @@
 ## 一、认证与鉴权
 
 ### 1.1 JWT Secret 硬编码回退值
-- **现状**: `routes/middleware/auth.js:4` — `process.env.JWT_SECRET || 'kedazi_jwt_secret_2026'`
+- **现状**: `routes/middleware/auth.js:4` — `process.env.JWT_SECRET || 'JWT_SECRET_PLACEHOLDER'`
 - **风险**: 生产环境若未设置环境变量，所有 token 使用同一密钥。攻击者可直接用该密钥伪造任意用户 token。
 - **建议**: 启动时检查 `JWT_SECRET` 是否存在，不存在则拒绝启动并打印错误。密钥至少 32 字节随机字符串。
 
