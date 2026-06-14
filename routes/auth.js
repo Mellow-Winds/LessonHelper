@@ -154,6 +154,12 @@ module.exports = function (db) {
       return { ok: false, error: '系统出现未知错误，请在看到此消息后及时反馈' };
     }
 
+    // 测试密钥：跳过 Cloudflare API 调用，直接放行（便于本地开发）
+    if (TURNSTILE_SECRET_KEY === '1x0000000000000000000000000000000AA') {
+      console.log('[Auth] Turnstile 测试密钥，跳过云端验证');
+      return { ok: true };
+    }
+
     try {
       const formData = new URLSearchParams();
       formData.append('secret', TURNSTILE_SECRET_KEY);
@@ -234,6 +240,27 @@ module.exports = function (db) {
       const turnstileResult = await verifyTurnstile(turnstileToken, clientIp);
       if (!turnstileResult.ok) {
         return res.status(403).json({ error: turnstileResult.error });
+      }
+
+      // 测试密钥：跳过邮件验证码，直接创建用户并返回 token
+      if (TURNSTILE_SECRET_KEY === '1x0000000000000000000000000000000AA') {
+        const passwordHash = bcrypt.hashSync(password, SALT_ROUNDS);
+        const nickname = generateNickname(studentId);
+        const username = email;
+
+        db.run(
+          `INSERT INTO users (username, display_name, email, password_hash, nickname, email_verified)
+           VALUES (?, ?, ?, ?, ?, 1)`,
+          [username, nickname, email, passwordHash, nickname]
+        );
+        db.save();
+
+        const newUser = db.get('SELECT * FROM users WHERE email = ?', [email]);
+        const token = generateToken(newUser);
+        const { password_hash, ...safeUser } = newUser;
+
+        console.log(`[Auth] 测试密钥注册成功（跳过邮件验证）: ${email}`);
+        return res.status(201).json({ token, user: safeUser });
       }
 
       // 限流检查
