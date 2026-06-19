@@ -274,6 +274,9 @@ window.togglePasswordVisibility = function(btn) {
 // Turnstile Site Key — 从 /env.js 注入，详见 .env 配置
 const TURNSTILE_SITE_KEY = window.ENV?.TURNSTILE_SITE_KEY || '';
 
+// 跟踪当前活跃的 Turnstile widget ID，用于清理幽灵实例
+let _activeTurnstileId = null;
+
 function loadTurnstile() {
   // 如果 Turnstile 脚本未加载，动态加载
   if (!window.turnstile) {
@@ -302,10 +305,15 @@ function renderTurnstile() {
     return;
   }
 
+  // 清理旧 widget，防止 SPA 路由切换时幽灵实例冲突
+  if (_activeTurnstileId) {
+    try { window.turnstile.remove(_activeTurnstileId); } catch (e) {}
+    _activeTurnstileId = null;
+  }
   container.innerHTML = '';
 
   try {
-    window.turnstile.render(container, {
+    const widgetId = window.turnstile.render(container, {
       sitekey: TURNSTILE_SITE_KEY,
       callback: (token) => {
         turnstileToken = token;
@@ -324,6 +332,7 @@ function renderTurnstile() {
         showToast('系统出现未知错误，请在看到此消息后及时反馈');
       },
     });
+    _activeTurnstileId = widgetId;
   } catch (e) {
     console.error('[Turnstile] 渲染失败:', e);
     showToast('系统出现未知错误，请在看到此消息后及时反馈');
@@ -398,10 +407,15 @@ function renderLoginTurnstile() {
     return;
   }
 
+  // 清理旧 widget，防止 SPA 路由切换时幽灵实例冲突
+  if (_activeTurnstileId) {
+    try { window.turnstile.remove(_activeTurnstileId); } catch (e) {}
+    _activeTurnstileId = null;
+  }
   container.innerHTML = '';
 
   try {
-    window.turnstile.render(container, {
+    const widgetId = window.turnstile.render(container, {
       sitekey: TURNSTILE_SITE_KEY,
       callback: (token) => {
         // Turnstile 验证成功，发送登录请求
@@ -419,6 +433,7 @@ function renderLoginTurnstile() {
         resetLoginBtn();
       },
     });
+    _activeTurnstileId = widgetId;
   } catch (e) {
     console.error('[Turnstile] 渲染失败:', e);
     showToast('系统出现未知错误，请在看到此消息后及时反馈');
@@ -533,10 +548,15 @@ function renderForgotTurnstile() {
     return;
   }
 
+  // 清理旧 widget，防止 SPA 路由切换时幽灵实例冲突
+  if (_activeTurnstileId) {
+    try { window.turnstile.remove(_activeTurnstileId); } catch (e) {}
+    _activeTurnstileId = null;
+  }
   container.innerHTML = '';
 
   try {
-    window.turnstile.render(container, {
+    const widgetId = window.turnstile.render(container, {
       sitekey: TURNSTILE_SITE_KEY,
       callback: (token) => {
         onForgotTurnstileSuccess(token);
@@ -549,6 +569,7 @@ function renderForgotTurnstile() {
         showToast('系统出现未知错误，请在看到此消息后及时反馈');
       },
     });
+    _activeTurnstileId = widgetId;
   } catch (e) {
     console.error('[Turnstile] 渲染失败:', e);
     showToast('系统出现未知错误，请在看到此消息后及时反馈');

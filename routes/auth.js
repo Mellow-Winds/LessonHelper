@@ -175,7 +175,7 @@ module.exports = function (db) {
       const data = await response.json();
 
       if (!data.success) {
-        console.error('[Auth] Turnstile 验证失败:', data);
+        console.error('[Auth] Turnstile 验证失败:', JSON.stringify(data));
         return { ok: false, error: '系统出现未知错误，请在看到此消息后及时反馈' };
       }
 
