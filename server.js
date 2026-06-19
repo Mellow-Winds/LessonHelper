@@ -52,7 +52,10 @@ class Database {
 
 // --- Init ---
 async function start() {
-  const SQL = await initSqlJs();
+  const SQL = await initSqlJs({
+    // 显式指定 WASM 文件路径，防止生产环境中找不到 WASM 文件
+    locateFile: file => path.join(__dirname, 'node_modules', 'sql.js', 'dist', file)
+  });
 
   fs.mkdirSync(path.join(__dirname, 'db'), { recursive: true });
   fs.mkdirSync(path.join(__dirname, 'uploads', 'materials'), { recursive: true });
